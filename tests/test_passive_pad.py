@@ -74,5 +74,18 @@ def test_passive_pad_operational_mode():
     assert h_detector.operational_mode == "HEURISTIC"
     
     o_detector = PassivePADDetector(mode=PADMode.ONNX_ONLY, onnx_model_path="non_existent_model.onnx")
-    # Non existent model returns MODEL mode property, but falls back gracefully during evaluation
     assert o_detector.operational_mode == "MODEL"
+
+
+def test_passive_pad_onnx_only_missing_model_safe_failure():
+    """Verifies that ONNX_ONLY fails safely with PROCESSING_ERROR when no model file exists."""
+    detector = PassivePADDetector(mode=PADMode.ONNX_ONLY, onnx_model_path="non_existent_model.onnx")
+    frame = np.full((480, 640, 3), 120, dtype=np.uint8)
+    face_box = (200, 150, 180, 180)
+    result = detector.evaluate_passive_liveness(frame, face_box)
+
+    assert result.verdict == PADVerdict.PROCESSING_ERROR
+    assert result.is_live is False
+    assert result.mode_used == "MODEL_UNAVAILABLE"
+    assert "error" in result.details
+    assert result.processing_time_ms >= 0.0

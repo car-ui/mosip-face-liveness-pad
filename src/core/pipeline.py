@@ -234,6 +234,15 @@ class LivenessPipeline:
 
             # 1. Definite Presentation Attack -> REJECT immediately
             if pad_result.verdict == PADVerdict.PRESENTATION_ATTACK:
+                meta = pad_result.model_metadata
+                meta_dict = {
+                    "backend": meta.backend_name if meta else "heuristic_multi_cue",
+                    "version": meta.version if meta else "v1.2.0-heuristic",
+                    "hash": meta.model_hash if meta else "N/A",
+                    "provider": meta.inference_provider if meta else "CPU",
+                    "mode": pad_result.mode_used,
+                    "processing_time_ms": pad_result.processing_time_ms
+                }
                 self.audit_logger.log_event(
                     AuditEventType.PAD_ATTACK_DETECTED,
                     session_id=self.session_id,
@@ -241,7 +250,8 @@ class LivenessPipeline:
                     details={
                         "attack_type": pad_result.attack_type,
                         "liveness_score": pad_result.liveness_score,
-                        "mode": pad_result.mode_used
+                        "mode": pad_result.mode_used,
+                        "model_provenance": meta_dict
                     }
                 )
 
@@ -307,11 +317,24 @@ class LivenessPipeline:
                     self.state = PipelineState.CAPTURE_SUCCESS
                     self._captured_biometric = bgr.copy()
                     
+                    meta = pad_result.model_metadata
+                    meta_dict = {
+                        "backend": meta.backend_name if meta else "heuristic_multi_cue",
+                        "version": meta.version if meta else "v1.2.0-heuristic",
+                        "hash": meta.model_hash if meta else "N/A",
+                        "provider": meta.inference_provider if meta else "CPU",
+                        "mode": pad_result.mode_used,
+                        "processing_time_ms": pad_result.processing_time_ms
+                    }
                     self.audit_logger.log_event(
                         AuditEventType.CAPTURE_SUCCESS,
                         session_id=self.session_id,
                         workflow=self.workflow.value,
-                        details={"path": "PASSIVE_DIRECT", "score": rolling_score}
+                        details={
+                            "path": "PASSIVE_DIRECT",
+                            "score": rolling_score,
+                            "model_provenance": meta_dict
+                        }
                     )
                     return PipelineStepResult(
                         state=self.state,
@@ -434,11 +457,24 @@ class LivenessPipeline:
                     self.state = PipelineState.CAPTURE_SUCCESS
                     self._captured_biometric = bgr.copy()
                     
+                    meta = self.pad_detector.operational_mode
+                    meta_obj = self.pad_detector._onnx_backend.get_metadata() if self.pad_detector.operational_mode == "MODEL" else self.pad_detector._heuristic_backend.get_metadata()
+                    meta_dict = {
+                        "backend": meta_obj.backend_name,
+                        "version": meta_obj.version,
+                        "hash": meta_obj.model_hash,
+                        "provider": meta_obj.inference_provider,
+                        "mode": self.pad_detector.operational_mode
+                    }
                     self.audit_logger.log_event(
                         AuditEventType.CAPTURE_SUCCESS,
                         session_id=self.session_id,
                         workflow=self.workflow.value,
-                        details={"path": "ACTIVE_CHALLENGES_VERIFIED"}
+                        details={
+                            "path": "ACTIVE_CHALLENGES_VERIFIED",
+                            "challenges": [c.value for c in self.challenge_manager.completed_challenges],
+                            "model_provenance": meta_dict
+                        }
                     )
 
                     return PipelineStepResult(

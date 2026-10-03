@@ -43,6 +43,7 @@ flowchart TD
         CM[ChallengeManager: Cryptographic Dynamic Selection & Timeouts]
         ALog[BiometricAuditLogger: Privacy-Preserving JSON Telemetry]
         UPD[SecureModelUpdateManager: SHA-256 / HMAC / Atomic Swap]
+        REM[ResidentEnrollmentManager: Lightweight Registration & Privacy]
         SM[Master LivenessPipeline State Machine: 14 States]
     end
 
@@ -64,6 +65,7 @@ flowchart TD
     SM --> AL
     SM --> CM
     SM --> ALog
+    SM --> REM
     UPD --> PAD
 
     SM --> MDS
@@ -211,3 +213,53 @@ Structured JSON events record session tokens and metrics while strictly omitting
 ```json
 {"eventId": "4323a378-bc4d-498b-a223-991edc13ceff", "timestamp": 1791015209.412, "isoTimestamp": "2026-10-03T08:13:29Z", "eventType": "PAD_ATTACK_DETECTED", "sessionId": "9db483b1-3120-4bdf-a8c3-6dbd632d5047", "workflow": "RESIDENT_REGISTRATION", "details": {"attack_type": "SCREEN_REPLAY", "liveness_score": 0.38, "mode": "HEURISTIC", "model_version": "v1.2.0-heuristic"}}
 ```
+
+---
+
+## 9. Lightweight Resident Enrollment & Strict Privacy Architecture
+
+To meet MOSIP's real-world registration station operational requirements without introducing bloat (such as user databases, password management, or web-app sessions), the subsystem incorporates a lightweight, focused biometric enrollment manager:
+
+```
+┌────────────────────────────────────────────────────────┐
+│             RESIDENT ENROLLMENT LIFECYCLE              │
+└────────────────────────────────────────────────────────┘
+                          START
+                            │
+                            ▼
+                    [ Enter/Generate ID ] (RES-00123)
+                            │
+                            ▼
+                    [ Face Positioning ] (ISO 19794-5 Quality Check)
+                            │
+                            ▼
+                  [ Liveness Verification ]
+                            │
+             ┌──────────────┴──────────────┐
+             ▼                             ▼
+       BONA_FIDE_LIVE                  UNCERTAIN
+             │                             │
+             │                             ▼
+             │                     [ Active Challenge ]
+             │                             │
+             └──────────────┬──────────────┘
+                            │ Pass
+                            ▼
+                   [ ENROLLMENT SUCCESS ]
+            (Cryptographic Biometric Token SHA-256)
+```
+
+### Core Architecture Components
+1. **`ResidentEnrollmentManager` (`src/core/enrollment.py`)**:
+   * Tracks dynamic enrollment states: `READY`, `POSITIONING`, `LIVENESS_CHECK`, `ENROLLED`, `REJECTED`, `FAILED`.
+   * Manages predictable `RES-XXXXX` identifier token sequences (with custom override support via CLI flag `--resident-id` or interactive hotkey `'n'`).
+   * Provides 3-step checklist status for desktop UI HUD overlays:
+     * `Step 1: Position Face`
+     * `Step 2: Liveness Check`
+     * `Step 3: Enrolled`
+
+2. **Strict Data Privacy & Zero Biometric Persistence**:
+   * **Ephemeral In-Memory Processing**: Captured camera frames exist solely in volatile memory during pipeline processing and are discarded immediately upon frame cycle completion.
+   * **No Raw Image Storage**: Neither the audit logs nor the `ResidentEnrollmentRecord` store raw pixel arrays, JPEG/PNG files, or face crops.
+   * **Cryptographic Biometric Token Hashing**: Upon successful enrollment, the system generates an ISO/IEC 19794-5-aligned representation and computes a SHA-256 digest (`token_hash = sha256(biometric_payload)`). Downstream MOSIP registration services verify and match against this hash without exposing raw biometric imagery to the local filesystem.
+

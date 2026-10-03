@@ -28,17 +28,33 @@ class ModelUpdatePackage:
     metadata: Optional[Dict[str, Any]] = None
 
 
+# Explicitly labeled development/test signing key fixture (NOT for production use)
+DEFAULT_DEV_TEST_KEY = b"DEV_INSECURE_TEST_KEY_FOR_LOCAL_EVALUATION_ONLY"
+
+
 class SecureModelUpdateManager:
     """
     Manages secure, offline deployment of biometric model weight updates.
     Ensures that corrupted, unverified, or downgraded models cannot be installed.
+    Production Architecture Note:
+    In production MOSIP deployments, model payloads are signed by the MOSIP Root Authority
+    using asymmetric PKI (e.g. RSA-4096 / ECDSA P-384) or hardware KMS/HSM modules.
+    For offline testing, symmetric HMAC-SHA256 with key injection via environment variable
+    MOSIP_MODEL_SIGNING_KEY or explicit parameter is supported.
     """
 
     def __init__(self,
                  models_directory: str,
-                 signing_key: bytes = b"MOSIP_DECODE_SECURE_OFFLINE_KEY_2026"):
+                 signing_key: Optional[bytes] = None):
         self.models_directory = models_directory
-        self.signing_key = signing_key
+        env_key = os.environ.get("MOSIP_MODEL_SIGNING_KEY")
+        if signing_key is not None:
+            self.signing_key = signing_key
+        elif env_key:
+            self.signing_key = env_key.encode("utf-8")
+        else:
+            self.signing_key = DEFAULT_DEV_TEST_KEY
+
         os.makedirs(self.models_directory, exist_ok=True)
 
     @staticmethod

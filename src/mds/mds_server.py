@@ -10,6 +10,7 @@ Conforms to the MOSIP Device Service (MDS) REST architecture:
 
 import base64
 import time
+import hashlib
 import cv2
 import numpy as np
 from fastapi import FastAPI, Response, HTTPException, status
@@ -18,7 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 
-from ..devices.base import FaceCaptureDevice, DeviceType, DeviceStatus, MockScenario
+from ..devices.base import FaceCaptureDevice, DeviceType, DeviceStatus, MockScenario, VendorL1Adapter
 from ..devices.webcam_device import WebcamCaptureDevice
 from ..devices.mock_l0_device import MockL0Device
 from ..core.pipeline import LivenessPipeline, PipelineState, LivenessDecision
@@ -48,6 +49,7 @@ ui_renderer = DesktopRegistrationClient(use_mock_device=True)
 
 class CaptureRequest(BaseModel):
     workflow: str = Field(default="RESIDENT_REGISTRATION", description="RESIDENT_REGISTRATION, OPERATOR_AUTHENTICATION, or SUPERVISOR_AUTHENTICATION")
+    resident_id: Optional[str] = Field(default=None, description="Resident identifier for registration workflow (e.g. RES-00123)")
     timeout_seconds: int = Field(default=15, ge=2, le=60, description="Session timeout in seconds")
 
 
@@ -128,10 +130,14 @@ def index_page():
                         <option value="SUPERVISOR_AUTHENTICATION">Supervisor Authentication</option>
                     </select>
 
+                    <div class="section-title">Resident ID (Enrollment)</div>
+                    <input type="text" id="resIdInput" value="RES-00123" style="width: 95%; padding: 8px; background: #0f1117; border: 1px solid #3a4250; color: #fff; border-radius: 6px; margin-bottom: 12px; font-weight: 600;">
+
                     <div class="section-title">Device Source</div>
                     <button class="btn btn-secondary" onclick="switchDevice('MOCK', 'BONA_FIDE_LIVE')">Mock Simulator (Live Face)</button>
                     <button class="btn btn-secondary" onclick="switchDevice('MOCK', 'STATIC_PHOTO_ATTACK')">Mock Simulator (Photo Spoof)</button>
                     <button class="btn btn-secondary" onclick="switchDevice('WEBCAM', '')">Switch to Live Webcam L0</button>
+                    <button class="btn btn-secondary" onclick="switchDevice('L1', '')">Switch to Vendor L1 Adapter (Simulated)</button>
 
                     <div class="section-title" style="margin-top: 14px;">Biometric Capture</div>
                     <button class="btn btn-primary" onclick="triggerCapture()">Trigger POST /capture</button>
@@ -144,6 +150,10 @@ def index_page():
                     <div class="metric-box">
                         <div class="metric-label">Decision</div>
                         <div class="metric-val" id="resDecision" style="font-size: 13px; color: #fff;">-</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-label">Enrollment Record</div>
+                        <div class="metric-val" id="resEnroll" style="font-size: 13px; color: #fff;">-</div>
                     </div>
                 </div>
             </div>
@@ -159,17 +169,19 @@ def index_page():
             }
             async function triggerCapture() {
                 const wf = document.getElementById('wfSelect').value;
+                const residentId = document.getElementById('resIdInput').value;
                 document.getElementById('resStatus').innerText = 'Capturing...';
                 document.getElementById('resStatus').style.color = '#ff9800';
                 try {
                     const res = await fetch('/capture', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({workflow: wf, timeout_seconds: 15})
+                        body: JSON.stringify({workflow: wf, resident_id: residentId, timeout_seconds: 15})
                     });
                     const data = await res.json();
                     document.getElementById('resStatus').innerText = data.responseStatus;
                     document.getElementById('resDecision').innerText = data.decision || data.reason || 'Completed';
+                    document.getElementById('resEnroll').innerText = (data.residentId ? data.residentId + ' [' + (data.enrollmentStatus || 'DONE') + ']' : '-');
                     if (data.responseStatus === 'SUCCESS') {
                         document.getElementById('resStatus').style.color = '#00e676';
                     } else {
@@ -190,24 +202,31 @@ def index_page():
 def get_device_info():
     """
     MOSIP Device Discovery endpoint (/info).
-    Reports device specification, serial number, and certification level.
+    Reports device hardware specifications, capabilities, and security level.
     """
     info = device.get_device_info()
+    caps = device.get_capabilities()
     return {
         "deviceId": info.device_id,
         "deviceSubId": [1],
         "deviceStatus": info.status.value,
         "deviceType": info.device_type.value,
+        "vendor": caps.vendor,
+        "model": caps.model,
+        "firmware": info.firmware_version,
+        "serialNumber": info.serial_number,
         "certification": "L1" if info.is_l1_secure else "L0",
+        "securityLevel": caps.security_level,
         "serviceVersion": "MDS_1.3.0",
         "specVersion": "MOSIP_MDS_0.9.5",
         "purpose": ["REGISTRATION", "AUTH"],
-        "firmware": info.firmware_version,
-        "serialNumber": info.serial_number,
+        "supportedCaptureModes": caps.supported_capture_modes,
+        "supportedResolutions": caps.supported_resolutions,
         "livenessCapability": {
-            "passivePAD": True,
+            "passivePAD": caps.liveness_capabilities.get("passive_pad", True),
             "padOperationalMode": pipeline.pad_detector.operational_mode,
             "activeChallenges": ["BLINK", "SMILE", "TURN_LEFT", "TURN_RIGHT"],
+            "hardwareLiveness": caps.liveness_capabilities.get("hardware_liveness", False),
             "offlineCapable": True
         }
     }
@@ -215,11 +234,14 @@ def get_device_info():
 
 @app.post("/switch-device")
 def switch_device(req: DeviceSwitchRequest):
-    """Switch between Physical Webcam (L0) and Mock L0 Simulator."""
+    """Switch between Physical Webcam (L0), Vendor L1 Adapter, and Mock L0 Simulator."""
     global device
     device.disconnect()
-    if req.device_mode.upper() == "WEBCAM":
+    mode = req.device_mode.upper()
+    if mode == "WEBCAM":
         device = WebcamCaptureDevice(0)
+    elif mode in ("L1", "L1_VENDOR", "VENDOR_L1"):
+        device = VendorL1Adapter()
     else:
         try:
             scenario_enum = MockScenario(req.scenario)
@@ -318,14 +340,20 @@ def capture_biometric(request: CaptureRequest):
         if result.state == PipelineState.CAPTURE_SUCCESS:
             _, buffer = cv2.imencode('.jpg', result.captured_face_image)
             img_b64 = base64.b64encode(buffer).decode('utf-8')
+            token_hash = hashlib.sha256(result.captured_face_image.tobytes()).hexdigest()
+            meta = result.pad_result.model_metadata if result.pad_result else None
             
             return {
                 "responseStatus": "SUCCESS",
                 "decision": result.decision.value,
+                "residentId": request.resident_id or "RES-00123",
+                "enrollmentStatus": "COMPLETED" if wf == WorkflowType.RESIDENT_REGISTRATION else "AUTHENTICATED",
                 "biometrics": [{
                     "specVersion": "ISO_19794_5",
+                    "specFormat": "ISO/IEC 19794-5-aligned representation (Application JPEG/Base64)",
                     "data": img_b64,
                     "mimeType": "image/jpeg",
+                    "tokenHash": token_hash,
                     "livenessVerified": True,
                     "passiveConfidence": result.pad_result.liveness_score if result.pad_result else 0.92,
                     "presentationAttackDetected": False
@@ -334,7 +362,13 @@ def capture_biometric(request: CaptureRequest):
                     "totalDurationSeconds": round(time.time() - start_time, 2),
                     "challengesCompleted": [c.value for c in pipeline.challenge_manager.completed_challenges],
                     "workflow": wf.value,
-                    "padMode": result.pad_result.mode_used if result.pad_result else "HEURISTIC"
+                    "padMode": result.pad_result.mode_used if result.pad_result else "HEURISTIC",
+                    "modelProvenance": {
+                        "backend": meta.backend_name if meta else "heuristic_multi_cue",
+                        "version": meta.version if meta else "v1.2.0-heuristic",
+                        "modelHash": meta.model_hash if meta else "N/A",
+                        "provider": meta.inference_provider if meta else "CPU"
+                    }
                 }
             }
 
@@ -344,6 +378,8 @@ def capture_biometric(request: CaptureRequest):
                 content={
                     "responseStatus": "FAILURE",
                     "decision": result.decision.value,
+                    "residentId": request.resident_id or "RES-00123",
+                    "enrollmentStatus": "REJECTED" if result.state == PipelineState.ATTACK_REJECTED else "FAILED",
                     "reason": result.status_text,
                     "detailedGuidance": result.detailed_guidance,
                     "attackType": result.pad_result.attack_type if result.pad_result else "UNKNOWN",

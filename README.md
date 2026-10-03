@@ -1,6 +1,6 @@
 # MOSIP Face Liveness Detection and Presentation Attack Detection (Decode 2026 - Problem 04)
 
-[![Tests: 54 Passed](https://img.shields.io/badge/Tests-54%20Passed-brightgreen.svg)]()
+[![Tests: 61 Passed](https://img.shields.io/badge/Tests-61%20Passed-brightgreen.svg)]()
 [![Platform: Offline-First](https://img.shields.io/badge/Architecture-100%25%20Offline-blue.svg)]()
 [![Standard: ISO/IEC 30107 & 19794-5 Aligned](https://img.shields.io/badge/Standards-ISO%2FIEC%2030107%20%7C%2019794--5-orange.svg)]()
 [![Python: 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg)]()
@@ -14,24 +14,29 @@ A robust, enterprise-grade, hardware-agnostic solution for **Face Liveness Detec
 
 ## 🚀 Key Architectural Highlights
 
-1. **Modular Passive PAD Engine (ISO/IEC 30107 Aligned)**:
-   * **Pluggable ONNX Inference Interface**: Allows dropping in pre-trained ONNX liveness models (`.onnx`) with zero code modifications.
+1. **Lightweight Resident Enrollment Experience & Strict Data Privacy**:
+   * **Predictable Resident ID Tracking**: Generates or accepts standard `RES-XXXXX` tokens via `ResidentEnrollmentManager`.
+   * **Live 3-Step Dynamic HUD Checklist**: Guides residents intuitively through `1. Position Face` $\rightarrow$ `2. Liveness Check` $\rightarrow$ `3. Enrolled`.
+   * **Strict Data Privacy**: Verifies liveness purely in ephemeral memory; enrollment records and structured audit logs store strictly zero raw facial images or pixel arrays, retaining only cryptographic SHA-256 biometric token hashes.
+
+2. **Modular Passive PAD Engine (ISO/IEC 30107 Aligned)**:
+   * **Pluggable ONNX Inference Interface**: Allows dropping in pre-trained ONNX liveness models (`.onnx`) with zero code modifications; safe fallback in `ONNX_ONLY` mode when models are missing.
    * **Deterministic Multi-Cue Heuristic Fallback**: Analyzes 2D Discrete Fourier Transform (DFT) high-frequency moiré harmonics, YCrCb/HSV chrominance distribution, specular glass/screen reflection glare, and Sobel micro-texture gradient depth.
    * **Calibrated Confidence**: Computes dispersion across cues and exposes a 4-way verdict: `BONA_FIDE_LIVE`, `UNCERTAIN`, `PRESENTATION_ATTACK`, or `PROCESSING_ERROR`.
-   * **Operational Mode Transparency**: Never fakes deep-learning inference; explicitly signals `operational_mode` (`MODEL` or `HEURISTIC`) in results and audit logs.
+   * **Operational Mode Transparency**: Never fakes deep-learning inference; explicitly signals `operational_mode` (`MODEL` or `HEURISTIC`) and model provenance with millisecond runtime timers in results and audit logs.
 
-2. **Clean Hybrid Decision Logic**:
+3. **Clean Hybrid Decision Logic**:
    * `BONA_FIDE_LIVE` $\rightarrow$ Proceed to `CAPTURE_SUCCESS` directly if temporal stability holds.
    * `UNCERTAIN` $\rightarrow$ Escalate to interactive `ACTIVE_CHALLENGE` to resolve ambiguity.
    * `PRESENTATION_ATTACK` $\rightarrow$ Immediate rejection (`ATTACK_REJECTED`); definite attacks are blocked without escalating to active challenges.
    * `PROCESSING_ERROR` $\rightarrow$ Non-punitive user guidance and retry cooldown.
 
-3. **Temporal Consistency Window (`TemporalLivenessBuffer`)**:
+4. **Temporal Consistency Window (`TemporalLivenessBuffer`)**:
    * Evaluates rolling weighted confidence, min/max score bounds, variance, and micro-motion trajectory across a configurable sliding frame window (default: 15–25 frames).
    * Prevents single aberrant frames from triggering false accepts or false rejections.
    * Detects completely frozen/static presentation attacks (zero micro-motion variance).
 
-4. **Dynamic Unpredictable Active Challenges**:
+5. **Dynamic Unpredictable Active Challenges**:
    * **Cryptographically Unpredictable**: Dynamic selection using `secrets.SystemRandom()` with non-repeating memory pool.
    * **Temporal State Machines**:
      * **Blink**: Strict three-phase `OPEN -> CLOSED -> OPEN` Eye Aspect Ratio (EAR) sequence with duration validation.
@@ -39,31 +44,31 @@ A robust, enterprise-grade, hardware-agnostic solution for **Face Liveness Detec
      * **Head Turn**: Temporal yaw progression (`CENTER -> TURN -> CENTER`) using Perspective-n-Point (SolvePnP) 3D head pose estimation.
    * **Anti-Replay Protection**: Rejects static photos and non-responsive replays.
 
-5. **L0/L1 Multi-Vendor Device Abstraction**:
+6. **L0/L1 Multi-Vendor Device Abstraction**:
    * Clear inheritance hierarchy: `BaseBiometricDevice` $\rightarrow$ `L0Device` (`WebcamCaptureDevice`, `MockL0Device`) & `L1Device` (`VendorL1Adapter`).
    * **Capability Discovery (`DeviceCapabilities`)**: Structured query of supported capture modes, resolutions, security level, and hardware capabilities.
    * **Comprehensive Scenario Simulator (`MockL0Device`)**: Reproducibly simulates 10 critical operational conditions for automated CI/CD:
      * `BONA_FIDE_LIVE`, `STATIC_PHOTO_ATTACK`, `SCREEN_REPLAY_ATTACK`, `NO_FACE`, `MULTIPLE_FACES`, `POOR_LIGHTING_DARK`, `POOR_LIGHTING_BRIGHT`, `POOR_LIGHTING_UNEVEN`, `BLURRY_FRAME`, `DEVICE_DISCONNECT`, `INVALID_FRAME`.
      * Supports programmable scripted actions (`BLINK`, `SMILE`, `TURN_LEFT`, `TURN_RIGHT`).
 
-6. **Model Versioning & Hardware Acceleration**:
+7. **Model Versioning & Hardware Acceleration**:
    * `ModelMetadata`: Every PAD decision is traceable to backend name, model version, SHA-256 cryptographic hash, input dimensions, inference provider, and threshold.
    * Automatic execution provider discovery via `onnxruntime.get_available_providers()` prioritizing CUDA, DirectML, OpenVINO, and CPU.
 
-7. **Secure Offline Model Updates (`SecureModelUpdateManager`)**:
+8. **Secure Offline Model Updates (`SecureModelUpdateManager`)**:
    * Model update package verification: SHA-256 integrity, HMAC-SHA256 signature verification, strict semantic version progression (anti-downgrade), atomic POSIX/Windows filesystem replacement, and automatic rollback on failure.
 
-8. **Multi-Workflow Policy Engine**:
+9. **Multi-Workflow Policy Engine**:
    * **Resident Registration**: Low-friction passive evaluation ($0.80$ threshold) with automatic active challenge escalation on uncertainty.
    * **Operator Authentication**: High-security threshold ($0.88$) with 1 mandatory challenge and tight timeouts.
    * **Supervisor Authentication**: Maximum security ($0.92$) requiring 2 sequential multi-challenges for biometric override.
 
-9. **MOSIP Device Service (MDS) REST & MJPEG Service**:
-   * Compliant with MOSIP Device Service architectural patterns on `http://127.0.0.1:4501/`.
-   * Standard endpoints: `/info` (device discovery), `/stream` (live MJPEG overlay), `/capture` (biometric token generation with ISO 19794-5 packaging), `/configure` (runtime threshold updates), and `/switch-device`.
-   * Full Pydantic request/response schema validation with standard HTTP error codes (`400`, `408`, `503`).
+10. **MOSIP Device Service (MDS) REST & MJPEG Service**:
+    * Compliant with MOSIP Device Service architectural patterns on `http://127.0.0.1:4501/`.
+    * Standard endpoints: `/info` (device discovery), `/stream` (live MJPEG overlay), `/capture` (biometric token generation with ISO 19794-5 packaging), `/configure` (runtime threshold updates), and `/switch-device`.
+    * Full Pydantic request/response schema validation with standard HTTP error codes (`400`, `408`, `503`).
 
-10. **Security & Privacy Protections**:
+11. **Security & Privacy Protections**:
     * **Safe Error Taxonomy**: Clear separation between internal diagnostics (`SCREEN_REPLAY_DETECTED`, `MOIRE_HARMONICS_DETECTED`) and safe user-facing instructions (`"Face verification could not be completed. Please position your face and try again."`) to prevent reverse-engineering of PAD thresholds.
     * **Zero Raw Biometric Logging**: Structured JSON audit logger (`BiometricAuditLogger`) logs UUID session tokens, timestamps, and detection metrics, while strictly omitting raw facial imagery.
     * **100% Offline Execution**: Zero external telemetry, cloud APIs, or outbound connections.
@@ -74,6 +79,7 @@ A robust, enterprise-grade, hardware-agnostic solution for **Face Liveness Detec
 
 | Component / Deliverable | Status | Nature of Implementation |
 | :--- | :--- | :--- |
+| **Resident Biometric Enrollment** | **REAL** | Lightweight enrollment manager (`RES-XXXXX`), live 3-step HUD checklist, zero raw image retention |
 | **Physical L0 Webcam Capture** | **REAL** | OpenCV / UVC hardware camera stream capture with DirectShow acceleration |
 | **ISO 19794-5 Quality Assessor** | **REAL** | Laplacian variance blur filter, mean luminance check, centering oval, single-face validation |
 | **Multi-Cue Heuristic PAD** | **REAL** | 2D Discrete Fourier Transform moiré detection, YCrCb chromatic variance, specular glare, Sobel texture |
@@ -106,6 +112,7 @@ livliness/
 │   │   ├── config.py              # Centralized policies, thresholds, and PADMode enums
 │   │   ├── errors.py              # BiometricErrorCode taxonomy & safe user message mapping
 │   │   ├── audit_logger.py        # Privacy-preserving structured JSON audit logger
+│   │   ├── enrollment.py          # Lightweight ResidentEnrollmentManager & privacy-preserving records
 │   │   ├── temporal_buffer.py     # Sliding temporal frame buffer & micro-motion analysis
 │   │   ├── face_detector.py       # ISO 19794-5 quality, blur, lighting, centering checks
 │   │   ├── passive_pad.py         # Modular ONNX & multi-cue physical heuristic PAD engine with ModelMetadata
@@ -125,15 +132,16 @@ livliness/
 │       └── MosipLivenessDeviceService.java # Java 21 MOSIP Client Adapter
 ├── tests/
 │   ├── test_face_detector.py      # 8 ISO 19794-5 quality assessment unit tests
-│   ├── test_passive_pad.py        # 5 Passive PAD cue & ONNX fallback tests
+│   ├── test_passive_pad.py        # 6 Passive PAD cue & ONNX fallback tests
 │   ├── test_active_liveness.py    # 7 Temporal EAR, Smile, Pose & timeout tests
 │   ├── test_mock_device.py        # 7 Lifecycle, scenario generation, capabilities & L1 adapter tests
 │   ├── test_pipeline.py           # 9 Master state machine, attack rejection, and retry exhaustion tests
 │   ├── test_temporal.py          # 4 Sliding window, micro-motion, and stability tests
 │   ├── test_model_updater.py      # 4 Integrity, signature, anti-downgrade, and rollback tests
 │   ├── test_workflows.py          # 4 Resident, Operator, Supervisor policy tests
-│   └── test_mds.py                # 6 MDS REST endpoint & capture contract tests
-├── run_desktop_app.py             # Desktop Client UI launcher with --demo and --diagnostic flags
+│   ├── test_mds.py                # 7 MDS REST endpoint & capability discovery tests
+│   └── test_enrollment.py         # 5 Lightweight resident enrollment & privacy tests
+├── run_desktop_app.py             # Desktop Client UI launcher with --demo, --diagnostic, and --resident-id flags
 ├── run_mds_service.py             # MOSIP Device Service (MDS) launcher
 ├── test_photo_spoof_simulation.py # Multi-vector presentation attack evaluation benchmark
 ├── requirements.txt
@@ -158,12 +166,12 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
-### 3. Run the Automated Test Suite (54 Tests)
+### 3. Run the Automated Test Suite (61 Tests)
 Execute the complete unit and integration test suite:
 ```powershell
 .\venv\Scripts\python -m pytest -v
 ```
-*All 54 tests pass 100%, covering face quality assessment, passive heuristics, temporal active challenges, device abstractions, offline model updates, workflow policies, and MDS REST endpoints.*
+*All 61 tests pass 100%, covering face quality assessment, passive heuristics, temporal active challenges, device abstractions, lightweight resident enrollment, privacy guarantees, offline model updates, workflow policies, and MDS REST endpoints.*
 
 ---
 
@@ -172,6 +180,9 @@ Execute the complete unit and integration test suite:
 The desktop client provides dedicated flags to demonstrate all 8 core evaluator scenarios instantly:
 
 ```powershell
+# Lightweight Resident Registration (With custom or auto-generated Resident ID)
+.\venv\Scripts\python run_desktop_app.py --resident-id RES-00123
+
 # Demo 1: Bona Fide Live Subject (Natural facial capture)
 .\venv\Scripts\python run_desktop_app.py --demo 1
 
@@ -201,7 +212,8 @@ The desktop client provides dedicated flags to demonstrate all 8 core evaluator 
 ```
 
 *Interactive Desktop Client Hotkeys*:
-* `r`: Reset session and re-evaluate.
+* `n`: Generate a new **Resident ID** (`RES-XXXXX`) and start a fresh enrollment session.
+* `r`: Reset current session and re-evaluate.
 * `d`: Toggle **Evaluator Diagnostic Mode** on/off (shows FPS, EAR, MAR, Yaw, and score breakdown).
 * `1`, `2`, `3`: Switch workflow policies on the fly (`1`: Resident, `2`: Operator, `3`: Supervisor).
 * `q` or `Esc`: Gracefully quit.

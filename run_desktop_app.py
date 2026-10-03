@@ -35,6 +35,8 @@ def main():
     parser.add_argument("--workflow", type=str, default="RESIDENT_REGISTRATION",
                         choices=["RESIDENT_REGISTRATION", "OPERATOR_AUTHENTICATION", "SUPERVISOR_AUTHENTICATION"],
                         help="Initial workflow profile")
+    parser.add_argument("--resident-id", type=str, default=None,
+                        help="Optional Resident ID for registration (e.g. RES-00123)")
     parser.add_argument("--diagnostic", action="store_true",
                         help="Launch directly in Evaluator Diagnostic Mode with technical telemetry HUD")
     args = parser.parse_args()
@@ -60,7 +62,8 @@ def main():
         use_mock_device=use_mock,
         mock_scenario=mock_scenario,
         initial_workflow=wf,
-        diagnostic_mode=args.diagnostic
+        diagnostic_mode=args.diagnostic,
+        resident_id=args.resident_id
     )
 
     if args.demo:

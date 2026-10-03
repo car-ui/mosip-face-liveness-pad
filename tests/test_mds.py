@@ -24,6 +24,11 @@ def test_mds_info_endpoint(client):
     assert "deviceId" in data
     assert "deviceStatus" in data
     assert "certification" in data
+    assert "securityLevel" in data
+    assert "vendor" in data
+    assert "model" in data
+    assert "supportedCaptureModes" in data
+    assert "supportedResolutions" in data
     assert "serviceVersion" in data
     assert "livenessCapability" in data
     assert data["livenessCapability"]["passivePAD"] is True
@@ -39,6 +44,21 @@ def test_mds_switch_device_endpoint(client):
     data = response.json()
     assert data["status"] == "SUCCESS"
     assert "MOCK" in data["current_device"]
+
+
+def test_mds_switch_to_vendor_l1(client):
+    response = client.post("/switch-device", json={
+        "device_mode": "L1"
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "SUCCESS"
+    assert "DEV-L1" in data["current_device"]
+
+    info = client.get("/info").json()
+    assert info["certification"] == "L1"
+    assert info["securityLevel"] == "L1_SECURE_HARDWARE"
+    assert info["vendor"] == "GenericMOSIP_Vendor"
 
 
 def test_mds_configure_endpoint(client):
@@ -72,16 +92,22 @@ def test_mds_capture_live_success(client):
 
     response = client.post("/capture", json={
         "workflow": "RESIDENT_REGISTRATION",
+        "resident_id": "RES-00777",
         "timeout_seconds": 10
     })
     assert response.status_code == 200
     data = response.json()
     assert data["responseStatus"] == "SUCCESS"
     assert data["decision"] == "PASSED"
+    assert data["residentId"] == "RES-00777"
+    assert data["enrollmentStatus"] == "COMPLETED"
     assert len(data["biometrics"]) == 1
     assert data["biometrics"][0]["specVersion"] == "ISO_19794_5"
+    assert "tokenHash" in data["biometrics"][0]
+    assert len(data["biometrics"][0]["tokenHash"]) == 64
     assert data["biometrics"][0]["livenessVerified"] is True
     assert len(data["biometrics"][0]["data"]) > 100
+    assert "modelProvenance" in data["telemetry"]
 
 
 def test_mds_capture_timeout(client):

@@ -53,6 +53,7 @@ class PADResult:
     mode_used: str             # "MODEL" or "HEURISTIC"
     details: Dict[str, Any] = field(default_factory=dict)
     model_metadata: Optional[ModelMetadata] = None
+    processing_time_ms: float = 0.0
 
 
 class BasePADBackend(ABC):
@@ -350,6 +351,7 @@ class PassivePADDetector:
         Evaluates a detected face crop.
         Returns complete, structured PADResult with 4-way verdict and model provenance metadata.
         """
+        t_start = time.time()
         x, y, w, h = face_box
         img_h, img_w = bgr_frame.shape[:2]
 
@@ -362,7 +364,24 @@ class PassivePADDetector:
         active_backend = self._heuristic_backend
         active_mode = self.operational_mode
 
+        # Enforce safe failure if ONNX_ONLY is requested but no model is loaded
+        if self.mode == PADMode.ONNX_ONLY and not self._onnx_backend.is_available():
+            proc_ms = round((time.time() - t_start) * 1000.0, 2)
+            return PADResult(
+                verdict=PADVerdict.PROCESSING_ERROR,
+                is_live=False,
+                liveness_score=0.0,
+                confidence=0.0,
+                attack_detected=False,
+                attack_type=None,
+                mode_used="MODEL_UNAVAILABLE",
+                details={"error": "ONNX_ONLY mode configured but no valid ONNX model file exists"},
+                model_metadata=self._onnx_backend.get_metadata(),
+                processing_time_ms=proc_ms
+            )
+
         if face_crop.size == 0 or face_crop.shape[0] < 35 or face_crop.shape[1] < 35:
+            proc_ms = round((time.time() - t_start) * 1000.0, 2)
             return PADResult(
                 verdict=PADVerdict.PROCESSING_ERROR,
                 is_live=False,
@@ -372,7 +391,8 @@ class PassivePADDetector:
                 attack_type=None,
                 mode_used=active_mode,
                 details={"error": "Face region invalid or too small"},
-                model_metadata=active_backend.get_metadata()
+                model_metadata=active_backend.get_metadata(),
+                processing_time_ms=proc_ms
             )
 
         if active_mode == "MODEL" and self._onnx_backend.is_available():
@@ -401,6 +421,7 @@ class PassivePADDetector:
             verdict = PADVerdict.UNCERTAIN
             is_live = False
 
+        proc_ms = round((time.time() - t_start) * 1000.0, 2)
         return PADResult(
             verdict=verdict,
             is_live=is_live,
@@ -410,5 +431,6 @@ class PassivePADDetector:
             attack_type=attack_type,
             mode_used=active_mode,
             details=details,
-            model_metadata=active_backend.get_metadata()
+            model_metadata=active_backend.get_metadata(),
+            processing_time_ms=proc_ms
         )

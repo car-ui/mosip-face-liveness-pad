@@ -20,6 +20,7 @@ from ..devices.webcam_device import WebcamCaptureDevice
 from ..devices.mock_l0_device import MockL0Device
 from ..core.pipeline import LivenessPipeline, PipelineState, PipelineStepResult
 from ..core.config import WorkflowType, LivenessConfig
+from ..core.enrollment import ResidentEnrollmentManager, EnrollmentStage
 
 
 class DesktopRegistrationClient:
@@ -27,10 +28,12 @@ class DesktopRegistrationClient:
                  use_mock_device: bool = False,
                  mock_scenario: MockScenario = MockScenario.BONA_FIDE_LIVE,
                  initial_workflow: WorkflowType = WorkflowType.RESIDENT_REGISTRATION,
-                 diagnostic_mode: bool = False):
+                 diagnostic_mode: bool = False,
+                 resident_id: Optional[str] = None):
         self.config = LivenessConfig()
         self.workflow = initial_workflow
         self.pipeline = LivenessPipeline(self.config, self.workflow)
+        self.enrollment_manager = ResidentEnrollmentManager(default_resident_id=resident_id)
         
         self.use_mock_device = use_mock_device
         self.mock_scenario = mock_scenario
@@ -257,18 +260,56 @@ class DesktopRegistrationClient:
         cv2.putText(canvas, "FACE LIVENESS & PAD", (230, 56),
                     cv2.FONT_HERSHEY_DUPLEX, 0.48, (200, 210, 230), 1, cv2.LINE_AA)
 
-        # Right Badges (Workflow, Device, Attempts)
-        badge_x = target_w - 530
+        # Right Badges (Workflow, Device, Resident ID, Attempts)
+        badge_x = target_w - 600
+        if self.workflow == WorkflowType.RESIDENT_REGISTRATION:
+            badge_x = self._draw_badge(canvas, f"ID: {self.enrollment_manager.resident_id}", (badge_x, 34),
+                                        (45, 55, 75), (255, 235, 120), 0.38) + 8
+
         badge_x = self._draw_badge(canvas, self.workflow.value.replace("_", " "), (badge_x, 34),
-                                    (35, 45, 65), (230, 240, 255), 0.38) + 10
+                                    (35, 45, 65), (230, 240, 255), 0.38) + 8
         
         dev_label = "MOCK SIMULATOR" if self.use_mock_device else "L0 WEBCAM"
         badge_x = self._draw_badge(canvas, dev_label, (badge_x, 34),
-                                    (30, 50, 45), (70, 230, 140), 0.38) + 10
+                                    (30, 50, 45), (70, 230, 140), 0.38) + 8
 
         retry_color = (60, 35, 40) if result.current_retry > 1 else (35, 45, 60)
         self._draw_badge(canvas, f"ATTEMPT {result.current_retry + 1}/{result.max_retries}", (badge_x, 34),
                          retry_color, (230, 220, 230), 0.38)
+
+        # 4b. RESIDENT REGISTRATION 3-STEP PROGRESSION TRACKER
+        if self.workflow == WorkflowType.RESIDENT_REGISTRATION:
+            self.enrollment_manager.update_from_pipeline(result, self.device.get_capabilities())
+            step_bar_w = 620
+            s_x1 = (target_w - step_bar_w) // 2
+            s_y1 = 90
+            s_x2 = s_x1 + step_bar_w
+            s_y2 = s_y1 + 32
+            self._draw_rounded_rect(canvas, (s_x1, s_y1), (s_x2, s_y2), (18, 22, 32),
+                                    radius=10, alpha=0.88, border_color=(45, 55, 75))
+
+            # Step 1: Face Position
+            s1_ok = self.enrollment_manager.face_positioned
+            s1_col = (70, 230, 70) if s1_ok else (150, 160, 180)
+            cv2.circle(canvas, (s_x1 + 22, s_y1 + 16), 5, s1_col, -1, cv2.LINE_AA)
+            cv2.putText(canvas, "1. Position Face", (s_x1 + 34, s_y1 + 21),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.38, s1_col, 1, cv2.LINE_AA)
+
+            # Step 2: Liveness & PAD
+            s2_ok = self.enrollment_manager.passive_completed
+            s2_in_prog = (self.enrollment_manager.stage == EnrollmentStage.LIVENESS_CHECK)
+            s2_col = (70, 230, 70) if s2_ok else ((0, 215, 255) if s2_in_prog else (150, 160, 180))
+            cv2.circle(canvas, (s_x1 + 220, s_y1 + 16), 5, s2_col, -1, cv2.LINE_AA)
+            cv2.putText(canvas, "2. Liveness Check", (s_x1 + 232, s_y1 + 21),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.38, s2_col, 1, cv2.LINE_AA)
+
+            # Step 3: Biometric Enrolled
+            s3_ok = (self.enrollment_manager.stage == EnrollmentStage.ENROLLED)
+            s3_rej = (self.enrollment_manager.stage == EnrollmentStage.REJECTED)
+            s3_col = (70, 230, 70) if s3_ok else ((60, 60, 240) if s3_rej else (150, 160, 180))
+            cv2.circle(canvas, (s_x1 + 420, s_y1 + 16), 5, s3_col, -1, cv2.LINE_AA)
+            cv2.putText(canvas, "3. Enrolled", (s_x1 + 432, s_y1 + 21),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.38, s3_col, 1, cv2.LINE_AA)
 
         # 5. FLOATING ACTION CARD (Prominently Above / Below Center)
         card_w = 680
@@ -347,18 +388,18 @@ class DesktopRegistrationClient:
                                 (16, 20, 28), radius=10, alpha=0.88, border_color=(40, 50, 68))
         
         mode_str = "ON" if self.diagnostic_mode else "OFF"
-        controls = f"[R] Reset   [D] Diagnostic: {mode_str}   |   [1] Resident   [2] Operator   [3] Supervisor   |   [Q] Exit"
+        controls = f"[R] Reset   [N] New ID   [D] Diagnostic: {mode_str}   |   [1] Resident   [2] Operator   [3] Supervisor   |   [Q] Exit"
         cv2.putText(canvas, controls, (42, target_h - 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.40, (150, 160, 180), 1, cv2.LINE_AA)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.38, (150, 160, 180), 1, cv2.LINE_AA)
         
         iso_tag = "ISO/IEC 30107-3 | ISO/IEC 19794-5"
         cv2.putText(canvas, iso_tag, (target_w - 275, target_h - 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.40, (110, 120, 140), 1, cv2.LINE_AA)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.38, (110, 120, 140), 1, cv2.LINE_AA)
 
-        # 7. SUCCESS CELEBRATION MODAL
+        # 8. SUCCESS & REJECTION MODALS
         if result.state == PipelineState.CAPTURE_SUCCESS:
-            modal_w = 460
-            modal_h = 130
+            modal_w = 540
+            modal_h = 145
             m_x1 = (target_w - modal_w) // 2
             m_y1 = center_y - (modal_h // 2)
             m_x2 = m_x1 + modal_w
@@ -368,16 +409,49 @@ class DesktopRegistrationClient:
                                     radius=18, alpha=0.96, border_color=(70, 230, 110))
             
             # Checkmark circle icon
-            cv2.circle(canvas, (m_x1 + 45, m_y1 + modal_h // 2), 22, (50, 200, 90), -1, cv2.LINE_AA)
-            cv2.putText(canvas, "OK", (m_x1 + 32, m_y1 + modal_h // 2 + 7),
-                        cv2.FONT_HERSHEY_DUPLEX, 0.60, (10, 30, 15), 2, cv2.LINE_AA)
+            cv2.circle(canvas, (m_x1 + 45, m_y1 + modal_h // 2), 24, (50, 200, 90), -1, cv2.LINE_AA)
+            cv2.putText(canvas, "OK", (m_x1 + 30, m_y1 + modal_h // 2 + 8),
+                        cv2.FONT_HERSHEY_DUPLEX, 0.65, (10, 30, 15), 2, cv2.LINE_AA)
 
-            cv2.putText(canvas, "BIOMETRIC VERIFIED", (m_x1 + 85, m_y1 + 46),
-                        cv2.FONT_HERSHEY_DUPLEX, 0.68, (255, 255, 255), 2, cv2.LINE_AA)
-            cv2.putText(canvas, "Liveness Confirmed • Token Encrypted", (m_x1 + 86, m_y1 + 72),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.44, (120, 220, 150), 1, cv2.LINE_AA)
-            cv2.putText(canvas, "Press [R] to start a new session", (m_x1 + 86, m_y1 + 96),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.38, (160, 175, 190), 1, cv2.LINE_AA)
+            if self.workflow == WorkflowType.RESIDENT_REGISTRATION:
+                cv2.putText(canvas, "MOSIP RESIDENT ENROLLMENT SUCCESSFUL", (m_x1 + 85, m_y1 + 38),
+                            cv2.FONT_HERSHEY_DUPLEX, 0.56, (255, 255, 255), 1, cv2.LINE_AA)
+                cv2.putText(canvas, f"Resident ID: {self.enrollment_manager.resident_id}  •  Status: ENROLLED", (m_x1 + 86, m_y1 + 64),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.44, (120, 230, 160), 1, cv2.LINE_AA)
+                rec = self.enrollment_manager.current_record
+                tok_str = (rec.biometric_token_hash[:16] + "...") if rec and rec.biometric_token_hash else "SHA-256 Token Signed"
+                cv2.putText(canvas, f"Liveness: Verified  •  Token: {tok_str}", (m_x1 + 86, m_y1 + 88),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.40, (170, 210, 190), 1, cv2.LINE_AA)
+                cv2.putText(canvas, "Press [R] to Enroll Next Resident  |  [Q] Exit", (m_x1 + 86, m_y1 + 114),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.38, (160, 175, 190), 1, cv2.LINE_AA)
+            else:
+                cv2.putText(canvas, "BIOMETRIC AUTHENTICATED", (m_x1 + 85, m_y1 + 46),
+                            cv2.FONT_HERSHEY_DUPLEX, 0.68, (255, 255, 255), 2, cv2.LINE_AA)
+                cv2.putText(canvas, "Liveness Confirmed • Token Encrypted", (m_x1 + 86, m_y1 + 76),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.44, (120, 220, 150), 1, cv2.LINE_AA)
+                cv2.putText(canvas, "Press [R] to start a new session", (m_x1 + 86, m_y1 + 104),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.38, (160, 175, 190), 1, cv2.LINE_AA)
+
+        elif result.state == PipelineState.ATTACK_REJECTED:
+            modal_w = 540
+            modal_h = 135
+            m_x1 = (target_w - modal_w) // 2
+            m_y1 = center_y - (modal_h // 2)
+            m_x2 = m_x1 + modal_w
+            m_y2 = m_y1 + modal_h
+
+            self._draw_rounded_rect(canvas, (m_x1, m_y1), (m_x2, m_y2), (28, 15, 18),
+                                    radius=18, alpha=0.96, border_color=(60, 60, 240))
+            cv2.circle(canvas, (m_x1 + 45, m_y1 + modal_h // 2), 24, (50, 50, 220), -1, cv2.LINE_AA)
+            cv2.putText(canvas, "X", (m_x1 + 35, m_y1 + modal_h // 2 + 8),
+                        cv2.FONT_HERSHEY_DUPLEX, 0.65, (255, 255, 255), 2, cv2.LINE_AA)
+
+            cv2.putText(canvas, "MOSIP RESIDENT ENROLLMENT REJECTED", (m_x1 + 85, m_y1 + 40),
+                        cv2.FONT_HERSHEY_DUPLEX, 0.56, (255, 255, 255), 1, cv2.LINE_AA)
+            cv2.putText(canvas, f"Resident ID: {self.enrollment_manager.resident_id}  •  Status: TERMINATED", (m_x1 + 86, m_y1 + 68),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.44, (120, 120, 240), 1, cv2.LINE_AA)
+            cv2.putText(canvas, "Biometric presentation attack detected. Press [R] to restart.", (m_x1 + 86, m_y1 + 96),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.38, (180, 180, 200), 1, cv2.LINE_AA)
 
         return canvas
 
@@ -394,9 +468,12 @@ class DesktopRegistrationClient:
         self.is_running = True
         self.pipeline.reset()
 
-        print("\n=== MOSIP Face Liveness Client Started ===")
+        print("\n=== MOSIP Face Liveness & Resident Enrollment Client Started ===")
+        print(f"Active Resident ID: {self.enrollment_manager.resident_id}")
         print("Hotkeys:")
-        print("  'r' - Reset verification session")
+        print("  'r' - Reset session")
+        print("  'n' - Generate new Resident ID (Enrollment)")
+        print("  'd' - Toggle Evaluator Diagnostic Mode")
         print("  '1' - Resident Registration Workflow")
         print("  '2' - Operator Authentication Workflow")
         print("  '3' - Supervisor Authentication Workflow")
@@ -423,7 +500,12 @@ class DesktopRegistrationClient:
                 if cv2.getWindowProperty(self.window_name, cv2.WND_PROP_VISIBLE) < 1:
                     break
                 elif key == ord('r'):
+                    self.enrollment_manager.reset(new_resident=False)
                     self.pipeline.reset()
+                elif key == ord('n') or key == ord('N'):
+                    self.enrollment_manager.reset(new_resident=True)
+                    self.pipeline.reset()
+                    print(f"New Resident ID assigned: {self.enrollment_manager.resident_id}")
                 elif key == ord('d') or key == ord('D'):
                     self.diagnostic_mode = not self.diagnostic_mode
                 elif key == ord('1'):
