@@ -39,7 +39,7 @@ flowchart TD
         QA[FaceQualityAssessor: ISO 19794-5 Illumination / Sharpness / Centering]
         TB[TemporalLivenessBuffer: Rolling Sliding Window & Micro-Motion]
         PAD[Modular Passive PAD: ONNX Model / Multi-Cue Physical Heuristics]
-        AL[ActiveLivenessDetector: 3D Landmarks / Temporal EAR / MAR / Pose]
+        AL[ActiveLivenessDetector: Facial Landmarks / Temporal EAR / MAR / Geometric Pose]
         CM[ChallengeManager: Cryptographic Dynamic Selection & Timeouts]
         ALog[BiometricAuditLogger: Privacy-Preserving JSON Telemetry]
         UPD[SecureModelUpdateManager: SHA-256 / HMAC / Atomic Swap]
@@ -192,7 +192,7 @@ While this submission focuses on the Desktop/Linux/Windows registration client, 
 
 1. **Adaptive Frame Subsampling**:
    * Passive PAD frequency analysis (2D DFT) executes every 3rd frame ($\approx 10$ Hz), reducing CPU load by 60%.
-   * 3D facial landmark tracking (MediaPipe) runs at native 30 FPS for smooth user interaction.
+   * Facial landmark tracking (MediaPipe) runs at native 30 FPS for smooth user interaction.
 2. **Quantized Mobile Models**:
    * The `ONNXModelPADBackend` accepts 8-bit quantized models (`int8`), reducing memory footprint from 45MB to under 8MB.
 3. **Hardware Acceleration Discovery**:

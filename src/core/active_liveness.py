@@ -1,9 +1,9 @@
 """
 Active Liveness Detection Engine
-Uses MediaPipe FaceLandmarker with 52 Blendshapes & 3D Landmark Geometry:
+Uses MediaPipe FaceLandmarker with 52 Blendshapes & Facial Landmark Geometry:
 - Real-time Blink Detection via temporal EAR state machine (OPEN -> CLOSED -> OPEN)
 - Real-time Smile Detection via dynamic relative baseline delta sustained across N frames
-- 3D Head Pose Estimation via temporal transitions (CENTER -> TURN -> CENTER)
+- Facial-Landmark Geometric Head-Pose Estimation via temporal transitions (CENTER -> TURN -> CENTER)
 
 100% Offline, high performance (~30 FPS on CPU).
 """

@@ -1,6 +1,6 @@
 """
 Face Detection and Image Quality Assessment
-Conforms to ISO/IEC 19794-5 face biometric quality requirements:
+Designed according to ISO/IEC 19794-5 face biometric quality requirements:
 - Single face enforcement
 - Lighting/illumination adequacy
 - Sharpness / blur detection (Laplacian variance)

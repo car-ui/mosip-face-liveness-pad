@@ -14,7 +14,7 @@ import java.nio.charset.StandardCharsets;
  * Demonstrates integration into the existing MOSIP Java Registration Client:
  * 1. Device discovery handshake via /info
  * 2. Biometric capture trigger via /capture
- * 3. Processing ISO/IEC 19794-5 image and ISO/IEC 30107 PAD verification response
+ * 3. Processing ISO/IEC 19794-5-aligned facial image representation and ISO/IEC 30107 PAD verification response
  */
 public class MosipLivenessDeviceService {
 
@@ -52,7 +52,7 @@ public class MosipLivenessDeviceService {
      * 
      * @param workflow "RESIDENT_REGISTRATION", "OPERATOR_AUTHENTICATION", or "SUPERVISOR_AUTHENTICATION"
      * @param timeoutSeconds Session timeout in seconds
-     * @return JSON response containing ISO/IEC 19794-5 biometric data and PAD token
+     * @return JSON response containing ISO/IEC 19794-5-aligned image payload and PAD verification token
      */
     public String captureBiometric(String workflow, int timeoutSeconds) throws Exception {
         URL url = URI.create(mdsBaseUrl + "/capture").toURL();

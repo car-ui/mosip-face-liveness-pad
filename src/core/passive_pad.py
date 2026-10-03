@@ -3,7 +3,7 @@ Modular Passive Liveness & Presentation Attack Detection (PAD) Engine
 Designed to align with ISO/IEC 30107 principles (Level 1 / Level 2 attack vectors):
 - Printed photograph attacks (paper texture, color gamut clipping, lack of micro-variation)
 - Digital screen replay attacks (moiré patterns, refresh artifacts, specular glass reflections)
-- 2D planar attacks vs natural 3D anatomical reflectance
+- 2D planar attacks vs natural anatomical facial reflectance and depth variation
 
 Supports:
 1. Pluggable ONNX Deep Learning model inference (e.g., MiniFASNet / Silent-Face-Anti-Spoofing)

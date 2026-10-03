@@ -29,7 +29,7 @@ sequenceDiagram
 
     alt Passive Liveness Score >= 0.80 (High Confidence)
         Engine-->>MDS: Decision: PASSED (Live Face Confirmed)
-        MDS->>Device: Capture ISO 19794-5 compliant frame
+        MDS->>Device: Capture ISO 19794-5 quality-aligned frame
         MDS-->>Client: Return 200 OK + Base64 Biometric Token
         Client->>Resident: Display "Good, face captured successfully"
     else Passive Liveness Score < 0.80 (Uncertain / Ambiguous)

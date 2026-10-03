@@ -262,7 +262,7 @@ Follow this 18-step sequential checklist to evaluate the complete subsystem end-
 11. **Operator Authentication Workflow**: Press `2` (or select Operator Auth). Note elevated passive threshold (0.88) and mandatory active challenge.
 12. **Supervisor Authentication Workflow**: Press `3` (or select Supervisor Auth). Note maximum security threshold (0.92) requiring multi-challenge verification.
 13. **Active Challenge Execution**: Press `n` or run `--demo 2` (dynamic escalation to challenge) or `--demo 5` (static photo failing challenge) to observe EAR blink sequence or baseline-neutral smile hold.
-14. **Toggle Diagnostic Mode**: Press `d` to inspect live FPS, EAR, MAR, 3D Pose Yaw/Pitch, and active PAD engine (`Heuristic PAD — Active` or `ONNX`).
+14. **Toggle Diagnostic Mode**: Press `d` to inspect live FPS, EAR, MAR, Pose Yaw/Pitch/Roll, and active PAD engine (`Heuristic PAD — Active` or `ONNX`).
 15. **Vendor L1 Adapter Demonstration**: Click "Vendor L1 — Simulated Adapter" or query `/info` to see `securityLevel: L1_SIMULATED` with HMAC-SHA256 biometric signing.
 16. **Offline Model Updater**: Run model updater verification test (`pytest tests/test_model_updater.py`) to observe SHA-256 check, HMAC verification, anti-downgrade check, and rollback.
 17. **Run Attack Benchmark**: Run `python test_photo_spoof_simulation.py` to inspect APCER/BPCER developer benchmark metrics.
@@ -311,4 +311,4 @@ With the MDS server running on port 4501, execute the Java 21 adapter:
 javac -d bin src/java_integration/MosipLivenessDeviceService.java
 java -cp bin io.mosip.registration.liveness.MosipLivenessDeviceService
 ```
-The adapter connects via HTTP/JSON to the MDS server, initiates biometric capture for the specified workflow, verifies the response payload, and decodes the ISO 19794-5 image token.
+The adapter connects via HTTP/JSON to the MDS server, initiates biometric capture for the specified workflow, verifies the response payload, and decodes the ISO/IEC 19794-5-aligned image representation.

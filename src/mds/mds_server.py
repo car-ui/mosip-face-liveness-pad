@@ -319,7 +319,7 @@ def capture_biometric(request: CaptureRequest):
     """
     MOSIP Biometric Capture Endpoint.
     Executes hybrid Passive -> Active verification loop.
-    Returns ISO 19794-5 image and PAD token on success.
+    Returns ISO/IEC 19794-5-aligned image representation and PAD token on success.
     """
     try:
         wf = WorkflowType(request.workflow)
