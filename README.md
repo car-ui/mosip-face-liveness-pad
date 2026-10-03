@@ -41,13 +41,13 @@ A robust, enterprise-grade, hardware-agnostic solution for **Face Liveness Detec
    * **Temporal State Machines**:
      * **Blink**: Strict three-phase `OPEN -> CLOSED -> OPEN` Eye Aspect Ratio (EAR) sequence with duration validation.
      * **Smile**: Baseline-neutral differential calculation ($\Delta \ge 0.15$) held over $N \ge 3$ consecutive frames.
-     * **Head Turn**: Temporal yaw progression (`CENTER -> TURN -> CENTER`) using Perspective-n-Point (SolvePnP) 3D head pose estimation.
+     * **Head Turn**: Temporal yaw progression (`CENTER -> TURN -> CENTER`) using facial-landmark geometric head-pose estimation (yaw, pitch, and roll calculation).
    * **Anti-Replay Protection**: Rejects static photos and non-responsive replays.
 
 6. **L0/L1 Multi-Vendor Device Abstraction**:
    * Clear inheritance hierarchy: `BaseBiometricDevice` $\rightarrow$ `L0Device` (`WebcamCaptureDevice`, `MockL0Device`) & `L1Device` (`VendorL1Adapter`).
    * **Capability Discovery (`DeviceCapabilities`)**: Structured query of supported capture modes, resolutions, security level (`L0_BASIC`, `L0_SIMULATED`, `L1_SIMULATED`), and hardware capabilities.
-   * **Comprehensive Scenario Simulator (`MockL0Device`)**: Reproducibly simulates 10 critical operational conditions for automated CI/CD:
+   * **Comprehensive Scenario Simulator (`MockL0Device`)**: Reproducibly simulates 11 critical operational conditions for automated CI/CD:
      * `BONA_FIDE_LIVE`, `STATIC_PHOTO_ATTACK`, `SCREEN_REPLAY_ATTACK`, `NO_FACE`, `MULTIPLE_FACES`, `POOR_LIGHTING_DARK`, `POOR_LIGHTING_BRIGHT`, `POOR_LIGHTING_UNEVEN`, `BLURRY_FRAME`, `DEVICE_DISCONNECT`, `INVALID_FRAME`.
      * Supports programmable scripted actions (`BLINK`, `SMILE`, `TURN_LEFT`, `TURN_RIGHT`).
 
@@ -130,14 +130,14 @@ livliness/
 │   │   ├── temporal_buffer.py     # Sliding temporal frame buffer & micro-motion analysis
 │   │   ├── face_detector.py       # ISO 19794-5 quality, blur, lighting, centering checks
 │   │   ├── passive_pad.py         # Modular ONNX & multi-cue physical heuristic PAD engine with ModelMetadata
-│   │   ├── active_liveness.py     # Temporal EAR, MAR, and SolvePnP 3D pose state machines
+│   │   ├── active_liveness.py     # Temporal EAR, MAR, and geometric 3D head-pose state machines
 │   │   ├── challenge_manager.py   # Cryptographic challenge selection & timeout tracker
 │   │   ├── model_updater.py       # Secure offline model update manager (SHA-256, HMAC, atomic swap)
 │   │   └── pipeline.py            # Master hybrid state machine orchestrator (14 states)
 │   ├── devices/
 │   │   ├── base.py                # BaseBiometricDevice, L0Device, L1Device, VendorL1Adapter, DeviceCapabilities
 │   │   ├── webcam_device.py       # Physical L0 Webcam adapter
-│   │   └── mock_l0_device.py      # 10-scenario deterministic mock biometric device
+│   │   └── mock_l0_device.py      # 11-scenario deterministic mock biometric device
 │   ├── mds/
 │   │   └── mds_server.py          # MOSIP Device Service REST & MJPEG server
 │   ├── ui/

@@ -22,7 +22,7 @@ flowchart TD
     subgraph Device Layer [Hardware & Simulation Abstraction]
         HW1[Physical L0 Webcam Sensor]
         HW2[L1 Dedicated Biometric Hardware]
-        SIM[MockL0Device 10-Scenario Deterministic Simulator]
+        SIM[MockL0Device 11-Scenario Deterministic Simulator]
         VEND[VendorL1Adapter Secure Token Simulator]
     end
 
@@ -130,7 +130,7 @@ The device layer cleanly separates standard optical sensors from cryptographical
 BaseBiometricDevice (Abstract)
 ├── L0Device
 │     ├── WebcamCaptureDevice (DirectShow / UVC physical camera)
-│     └── MockL0Device (10-scenario deterministic simulator)
+│     └── MockL0Device (11-scenario deterministic simulator)
 └── L1Device
       └── VendorL1Adapter (Architecture-ready adapter for vendor SDKs)
 ```
@@ -157,6 +157,12 @@ Every biometric evaluation generates complete provenance records via `ModelMetad
 * `input_size`: Dimensions of neural network input tensor
 * `inference_provider`: Hardware accelerator utilized (e.g. `CUDAExecutionProvider`, `DirectMLExecutionProvider`, `CPUExecutionProvider`)
 * `threshold`: Decision boundary threshold applied
+
+### ONNX Model Contract & Output Layout Specification
+* **Status**: `ARCHITECTURE-READY`. The inference engine (`ONNXModelPADBackend`) is fully implemented with dynamic hardware provider discovery (DirectML, CUDA, OpenVINO, CPU) and SHA-256 model provenance. Pre-trained deep-learning production weights are **not** bundled; deterministic multi-cue physical heuristics serve as the active engine.
+* **Input Tensor**: Shape `[1, 3, 224, 224]` (NCHW format, float32, RGB), normalized using ImageNet mean `[0.485, 0.456, 0.406]` and std `[0.229, 0.224, 0.225]`.
+* **Output Tensor Contract**: Binary classification layout `[prob_live, prob_spoof]` over Softmax probabilities. If a single logit is produced, `prob_spoof = 1.0 - prob_live`.
+* **Plug-and-Play Placement**: Drop any compatible `.onnx` model into `assets/models/` to automatically activate deep-learning inference with zero code modifications.
 
 ---
 
@@ -261,5 +267,5 @@ To meet MOSIP's real-world registration station operational requirements without
 2. **Strict Data Privacy & Zero Biometric Persistence**:
    * **Ephemeral In-Memory Processing**: Captured camera frames exist solely in volatile memory during pipeline processing and are discarded immediately upon frame cycle completion.
    * **No Raw Image Storage**: Neither the audit logs nor the `ResidentEnrollmentRecord` store raw pixel arrays, JPEG/PNG files, or face crops.
-   * **Cryptographic Biometric Token Hashing**: Upon successful enrollment, the system generates an ISO/IEC 19794-5-aligned representation and computes a SHA-256 digest (`token_hash = sha256(biometric_payload)`). Downstream MOSIP registration services verify and match against this hash without exposing raw biometric imagery to the local filesystem.
+   * **Cryptographic Biometric Token Hashing**: Upon successful enrollment, the system generates an ISO/IEC 19794-5-aligned representation and computes a SHA-256 digest (`token_hash = sha256(biometric_payload)`). Downstream MOSIP registration services verify token integrity against this SHA-256 digest of the ephemeral captured image payload without exposing raw biometric imagery to the local filesystem (note: this hash serves as an integrity/token verification check, not an extracted biometric feature template for 1:1 or 1:N biometric matching).
 
