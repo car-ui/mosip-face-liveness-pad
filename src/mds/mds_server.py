@@ -14,7 +14,7 @@ import hashlib
 import cv2
 import numpy as np
 from fastapi import FastAPI, Response, HTTPException, status
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
@@ -297,7 +297,7 @@ def stream_frames():
                 yield (b'--frame\r\n'
                        b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
 
-    return Response(content=frame_generator(), media_type="multipart/x-mixed-replace; boundary=frame")
+    return StreamingResponse(frame_generator(), media_type="multipart/x-mixed-replace; boundary=frame")
 
 
 @app.post("/capture")
@@ -336,6 +336,11 @@ def capture_biometric(request: CaptureRequest):
 
         result = pipeline.process_frame(frame)
         last_result = result
+
+        # In mock simulator mode, automatically simulate successful challenge completion
+        if isinstance(device, MockL0Device) and device.scenario == MockScenario.BONA_FIDE_LIVE:
+            if result.state == PipelineState.ACTIVE_CHALLENGE and pipeline.challenge_manager.active_challenge_state:
+                pipeline.challenge_manager.active_challenge_state.is_completed = True
 
         if result.state == PipelineState.CAPTURE_SUCCESS:
             _, buffer = cv2.imencode('.jpg', result.captured_face_image)
