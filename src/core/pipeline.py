@@ -232,7 +232,7 @@ class LivenessPipeline:
             )
             temp_analysis = self.temporal_buffer.analyze()
 
-            # Check for definite presentation attack:
+            # 1. Definite Presentation Attack -> REJECT immediately
             if pad_result.verdict == PADVerdict.PRESENTATION_ATTACK:
                 self.audit_logger.log_event(
                     AuditEventType.PAD_ATTACK_DETECTED,
@@ -245,8 +245,8 @@ class LivenessPipeline:
                     }
                 )
 
-                if self.policy.active_liveness_enabled:
-                    # Ambiguous attack vector -> escalate to dynamic active challenge per MOSIP spec
+                # Only if explicitly configured via policy does a definite attack escalate to active challenges
+                if getattr(self.policy, "escalate_attacks_to_active", False) and self.policy.active_liveness_enabled:
                     self.state = PipelineState.ACTIVE_CHALLENGE
                     challenge = self.challenge_manager.generate_next_challenge()
                     return PipelineStepResult(
@@ -277,6 +277,22 @@ class LivenessPipeline:
                         current_retry=self.challenge_manager.current_retry,
                         max_retries=self.policy.max_retries
                     )
+
+            # 2. Processing Error -> Handle gracefully with retry guidance
+            elif pad_result.verdict == PADVerdict.PROCESSING_ERROR:
+                return PipelineStepResult(
+                    state=self.state,
+                    decision=LivenessDecision.ERROR,
+                    status_text="Processing Frame",
+                    detailed_guidance="Please adjust your position so your face is clearly visible.",
+                    progress=0.05,
+                    quality=quality,
+                    pad_result=pad_result,
+                    error_code=BiometricErrorCode.INVALID_FRAME,
+                    can_retry=self.challenge_manager.can_retry(),
+                    current_retry=self.challenge_manager.current_retry,
+                    max_retries=self.policy.max_retries
+                )
 
             self._passive_frames_analyzed += 1
             max_passive_window = 25  # ~0.8-1.0 second visible evaluation
@@ -357,8 +373,8 @@ class LivenessPipeline:
             challenge_state = self.challenge_manager.active_challenge_state
             if challenge_state is None:
                 challenge_state = self.challenge_manager.generate_next_challenge()
-                telemetry, updated_challenge = self.active_detector.process_frame(bgr, challenge_state)
-                self.challenge_manager.active_challenge_state = updated_challenge
+            telemetry, updated_challenge = self.active_detector.process_frame(bgr, challenge_state)
+            self.challenge_manager.active_challenge_state = updated_challenge
 
             # Check challenge timeout or failure
             if updated_challenge and not updated_challenge.is_active and not updated_challenge.is_completed:

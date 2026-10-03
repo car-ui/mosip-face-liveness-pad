@@ -26,13 +26,17 @@ class DesktopRegistrationClient:
     def __init__(self,
                  use_mock_device: bool = False,
                  mock_scenario: MockScenario = MockScenario.BONA_FIDE_LIVE,
-                 initial_workflow: WorkflowType = WorkflowType.RESIDENT_REGISTRATION):
+                 initial_workflow: WorkflowType = WorkflowType.RESIDENT_REGISTRATION,
+                 diagnostic_mode: bool = False):
         self.config = LivenessConfig()
         self.workflow = initial_workflow
         self.pipeline = LivenessPipeline(self.config, self.workflow)
         
         self.use_mock_device = use_mock_device
         self.mock_scenario = mock_scenario
+        self.diagnostic_mode = diagnostic_mode
+        self._prev_frame_time = time.time()
+        self._fps = 30.0
         self.device: FaceCaptureDevice = MockL0Device(scenario=mock_scenario) if use_mock_device else WebcamCaptureDevice(0)
         self.window_name = "MOSIP Registration Client - Face Liveness & PAD (Decode 04)"
         self.is_running = False
@@ -306,13 +310,46 @@ class DesktopRegistrationClient:
         cv2.putText(canvas, pct_text, (bar_x + 35, bar_y + 24),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.38, (180, 190, 210), 1, cv2.LINE_AA)
 
-        # 6. FLOATING BOTTOM FOOTER: Hotkey Legend & Standards
+        # FPS calculation
+        now = time.time()
+        dt = now - self._prev_frame_time
+        self._prev_frame_time = now
+        if dt > 0:
+            self._fps = (self._fps * 0.9) + ((1.0 / dt) * 0.1)
+
+        # 6. EVALUATOR DIAGNOSTIC OVERLAY (Toggled via [D])
+        if self.diagnostic_mode:
+            diag_w = 270
+            diag_h = 210
+            dx1 = target_w - diag_w - 24
+            dy1 = 80
+            self._draw_rounded_rect(canvas, (dx1, dy1), (dx1 + diag_w, dy1 + diag_h),
+                                    (18, 22, 32), radius=10, alpha=0.92, border_color=(60, 130, 240))
+            cv2.putText(canvas, "DIAGNOSTIC MODE [D: TOGGLE]", (dx1 + 14, dy1 + 24),
+                        cv2.FONT_HERSHEY_DUPLEX, 0.42, (90, 180, 255), 1, cv2.LINE_AA)
+            
+            lines = [
+                f"Throughput: {self._fps:.1f} FPS",
+                f"PAD Mode: {result.pad_result.mode_used if result.pad_result else 'HEURISTIC'}",
+                f"Passive Score: {result.pad_result.liveness_score if result.pad_result else 0.0:.3f}",
+                f"Confidence: {result.pad_result.confidence if result.pad_result else 0.0:.3f}",
+                f"EAR: {result.telemetry.get('ear', 0.0) if result.telemetry else 0.0:.3f}",
+                f"MAR: {result.telemetry.get('mar', 0.0) if result.telemetry else 0.0:.3f}",
+                f"Yaw/Pitch: {result.telemetry.get('yaw', 0.0) if result.telemetry else 0.0:.1f} / {result.telemetry.get('pitch', 0.0) if result.telemetry else 0.0:.1f}",
+                f"Retry Count: {result.current_retry}/{result.max_retries}"
+            ]
+            for i, line in enumerate(lines):
+                cv2.putText(canvas, line, (dx1 + 14, dy1 + 48 + (i * 20)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.38, (210, 220, 240), 1, cv2.LINE_AA)
+
+        # 7. FLOATING BOTTOM FOOTER: Hotkey Legend & Standards
         self._draw_rounded_rect(canvas, (24, target_h - 52), (target_w - 24, target_h - 16),
                                 (16, 20, 28), radius=10, alpha=0.88, border_color=(40, 50, 68))
         
-        controls = "[R] Reset Session   |   [1] Resident   [2] Operator   [3] Supervisor   |   [Q] Exit"
+        mode_str = "ON" if self.diagnostic_mode else "OFF"
+        controls = f"[R] Reset   [D] Diagnostic: {mode_str}   |   [1] Resident   [2] Operator   [3] Supervisor   |   [Q] Exit"
         cv2.putText(canvas, controls, (42, target_h - 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.42, (150, 160, 180), 1, cv2.LINE_AA)
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.40, (150, 160, 180), 1, cv2.LINE_AA)
         
         iso_tag = "ISO/IEC 30107-3 | ISO/IEC 19794-5"
         cv2.putText(canvas, iso_tag, (target_w - 275, target_h - 30),
@@ -387,6 +424,8 @@ class DesktopRegistrationClient:
                     break
                 elif key == ord('r'):
                     self.pipeline.reset()
+                elif key == ord('d') or key == ord('D'):
+                    self.diagnostic_mode = not self.diagnostic_mode
                 elif key == ord('1'):
                     self.set_workflow(WorkflowType.RESIDENT_REGISTRATION)
                 elif key == ord('2'):

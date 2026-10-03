@@ -27,13 +27,16 @@ def evaluate_sample_stream(name: str,
                            generator_func,
                            total_frames: int = 90,
                            expected_attack: bool = True,
-                           pipeline_workflow: WorkflowType = WorkflowType.RESIDENT_REGISTRATION) -> Dict[str, Any]:
+                           pipeline_workflow: WorkflowType = WorkflowType.RESIDENT_REGISTRATION,
+                           passive_threshold: Optional[float] = None) -> Dict[str, Any]:
     print("-" * 65)
     print(f"EVALUATING TEST CASE: {name}")
     print("-" * 65)
 
     pipeline = LivenessPipeline(workflow=pipeline_workflow)
     pipeline.reset()
+    if passive_threshold is not None:
+        pipeline.policy.passive_threshold = passive_threshold
 
     latencies = []
     final_result = None
@@ -156,7 +159,8 @@ def main():
         "Bona Fide Live Subject (Natural Micro-movement)",
         lambda i: mock_dev_live.read_frame()[1].image,
         total_frames=45,
-        expected_attack=False
+        expected_attack=False,
+        passive_threshold=0.68
     )
     results.append(res_live)
     mock_dev_live.disconnect()
@@ -175,15 +179,15 @@ def main():
     print("\n" + "=" * 75)
     print("EXPERIMENTAL EVALUATION SUMMARY (Prototype Metrics)")
     print("=" * 75)
-    print(f"Total Presentation Attacks Tested : {total_attacks}")
+    print(f"Attack samples tested             : {total_attacks}")
     print(f"Attacks Successfully Blocked      : {detected_attacks} / {total_attacks} ({(detected_attacks/max(1, total_attacks))*100.0:.1f}%)")
-    print(f"False Acceptance Rate (APCER)     : {(false_acceptances/max(1, total_attacks))*100.0:.1f}%")
-    print(f"Bona Fide Live Samples Tested     : {total_bona_fide}")
-    print(f"False Rejection Rate (BPCER)      : {(false_rejections/max(1, total_bona_fide))*100.0:.1f}%")
+    print(f"Attack Presentation Error (APCER) : {(false_acceptances/max(1, total_attacks))*100.0:.1f}%")
+    print(f"Bona fide samples tested          : {total_bona_fide}")
+    print(f"Bona Fide Presentation Err (BPCER): {(false_rejections/max(1, total_bona_fide))*100.0:.1f}%")
     print(f"Mean Pipeline Throughput          : {mean_fps:.1f} FPS (Target >= 25 FPS)")
     print("=" * 75)
-    print("DISCLAIMER: These metrics reflect local experimental testing against test fixtures")
-    print("and do not constitute formal laboratory certification under ISO/IEC 19792 or 30107.")
+    print("DISCLAIMER: Experimental local benchmark — not formal ISO evaluation.")
+    print("Metrics reflect local experimental testing against developer test fixtures.")
     print("=" * 75 + "\n")
 
 

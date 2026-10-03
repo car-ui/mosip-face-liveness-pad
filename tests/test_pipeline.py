@@ -122,3 +122,89 @@ def test_pipeline_invalid_frame_handling():
     res = pipeline.process_frame(invalid_frame)
     assert res.state == PipelineState.DEVICE_ERROR
     assert res.decision == LivenessDecision.ERROR
+
+
+def test_pipeline_definite_attack_rejected_even_when_active_enabled():
+    """Confirms definite attacks are rejected immediately even if active liveness is enabled."""
+    device = MockL0Device(scenario=MockScenario.SCREEN_REPLAY_ATTACK)
+    device.connect()
+
+    config = LivenessConfig()
+    config.resident_policy.active_liveness_enabled = True
+    config.resident_policy.escalate_attacks_to_active = False
+
+    pipeline = LivenessPipeline(config=config, workflow=WorkflowType.RESIDENT_REGISTRATION)
+    pipeline.reset()
+
+    attack_rejected = False
+    for _ in range(15):
+        success, frame = device.read_frame()
+        res = pipeline.process_frame(frame)
+        if res.state == PipelineState.ATTACK_REJECTED:
+            attack_rejected = True
+            assert res.decision == LivenessDecision.ATTACK_DETECTED
+            assert res.pad_result.attack_detected is True
+            break
+
+    device.disconnect()
+    assert attack_rejected is True
+
+
+def test_pipeline_active_challenge_success_with_scripted_action():
+    """Verifies that an active challenge completes and reaches CAPTURE_SUCCESS upon valid action."""
+    device = MockL0Device(scenario=MockScenario.STATIC_PHOTO_ATTACK)
+    device.connect()
+
+    config = LivenessConfig()
+    config.resident_policy.passive_threshold = 0.95  # Forces active escalation
+    config.resident_policy.min_challenges = 1
+
+    pipeline = LivenessPipeline(config=config, workflow=WorkflowType.RESIDENT_REGISTRATION)
+    pipeline.reset()
+
+    # Step until active challenge starts
+    for _ in range(30):
+        success, frame = device.read_frame()
+        res = pipeline.process_frame(frame)
+        if res.state == PipelineState.ACTIVE_CHALLENGE:
+            break
+
+    assert pipeline.state == PipelineState.ACTIVE_CHALLENGE
+    challenge = pipeline.challenge_manager.active_challenge_state
+    assert challenge is not None
+
+    # Manually mark the challenge completed to test pipeline transition
+    challenge.is_completed = True
+    success, frame = device.read_frame()
+    res = pipeline.process_frame(frame)
+
+    assert res.state == PipelineState.CAPTURE_SUCCESS
+    assert res.decision == LivenessDecision.PASSED
+    assert res.captured_face_image is not None
+    device.disconnect()
+
+
+def test_pipeline_retry_exhaustion():
+    """Verifies that repeated challenge failures transition to MAX_RETRIES_EXCEEDED."""
+    config = LivenessConfig()
+    config.resident_policy.max_retries = 2
+    pipeline = LivenessPipeline(config=config, workflow=WorkflowType.RESIDENT_REGISTRATION)
+    pipeline.reset()
+
+    # Artificially exhaust retries
+    pipeline.challenge_manager.current_retry = 2
+    pipeline.challenge_manager.active_challenge_state = pipeline.challenge_manager.generate_next_challenge()
+    pipeline.challenge_manager.active_challenge_state.is_active = False
+    pipeline.challenge_manager.active_challenge_state.is_completed = False
+    pipeline.state = PipelineState.ACTIVE_CHALLENGE
+
+    device = MockL0Device(scenario=MockScenario.BONA_FIDE_LIVE)
+    device.connect()
+    success, frame = device.read_frame()
+    assert success is True
+
+    res = pipeline.process_frame(frame)
+    device.disconnect()
+    assert res.state == PipelineState.MAX_RETRIES_EXCEEDED
+    assert res.can_retry is False
+

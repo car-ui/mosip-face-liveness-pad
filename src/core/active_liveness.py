@@ -187,12 +187,15 @@ class ActiveLivenessDetector:
                 })
 
         updated_challenge = None
-        if challenge_state and challenge_state.is_active:
+        if challenge_state is not None:
             updated_challenge = self._evaluate_challenge(challenge_state, telemetry)
 
         return telemetry, updated_challenge
 
     def _evaluate_challenge(self, state: ChallengeState, telemetry: Dict[str, Any]) -> ChallengeState:
+        if not state.is_active:
+            return state
+
         elapsed = time.time() - state.start_time
         
         # Timeout enforcement

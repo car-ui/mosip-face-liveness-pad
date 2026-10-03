@@ -35,6 +35,8 @@ def main():
     parser.add_argument("--workflow", type=str, default="RESIDENT_REGISTRATION",
                         choices=["RESIDENT_REGISTRATION", "OPERATOR_AUTHENTICATION", "SUPERVISOR_AUTHENTICATION"],
                         help="Initial workflow profile")
+    parser.add_argument("--diagnostic", action="store_true",
+                        help="Launch directly in Evaluator Diagnostic Mode with technical telemetry HUD")
     args = parser.parse_args()
 
     use_mock = args.mock or (args.demo is not None)
@@ -57,7 +59,8 @@ def main():
     client = DesktopRegistrationClient(
         use_mock_device=use_mock,
         mock_scenario=mock_scenario,
-        initial_workflow=wf
+        initial_workflow=wf,
+        diagnostic_mode=args.diagnostic
     )
 
     if args.demo:

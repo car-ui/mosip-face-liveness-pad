@@ -86,3 +86,39 @@ def test_mock_device_scripted_action():
     assert success is True
     assert frame is not None
     device.disconnect()
+
+
+def test_device_capabilities_discovery():
+    device = MockL0Device()
+    caps = device.get_capabilities()
+    assert caps.device_type == DeviceType.MOCK_L0_SIMULATOR
+    assert caps.vendor == "MOSIP Open Source"
+    assert caps.security_level == "L0_SIMULATED"
+    assert "STREAM" in caps.supported_capture_modes
+    assert (640, 480) in caps.supported_resolutions
+    assert caps.liveness_capabilities["passive_pad"] is True
+
+
+def test_vendor_l1_adapter_operations():
+    from src.devices.base import VendorL1Adapter
+    adapter = VendorL1Adapter(vendor_name="SupremaSecure", model_name="BioMiniL1")
+    assert adapter.connect() is True
+    assert adapter.is_connected() is True
+
+    caps = adapter.get_capabilities()
+    assert caps.vendor == "SupremaSecure"
+    assert caps.security_level == "L1_SECURE_HARDWARE"
+    assert "CRYPTO_TOKEN" in caps.supported_capture_modes
+
+    # Test cryptographic biometric token signing
+    sample_biometric = b"SAMPLE_ISO_19794_5_BIOMETRIC_DATA"
+    signature = adapter.sign_biometric_data(sample_biometric)
+    assert len(signature) == 32  # SHA-256 HMAC digest length
+
+    # Test hardware tamper status
+    assert adapter.verify_tamper_status() is True
+    adapter.simulate_tamper_alarm()
+    assert adapter.verify_tamper_status() is False
+
+    adapter.disconnect()
+    assert not adapter.is_connected()

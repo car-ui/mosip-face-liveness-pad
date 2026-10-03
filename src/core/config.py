@@ -59,6 +59,7 @@ class WorkflowPolicy:
     enforce_single_face: bool = True
     min_face_size_ratio: float = 0.04
     max_face_size_ratio: float = 0.85
+    escalate_attacks_to_active: bool = False
 
 
 @dataclass

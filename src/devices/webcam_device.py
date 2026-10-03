@@ -7,10 +7,10 @@ Conforms to FaceCaptureDevice interface.
 import time
 import cv2
 from typing import Optional, Generator, Tuple
-from .base import FaceCaptureDevice, DeviceInfo, DeviceType, DeviceStatus, VideoFrame
+from .base import L0Device, FaceCaptureDevice, DeviceInfo, DeviceType, DeviceStatus, VideoFrame, DeviceCapabilities
 
 
-class WebcamCaptureDevice(FaceCaptureDevice):
+class WebcamCaptureDevice(L0Device):
     def __init__(self, camera_index: int = 0, target_width: int = 640, target_height: int = 480):
         self.camera_index = camera_index
         self.target_width = target_width
@@ -71,6 +71,23 @@ class WebcamCaptureDevice(FaceCaptureDevice):
 
     def get_device_info(self) -> DeviceInfo:
         return self._info
+
+    def get_capabilities(self) -> DeviceCapabilities:
+        return DeviceCapabilities(
+            device_type=DeviceType.PHYSICAL_L0_WEBCAM,
+            device_id=self._info.device_id,
+            vendor="Standard UVC / DirectShow",
+            model=f"Generic Camera #{self.camera_index}",
+            firmware_version=self._info.firmware_version,
+            security_level="L0_BASIC",
+            supported_capture_modes=["STREAM", "STILL_FRAME"],
+            supported_resolutions=[(self.target_width, self.target_height)],
+            liveness_capabilities={
+                "passive_pad": True,
+                "active_challenge": True,
+                "hardware_liveness": False
+            }
+        )
 
     def read_frame(self) -> Tuple[bool, Optional[VideoFrame]]:
         if not self.is_connected():

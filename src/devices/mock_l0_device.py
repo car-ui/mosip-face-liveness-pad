@@ -19,10 +19,10 @@ import os
 import cv2
 import numpy as np
 from typing import Optional, Generator, Tuple, Dict, Any
-from .base import FaceCaptureDevice, DeviceInfo, DeviceType, DeviceStatus, VideoFrame, MockScenario
+from .base import L0Device, FaceCaptureDevice, DeviceInfo, DeviceType, DeviceStatus, VideoFrame, MockScenario, DeviceCapabilities
 
 
-class MockL0Device(FaceCaptureDevice):
+class MockL0Device(L0Device):
     def __init__(self,
                  scenario: MockScenario = MockScenario.BONA_FIDE_LIVE,
                  video_source: Optional[str] = None,
@@ -87,6 +87,24 @@ class MockL0Device(FaceCaptureDevice):
 
     def get_device_info(self) -> DeviceInfo:
         return self._info
+
+    def get_capabilities(self) -> DeviceCapabilities:
+        return DeviceCapabilities(
+            device_type=DeviceType.MOCK_L0_SIMULATOR,
+            device_id=self._info.device_id,
+            vendor="MOSIP Open Source",
+            model="MockL0_Simulator_2026",
+            firmware_version=self._info.firmware_version,
+            security_level="L0_SIMULATED",
+            supported_capture_modes=["STREAM", "STILL_FRAME"],
+            supported_resolutions=[(640, 480)],
+            liveness_capabilities={
+                "passive_pad": True,
+                "active_challenge": True,
+                "hardware_liveness": False,
+                "simulated_scenarios": len(MockScenario)
+            }
+        )
 
     def _create_synthetic_face(self,
                                center_x: int = 320,
