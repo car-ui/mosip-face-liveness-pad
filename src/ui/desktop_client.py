@@ -474,7 +474,7 @@ class DesktopRegistrationClient:
 
         return canvas
 
-    def start(self):
+    def start(self, max_frames: Optional[int] = None):
         print(f"Connecting to capture device: {self.device.get_device_info().device_name}...")
         if not self.device.connect():
             print("Primary device failed to open, switching to Mock L0 simulator...")
@@ -486,6 +486,7 @@ class DesktopRegistrationClient:
         cv2.resizeWindow(self.window_name, 960, 720)
         self.is_running = True
         self.pipeline.reset()
+        processed_frames = 0
 
         print("\n=== MOSIP Face Liveness & Resident Enrollment Client Started ===")
         print(f"Active Resident ID: {self.enrollment_manager.resident_id}")
@@ -504,6 +505,10 @@ class DesktopRegistrationClient:
                 if not success or frame is None:
                     time.sleep(0.01)
                     continue
+
+                processed_frames += 1
+                if max_frames and processed_frames >= max_frames:
+                    break
 
                 # Run Liveness & PAD pipeline
                 result = self.pipeline.process_frame(frame)

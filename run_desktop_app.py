@@ -2,7 +2,7 @@
 Entry point to launch the MOSIP Desktop Registration Client
 Supports:
 - Live physical L0 webcam capture
-- Mock biometric device simulation with 8 evaluator demonstration modes
+- Mock biometric device simulation with 10 evaluator demonstration modes
 """
 
 import sys
@@ -41,6 +41,8 @@ def main():
                         help="Optional Resident ID for registration (e.g. RES-00123)")
     parser.add_argument("--diagnostic", action="store_true",
                         help="Launch directly in Evaluator Diagnostic Mode with technical telemetry HUD")
+    parser.add_argument("--max-frames", type=int, default=None,
+                        help="Optional maximum number of frames to process before auto-exit (for automated verification)")
     args = parser.parse_args()
 
     use_mock = args.mock or (args.demo is not None)
@@ -72,7 +74,7 @@ def main():
         _, _, threshold = DEMO_MODES[args.demo]
         client.pipeline.policy.passive_threshold = threshold
 
-    client.start()
+    client.start(max_frames=args.max_frames)
 
 
 if __name__ == "__main__":
