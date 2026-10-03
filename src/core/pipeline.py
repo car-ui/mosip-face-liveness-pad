@@ -1,38 +1,48 @@
 """
 Master Face Liveness & PAD Orchestration Pipeline
 Implements the hybrid passive-active workflow defined in MOSIP Decode Problem 04:
-1. Receive incoming frame stream from L0/L1 device
-2. Assess face positioning & biometric quality (ISO/IEC 19794-5)
-3. Perform passive liveness and PAD assessment (ISO/IEC 30107)
-4. Evaluate quality/confidence vs configured policy threshold
-5. If passed, complete capture successfully
-6. If below threshold, automatically initiate dynamic active challenge
-7. Validate action response within timeout
-8. Return biometric artifact or handle retry/failure gracefully
+1. Frame reception & device health check
+2. Biometric quality assessment (ISO/IEC 19794-5)
+3. Modular Passive Liveness & PAD assessment (ISO/IEC 30107) with temporal consistency window
+4. Hybrid decision evaluation:
+   - High Confidence Live -> Immediate CAPTURE_SUCCESS
+   - Presentation Attack Detected -> REJECTED (Zero biometric leakage)
+   - Uncertain / Borderline -> Automatic transition to dynamic active challenge
+5. Dynamic active challenge execution with anti-replay baseline verification
+6. Audit logging and privacy protection
 """
 
 import time
+import uuid
 from enum import Enum
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, Tuple
 import cv2
 import numpy as np
 
-from .config import LivenessConfig, WorkflowType, WorkflowPolicy, LivenessDecision
+from .config import LivenessConfig, WorkflowType, WorkflowPolicy, LivenessDecision, PADVerdict, PADMode
 from .face_detector import FaceQualityAssessor, DetectedFace, QualityMetrics
 from .passive_pad import PassivePADDetector, PADResult
 from .active_liveness import ActiveLivenessDetector, ChallengeState
 from .challenge_manager import ChallengeManager
+from .temporal_buffer import TemporalLivenessBuffer, TemporalAnalysisResult
+from .errors import BiometricErrorCode, get_safe_user_message
+from .audit_logger import BiometricAuditLogger, AuditEventType
 from ..devices.base import VideoFrame
 
 
 class PipelineState(str, Enum):
     IDLE = "IDLE"
-    DETECTING_FACE = "DETECTING_FACE"
-    EVALUATING_PASSIVE = "EVALUATING_PASSIVE"
+    DEVICE_CONNECTING = "DEVICE_CONNECTING"
+    FACE_DETECTION = "FACE_DETECTION"
+    QUALITY_CHECK = "QUALITY_CHECK"
+    PASSIVE_LIVENESS = "PASSIVE_LIVENESS"
     ACTIVE_CHALLENGE = "ACTIVE_CHALLENGE"
-    ATTACK_REJECTED = "ATTACK_REJECTED"
+    CHALLENGE_VALIDATION = "CHALLENGE_VALIDATION"
     CAPTURE_SUCCESS = "CAPTURE_SUCCESS"
+    ATTACK_REJECTED = "ATTACK_REJECTED"
+    QUALITY_FAILURE = "QUALITY_FAILURE"
+    ACTIVE_CHALLENGE_FAILURE = "ACTIVE_CHALLENGE_FAILURE"
     RETRY_PENDING = "RETRY_PENDING"
     MAX_RETRIES_EXCEEDED = "MAX_RETRIES_EXCEEDED"
     DEVICE_ERROR = "DEVICE_ERROR"
@@ -50,48 +60,86 @@ class PipelineStepResult:
     active_challenge: Optional[ChallengeState] = None
     captured_face_image: Optional[np.ndarray] = None
     telemetry: Optional[Dict[str, Any]] = None
+    error_code: Optional[BiometricErrorCode] = None
     can_retry: bool = True
     current_retry: int = 0
     max_retries: int = 3
 
 
 class LivenessPipeline:
-    def __init__(self, config: Optional[LivenessConfig] = None, workflow: WorkflowType = WorkflowType.RESIDENT_REGISTRATION):
+    def __init__(self,
+                 config: Optional[LivenessConfig] = None,
+                 workflow: WorkflowType = WorkflowType.RESIDENT_REGISTRATION,
+                 session_id: Optional[str] = None):
         self.config = config or LivenessConfig()
         self.workflow = workflow
         self.policy: WorkflowPolicy = self.config.get_policy(workflow)
+        self.session_id = session_id or str(uuid.uuid4())
 
         self.quality_assessor = FaceQualityAssessor(
+            min_sharpness=self.config.min_sharpness,
             min_brightness=self.config.min_lighting_score,
             max_brightness=self.config.max_lighting_score
         )
-        self.pad_detector = PassivePADDetector()
+        self.pad_detector = PassivePADDetector(
+            onnx_model_path=self.config.onnx_model_path,
+            mode=self.config.pad_mode,
+            high_confidence_threshold=self.policy.passive_threshold,
+            attack_threshold=self.config.pad_attack_rejection_threshold
+        )
         self.active_detector = ActiveLivenessDetector()
         self.challenge_manager = ChallengeManager(self.policy, self.config.supported_challenges)
+        self.temporal_buffer = TemporalLivenessBuffer(
+            window_size=self.config.temporal_window_size,
+            min_motion_threshold=self.config.min_motion_threshold
+        )
+        self.audit_logger = BiometricAuditLogger.get_logger()
 
         self.state: PipelineState = PipelineState.IDLE
         self._captured_biometric: Optional[np.ndarray] = None
         self._passive_frames_analyzed = 0
-        self._passive_score_accum: float = 0.0
         self._state_start_time = time.time()
         self._last_face_box: Optional[Tuple[int, int, int, int]] = None
 
-    def set_workflow(self, workflow: WorkflowType):
+    def set_workflow(self, workflow: WorkflowType) -> None:
         self.workflow = workflow
         self.policy = self.config.get_policy(workflow)
         self.challenge_manager = ChallengeManager(self.policy, self.config.supported_challenges)
         self.reset()
 
-    def reset(self):
-        """Resets the pipeline for a new biometric capture session."""
-        self.state = PipelineState.DETECTING_FACE
+    def reset(self) -> None:
+        """Resets the pipeline for a fresh biometric verification session."""
+        self.session_id = str(uuid.uuid4())
+        self.state = PipelineState.FACE_DETECTION
         self._captured_biometric = None
         self._passive_frames_analyzed = 0
-        self._passive_score_accum = 0.0
         self._state_start_time = time.time()
         self.challenge_manager.reset()
+        self.temporal_buffer.clear()
+        
+        self.audit_logger.log_event(
+            AuditEventType.CAPTURE_STARTED,
+            session_id=self.session_id,
+            workflow=self.workflow.value,
+            details={"policy_passive_threshold": self.policy.passive_threshold}
+        )
 
     def process_frame(self, frame: VideoFrame) -> PipelineStepResult:
+        # 0. Frame Validation
+        if frame is None or frame.image is None or frame.image.size == 0:
+            self.state = PipelineState.DEVICE_ERROR
+            return PipelineStepResult(
+                state=self.state,
+                decision=LivenessDecision.ERROR,
+                status_text="Device Frame Error",
+                detailed_guidance=get_safe_user_message(BiometricErrorCode.INVALID_FRAME),
+                progress=0.0,
+                error_code=BiometricErrorCode.INVALID_FRAME,
+                can_retry=self.challenge_manager.can_retry(),
+                current_retry=self.challenge_manager.current_retry,
+                max_retries=self.policy.max_retries
+            )
+
         bgr = frame.image
         h, w = bgr.shape[:2]
 
@@ -101,46 +149,55 @@ class LivenessPipeline:
         if challenge_state:
             self.challenge_manager.active_challenge_state = updated_challenge
 
-        # 1. Face Detection & Quality Assessment (using fast known_box if available)
+        # 1. Face Detection & Quality Assessment (ISO/IEC 19794-5)
         known_box = telemetry.get("face_box")
         faces = self.quality_assessor.detect_faces(bgr, known_box=known_box)
         quality = self.quality_assessor.assess_quality(bgr, faces)
 
         # Handle face detection / quality errors
         if not quality.is_acceptable:
+            err_code = BiometricErrorCode.NO_FACE
             if quality.face_count > 1:
+                err_code = BiometricErrorCode.MULTIPLE_FACES
                 status_text = "Multiple Faces Detected"
             elif quality.is_poorly_lit:
+                err_code = BiometricErrorCode.POOR_LIGHTING_DARK
                 status_text = "Adjust Lighting"
             elif quality.is_blurry:
+                err_code = BiometricErrorCode.BLURRY_FACE
                 status_text = "Hold Still"
             elif not quality.is_centered:
+                err_code = BiometricErrorCode.FACE_NOT_CENTERED
                 status_text = "Center Your Face"
             else:
                 status_text = "Positioning face..."
 
-            # If during active challenge, keep active state but warn user
+            safe_guidance = quality.error_message or get_safe_user_message(err_code)
+
             if self.state == PipelineState.ACTIVE_CHALLENGE and self.challenge_manager.active_challenge_state:
                 return PipelineStepResult(
                     state=self.state,
                     decision=LivenessDecision.ACTIVE_CHALLENGE_REQUIRED,
                     status_text=status_text,
-                    detailed_guidance=quality.error_message or "Keep face centered in frame",
+                    detailed_guidance=safe_guidance,
                     progress=self.challenge_manager.active_challenge_state.progress,
                     quality=quality,
                     active_challenge=self.challenge_manager.active_challenge_state,
+                    error_code=err_code,
                     can_retry=self.challenge_manager.can_retry(),
                     current_retry=self.challenge_manager.current_retry,
                     max_retries=self.policy.max_retries
                 )
-            
+
+            self.state = PipelineState.FACE_DETECTION
             return PipelineStepResult(
-                state=PipelineState.DETECTING_FACE,
+                state=self.state,
                 decision=LivenessDecision.ERROR,
                 status_text=status_text,
-                detailed_guidance=quality.error_message or "Look directly at camera",
+                detailed_guidance=safe_guidance,
                 progress=0.1,
                 quality=quality,
+                error_code=err_code,
                 can_retry=self.challenge_manager.can_retry(),
                 current_retry=self.challenge_manager.current_retry,
                 max_retries=self.policy.max_retries
@@ -150,52 +207,96 @@ class LivenessPipeline:
         face_box = (face.x, face.y, face.w, face.h)
         self._last_face_box = face_box
 
-        # 2. State Machine Handling
-        # If in DETECTING_FACE and face is well positioned, proceed to PASSIVE check
-        if self.state in (PipelineState.IDLE, PipelineState.DETECTING_FACE):
-            self.state = PipelineState.EVALUATING_PASSIVE
+        # 2. State Machine: Transition from FACE_DETECTION to PASSIVE_LIVENESS
+        if self.state in (PipelineState.IDLE, PipelineState.FACE_DETECTION):
+            self.state = PipelineState.PASSIVE_LIVENESS
             self._passive_frames_analyzed = 0
-            self._passive_score_accum = 0.0
             self._state_start_time = time.time()
+            self.temporal_buffer.clear()
 
         # 3. PASSIVE LIVENESS & PAD EVALUATION
-        if self.state == PipelineState.EVALUATING_PASSIVE:
+        if self.state == PipelineState.PASSIVE_LIVENESS:
             pad_result = self.pad_detector.evaluate_passive_liveness(bgr, face_box)
-            
-            # Check for presentation attack: if active liveness is enabled, challenge the user to prove liveness
-            if pad_result.attack_detected:
+
+            # Update temporal sliding buffer
+            self.temporal_buffer.add_frame(
+                timestamp=time.time(),
+                liveness_score=pad_result.liveness_score,
+                is_live=pad_result.is_live,
+                attack_detected=pad_result.attack_detected,
+                ear=telemetry.get("ear", 0.3),
+                smile_score=telemetry.get("smile_score", 0.0),
+                yaw=telemetry.get("yaw", 0.0),
+                pitch=telemetry.get("pitch", 0.0),
+                face_center=telemetry.get("face_center", (w / 2.0, h / 2.0))
+            )
+            temp_analysis = self.temporal_buffer.analyze()
+
+            # Check for definite presentation attack:
+            if pad_result.verdict == PADVerdict.PRESENTATION_ATTACK:
+                self.audit_logger.log_event(
+                    AuditEventType.PAD_ATTACK_DETECTED,
+                    session_id=self.session_id,
+                    workflow=self.workflow.value,
+                    details={
+                        "attack_type": pad_result.attack_type,
+                        "liveness_score": pad_result.liveness_score,
+                        "mode": pad_result.mode_used
+                    }
+                )
+
                 if self.policy.active_liveness_enabled:
+                    # Ambiguous attack vector -> escalate to dynamic active challenge per MOSIP spec
                     self.state = PipelineState.ACTIVE_CHALLENGE
-                    self.challenge_manager.generate_next_challenge()
+                    challenge = self.challenge_manager.generate_next_challenge()
+                    return PipelineStepResult(
+                        state=self.state,
+                        decision=LivenessDecision.ACTIVE_CHALLENGE_REQUIRED,
+                        status_text=f"Please {challenge.challenge_type.value.lower().replace('_', ' ')}",
+                        detailed_guidance="Verification requires a quick interactive response.",
+                        progress=0.3,
+                        quality=quality,
+                        pad_result=pad_result,
+                        active_challenge=challenge,
+                        can_retry=self.challenge_manager.can_retry(),
+                        current_retry=self.challenge_manager.current_retry,
+                        max_retries=self.policy.max_retries
+                    )
                 else:
                     self.state = PipelineState.ATTACK_REJECTED
                     return PipelineStepResult(
                         state=self.state,
                         decision=LivenessDecision.ATTACK_DETECTED,
-                        status_text="Verification could not be completed",
-                        detailed_guidance="Potential presentation attack detected. Please present a live face.",
+                        status_text="Verification Incomplete",
+                        detailed_guidance=get_safe_user_message(BiometricErrorCode.PAD_ATTACK_DETECTED),
                         progress=0.0,
                         quality=quality,
                         pad_result=pad_result,
+                        error_code=BiometricErrorCode.PAD_ATTACK_DETECTED,
                         can_retry=self.challenge_manager.can_retry(),
                         current_retry=self.challenge_manager.current_retry,
                         max_retries=self.policy.max_retries
                     )
 
             self._passive_frames_analyzed += 1
-            self._passive_score_accum += pad_result.liveness_score
-            avg_score = self._passive_score_accum / self._passive_frames_analyzed
-
-            # Evaluate over a visible 1.5 second window (30 frames) per MOSIP Section 10.2
-            max_passive_window = 30
+            max_passive_window = 25  # ~0.8-1.0 second visible evaluation
             passive_progress = min(1.0, self._passive_frames_analyzed / float(max_passive_window))
 
             if self._passive_frames_analyzed >= max_passive_window:
-                if avg_score >= self.policy.passive_threshold:
-                    # High confidence passive liveness passed without requiring active action!
+                # Evaluate temporal rolling score rather than single frame
+                rolling_score = temp_analysis.rolling_liveness_score
+
+                if rolling_score >= self.policy.passive_threshold and temp_analysis.temporal_stability >= 0.60:
+                    # High confidence passive liveness passed!
                     self.state = PipelineState.CAPTURE_SUCCESS
                     self._captured_biometric = bgr.copy()
-                    self._state_start_time = time.time()
+                    
+                    self.audit_logger.log_event(
+                        AuditEventType.CAPTURE_SUCCESS,
+                        session_id=self.session_id,
+                        workflow=self.workflow.value,
+                        details={"path": "PASSIVE_DIRECT", "score": rolling_score}
+                    )
                     return PipelineStepResult(
                         state=self.state,
                         decision=LivenessDecision.PASSED,
@@ -210,22 +311,42 @@ class LivenessPipeline:
                         max_retries=self.policy.max_retries
                     )
                 else:
-                    # Passive score insufficient -> Transition dynamically to Active Challenge per MOSIP Spec
+                    # Uncertain / borderline score -> escalate to active challenges
                     if self.policy.active_liveness_enabled:
                         self.state = PipelineState.ACTIVE_CHALLENGE
-                        self.challenge_manager.generate_next_challenge()
+                        challenge = self.challenge_manager.generate_next_challenge()
+                        self.audit_logger.log_event(
+                            AuditEventType.ACTIVE_CHALLENGE_STARTED,
+                            session_id=self.session_id,
+                            workflow=self.workflow.value,
+                            details={"reason": "PASSIVE_UNCERTAIN", "rolling_score": rolling_score}
+                        )
+                        return PipelineStepResult(
+                            state=self.state,
+                            decision=LivenessDecision.ACTIVE_CHALLENGE_REQUIRED,
+                            status_text=f"Please {challenge.challenge_type.value.lower().replace('_', ' ')}",
+                            detailed_guidance="Verification requires a quick interactive response.",
+                            progress=0.4,
+                            quality=quality,
+                            pad_result=pad_result,
+                            active_challenge=challenge,
+                            can_retry=self.challenge_manager.can_retry(),
+                            current_retry=self.challenge_manager.current_retry,
+                            max_retries=self.policy.max_retries
+                        )
                     else:
                         self.state = PipelineState.RETRY_PENDING
                         self._state_start_time = time.time()
 
             return PipelineStepResult(
                 state=self.state,
-                decision=LivenessDecision.ACTIVE_CHALLENGE_REQUIRED,
-                status_text="Checking face liveness...",
-                detailed_guidance="Hold still while analyzing facial characteristics (Passive Check)",
+                decision=LivenessDecision.ACTIVE_CHALLENGE_REQUIRED if self.state == PipelineState.ACTIVE_CHALLENGE else LivenessDecision.IN_PROGRESS,
+                status_text="Please complete the active challenge" if self.state == PipelineState.ACTIVE_CHALLENGE else "Checking face liveness...",
+                detailed_guidance="Follow on-screen instructions" if self.state == PipelineState.ACTIVE_CHALLENGE else "Analyzing facial biometric characteristics (Passive Check)",
                 progress=passive_progress * 0.5,
                 quality=quality,
                 pad_result=pad_result,
+                active_challenge=self.challenge_manager.active_challenge_state,
                 can_retry=self.challenge_manager.can_retry(),
                 current_retry=self.challenge_manager.current_retry,
                 max_retries=self.policy.max_retries
@@ -239,10 +360,16 @@ class LivenessPipeline:
                 telemetry, updated_challenge = self.active_detector.process_frame(bgr, challenge_state)
                 self.challenge_manager.active_challenge_state = updated_challenge
 
-            # Check if active challenge timed out or failed
+            # Check challenge timeout or failure
             if updated_challenge and not updated_challenge.is_active and not updated_challenge.is_completed:
-                # Challenge failed
                 self.challenge_manager.increment_retry()
+                self.audit_logger.log_event(
+                    AuditEventType.ACTIVE_CHALLENGE_FAILED,
+                    session_id=self.session_id,
+                    workflow=self.workflow.value,
+                    details={"retry": self.challenge_manager.current_retry, "max": self.policy.max_retries}
+                )
+
                 if self.challenge_manager.can_retry():
                     self.state = PipelineState.RETRY_PENDING
                     self._state_start_time = time.time()
@@ -250,11 +377,12 @@ class LivenessPipeline:
                         state=self.state,
                         decision=LivenessDecision.FAILED,
                         status_text="Challenge not completed",
-                        detailed_guidance=f"Verification failed. Retry {self.challenge_manager.current_retry}/{self.policy.max_retries}.",
+                        detailed_guidance=f"Verification attempt failed. Retry {self.challenge_manager.current_retry}/{self.policy.max_retries}.",
                         progress=0.0,
                         quality=quality,
                         active_challenge=updated_challenge,
                         telemetry=telemetry,
+                        error_code=BiometricErrorCode.ACTIVE_CHALLENGE_TIMEOUT,
                         can_retry=True,
                         current_retry=self.challenge_manager.current_retry,
                         max_retries=self.policy.max_retries
@@ -265,24 +393,38 @@ class LivenessPipeline:
                         state=self.state,
                         decision=LivenessDecision.FAILED,
                         status_text="Verification Limit Reached",
-                        detailed_guidance="Maximum verification attempts exceeded. Please contact the registration supervisor.",
+                        detailed_guidance=get_safe_user_message(BiometricErrorCode.MAX_RETRIES_EXCEEDED),
                         progress=0.0,
                         quality=quality,
                         active_challenge=updated_challenge,
                         telemetry=telemetry,
+                        error_code=BiometricErrorCode.MAX_RETRIES_EXCEEDED,
                         can_retry=False,
                         current_retry=self.challenge_manager.current_retry,
                         max_retries=self.policy.max_retries
                     )
 
-            # Check if current challenge succeeded
+            # Check if active challenge succeeded
             if updated_challenge and updated_challenge.is_completed:
                 self.challenge_manager.record_challenge_success()
-                
-                # Check if all required challenges are met
+                self.audit_logger.log_event(
+                    AuditEventType.ACTIVE_CHALLENGE_PASSED,
+                    session_id=self.session_id,
+                    workflow=self.workflow.value,
+                    details={"challenge": updated_challenge.challenge.value}
+                )
+
                 if self.challenge_manager.is_all_challenges_satisfied():
                     self.state = PipelineState.CAPTURE_SUCCESS
                     self._captured_biometric = bgr.copy()
+                    
+                    self.audit_logger.log_event(
+                        AuditEventType.CAPTURE_SUCCESS,
+                        session_id=self.session_id,
+                        workflow=self.workflow.value,
+                        details={"path": "ACTIVE_CHALLENGES_VERIFIED"}
+                    )
+
                     return PipelineStepResult(
                         state=self.state,
                         decision=LivenessDecision.PASSED,
@@ -298,7 +440,7 @@ class LivenessPipeline:
                         max_retries=self.policy.max_retries
                     )
                 else:
-                    # Generate next challenge in the dynamic sequence
+                    # Proceed to next challenge
                     self.challenge_manager.generate_next_challenge()
 
             return PipelineStepResult(
@@ -315,7 +457,7 @@ class LivenessPipeline:
                 max_retries=self.policy.max_retries
             )
 
-        # 5. RETRY / TERMINAL STATES
+        # 5. TERMINAL & RETRY STATES
         if self.state == PipelineState.CAPTURE_SUCCESS:
             return PipelineStepResult(
                 state=self.state,
@@ -331,17 +473,16 @@ class LivenessPipeline:
 
         if self.state == PipelineState.RETRY_PENDING:
             if time.time() - self._state_start_time > 2.0:
-                # Automatically resume capture for next retry attempt
-                self.state = PipelineState.DETECTING_FACE
+                self.state = PipelineState.FACE_DETECTION
                 self._passive_frames_analyzed = 0
-                self._passive_score_accum = 0.0
+                self.temporal_buffer.clear()
 
         is_max = (self.state == PipelineState.MAX_RETRIES_EXCEEDED)
         return PipelineStepResult(
             state=self.state,
             decision=LivenessDecision.FAILED,
             status_text="Verification Limit Reached" if is_max else "Retrying in 2 seconds...",
-            detailed_guidance="Please try again or seek supervisor assistance." if is_max else f"Attempt {self.challenge_manager.current_retry + 1} of {self.policy.max_retries}. Stay centered.",
+            detailed_guidance=get_safe_user_message(BiometricErrorCode.MAX_RETRIES_EXCEEDED) if is_max else f"Attempt {self.challenge_manager.current_retry + 1} of {self.policy.max_retries}. Stay centered.",
             progress=0.0,
             can_retry=self.challenge_manager.can_retry(),
             current_retry=self.challenge_manager.current_retry,

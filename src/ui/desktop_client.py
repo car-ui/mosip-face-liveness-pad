@@ -15,7 +15,7 @@ import cv2
 import numpy as np
 from typing import Optional, Tuple
 
-from ..devices.base import FaceCaptureDevice
+from ..devices.base import FaceCaptureDevice, DeviceType, MockScenario
 from ..devices.webcam_device import WebcamCaptureDevice
 from ..devices.mock_l0_device import MockL0Device
 from ..core.pipeline import LivenessPipeline, PipelineState, PipelineStepResult
@@ -23,13 +23,17 @@ from ..core.config import WorkflowType, LivenessConfig
 
 
 class DesktopRegistrationClient:
-    def __init__(self, use_mock_device: bool = False):
+    def __init__(self,
+                 use_mock_device: bool = False,
+                 mock_scenario: MockScenario = MockScenario.BONA_FIDE_LIVE,
+                 initial_workflow: WorkflowType = WorkflowType.RESIDENT_REGISTRATION):
         self.config = LivenessConfig()
-        self.workflow = WorkflowType.RESIDENT_REGISTRATION
+        self.workflow = initial_workflow
         self.pipeline = LivenessPipeline(self.config, self.workflow)
         
         self.use_mock_device = use_mock_device
-        self.device: FaceCaptureDevice = MockL0Device() if use_mock_device else WebcamCaptureDevice(0)
+        self.mock_scenario = mock_scenario
+        self.device: FaceCaptureDevice = MockL0Device(scenario=mock_scenario) if use_mock_device else WebcamCaptureDevice(0)
         self.window_name = "MOSIP Registration Client - Face Liveness & PAD (Decode 04)"
         self.is_running = False
 
@@ -103,7 +107,7 @@ class DesktopRegistrationClient:
                                 state: PipelineState) -> None:
         """Renders a cinematic laser scanning line sweeping top-to-bottom with a trailing holographic light curtain."""
         # Only sweep during face detection, passive evaluation, or active challenge
-        if state not in (PipelineState.DETECTING_FACE, PipelineState.EVALUATING_PASSIVE, PipelineState.ACTIVE_CHALLENGE):
+        if state not in (PipelineState.FACE_DETECTION, PipelineState.PASSIVE_LIVENESS, PipelineState.ACTIVE_CHALLENGE, PipelineState.CHALLENGE_VALIDATION):
             return
 
         # Continuous smooth sweep from top to bottom (cycle duration ~1.6s)
@@ -167,7 +171,7 @@ class DesktopRegistrationClient:
         cv2.circle(canvas, (x2, scan_y), 7, theme_accent, 1, cv2.LINE_AA)
 
         # 5. High-Tech HUD Telemetry Tag
-        hud_label = "PASSIVE BIOMETRIC SCAN" if state == PipelineState.EVALUATING_PASSIVE else "LIVENESS ACTIVE VERIFY"
+        hud_label = "PASSIVE BIOMETRIC SCAN" if state == PipelineState.PASSIVE_LIVENESS else "LIVENESS ACTIVE VERIFY"
         cv2.putText(canvas, hud_label, (center_x - 76, scan_y - 8),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.32, bright_core, 1, cv2.LINE_AA)
 
@@ -199,10 +203,10 @@ class DesktopRegistrationClient:
         if result.state == PipelineState.CAPTURE_SUCCESS:
             theme_accent = (70, 230, 70)   # Vivid Emerald
             status_dot_color = (70, 230, 70)
-        elif result.state in (PipelineState.ATTACK_REJECTED, PipelineState.MAX_RETRIES_EXCEEDED):
+        elif result.state in (PipelineState.ATTACK_REJECTED, PipelineState.MAX_RETRIES_EXCEEDED, PipelineState.DEVICE_ERROR, PipelineState.QUALITY_FAILURE, PipelineState.ACTIVE_CHALLENGE_FAILURE):
             theme_accent = (60, 60, 240)   # Vivid Coral Red
             status_dot_color = (60, 60, 240)
-        elif result.state == PipelineState.ACTIVE_CHALLENGE:
+        elif result.state in (PipelineState.ACTIVE_CHALLENGE, PipelineState.CHALLENGE_VALIDATION):
             theme_accent = (0, 215, 255)   # Amber Gold
             status_dot_color = (0, 215, 255)
         elif result.state == PipelineState.RETRY_PENDING:

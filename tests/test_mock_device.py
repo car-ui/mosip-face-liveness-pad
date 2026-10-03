@@ -1,11 +1,13 @@
 import pytest
+import numpy as np
 from src.devices.mock_l0_device import MockL0Device
-from src.devices.base import DeviceStatus, DeviceType
+from src.devices.base import DeviceStatus, DeviceType, MockScenario
 
 
 def test_mock_device_lifecycle():
     device = MockL0Device(fps=30)
     assert not device.is_connected()
+    assert device.is_available() is True
     
     # Test connection
     assert device.connect() is True
@@ -26,3 +28,61 @@ def test_mock_device_lifecycle():
     # Test disconnect
     device.disconnect()
     assert not device.is_connected()
+
+
+def test_mock_device_scenarios():
+    scenarios = [
+        MockScenario.BONA_FIDE_LIVE,
+        MockScenario.STATIC_PHOTO_ATTACK,
+        MockScenario.SCREEN_REPLAY_ATTACK,
+        MockScenario.NO_FACE,
+        MockScenario.MULTIPLE_FACES,
+        MockScenario.POOR_LIGHTING_DARK,
+        MockScenario.POOR_LIGHTING_BRIGHT,
+        MockScenario.POOR_LIGHTING_UNEVEN,
+        MockScenario.BLURRY_FRAME,
+    ]
+    
+    for s in scenarios:
+        device = MockL0Device(scenario=s)
+        device.connect()
+        success, frame = device.read_frame()
+        assert success is True, f"Failed for scenario {s}"
+        assert frame is not None
+        assert frame.image.shape == (480, 640, 3)
+        device.disconnect()
+
+
+def test_mock_device_invalid_frame_scenario():
+    device = MockL0Device(scenario=MockScenario.INVALID_FRAME)
+    device.connect()
+    success, frame = device.read_frame()
+    assert success is False
+    assert frame is None
+    device.disconnect()
+
+
+def test_mock_device_disconnect_scenario():
+    device = MockL0Device(scenario=MockScenario.DEVICE_DISCONNECT, disconnect_after_frames=3)
+    device.connect()
+    
+    # Frames 1, 2, 3 should succeed
+    for _ in range(3):
+        success, frame = device.read_frame()
+        assert success is True
+    
+    # Beyond frame 3, device should simulate drop
+    success, frame = device.read_frame()
+    assert success is False
+    assert not device.is_connected()
+
+
+def test_mock_device_scripted_action():
+    device = MockL0Device(scenario=MockScenario.BONA_FIDE_LIVE)
+    device.connect()
+    device.script_action("BLINK", duration_frames=5)
+    
+    success, frame = device.read_frame()
+    assert success is True
+    assert frame is not None
+    device.disconnect()

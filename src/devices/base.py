@@ -1,7 +1,9 @@
 """
 Common Face Capture Device Interface and Device Adapter Pattern
-Ensures independence from any specific biometric hardware vendor.
-Supports L0/L1 compliant streams, physical webcams, and mock devices.
+Conforms to MOSIP Device Service (MDS) hardware abstraction requirements:
+- Complete vendor neutrality
+- Decouples biometric processing from physical capture hardware
+- Supports Physical L0 Webcams, L1 Secure Hardware Sensors, and Mock Simulators
 """
 
 from abc import ABC, abstractmethod
@@ -22,6 +24,20 @@ class DeviceStatus(str, Enum):
     STREAMING = "STREAMING"
     DISCONNECTED = "DISCONNECTED"
     ERROR = "ERROR"
+
+
+class MockScenario(str, Enum):
+    BONA_FIDE_LIVE = "BONA_FIDE_LIVE"
+    STATIC_PHOTO_ATTACK = "STATIC_PHOTO_ATTACK"
+    SCREEN_REPLAY_ATTACK = "SCREEN_REPLAY_ATTACK"
+    NO_FACE = "NO_FACE"
+    MULTIPLE_FACES = "MULTIPLE_FACES"
+    POOR_LIGHTING_DARK = "POOR_LIGHTING_DARK"
+    POOR_LIGHTING_BRIGHT = "POOR_LIGHTING_BRIGHT"
+    POOR_LIGHTING_UNEVEN = "POOR_LIGHTING_UNEVEN"
+    BLURRY_FRAME = "BLURRY_FRAME"
+    DEVICE_DISCONNECT = "DEVICE_DISCONNECT"
+    INVALID_FRAME = "INVALID_FRAME"
 
 
 @dataclass
@@ -63,7 +79,12 @@ class FaceCaptureDevice(ABC):
 
     @abstractmethod
     def is_connected(self) -> bool:
-        """Check if device is ready and healthy."""
+        """Check if device is currently connected and active."""
+        pass
+
+    @abstractmethod
+    def is_available(self) -> bool:
+        """Check if device hardware is available on the system."""
         pass
 
     @abstractmethod

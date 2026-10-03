@@ -21,9 +21,10 @@ sequenceDiagram
     Device-->>MDS: Frame stream (30 FPS)
     MDS-->>Client: Live video stream overlay (/stream)
 
-    loop Every Incoming Frame
-        MDS->>Engine: Process frame (Quality + Passive PAD)
-        Engine-->>MDS: QualityMetrics + PADResult
+    loop Every Incoming Frame (Sliding Window N=20)
+        MDS->>Engine: Process frame (ISO 19794-5 Quality + Temporal Buffer + Passive PAD)
+        Engine->>Engine: Aggregate weighted rolling confidence & micro-motion jitter
+        Engine-->>MDS: QualityMetrics + PADResult + TemporalAnalysis
     end
 
     alt Passive Liveness Score >= 0.80 (High Confidence)

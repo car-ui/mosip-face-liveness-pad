@@ -1,6 +1,7 @@
 """
 Standard Physical Webcam Implementation (L0 Device)
 Captures live frames from built-in or USB cameras via OpenCV/UVC abstraction.
+Conforms to FaceCaptureDevice interface.
 """
 
 import time
@@ -56,6 +57,17 @@ class WebcamCaptureDevice(FaceCaptureDevice):
 
     def is_connected(self) -> bool:
         return self._cap is not None and self._cap.isOpened()
+
+    def is_available(self) -> bool:
+        if self.is_connected():
+            return True
+        try:
+            temp_cap = cv2.VideoCapture(self.camera_index)
+            avail = temp_cap.isOpened()
+            temp_cap.release()
+            return avail
+        except Exception:
+            return False
 
     def get_device_info(self) -> DeviceInfo:
         return self._info
