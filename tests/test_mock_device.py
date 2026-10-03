@@ -107,7 +107,7 @@ def test_vendor_l1_adapter_operations():
 
     caps = adapter.get_capabilities()
     assert caps.vendor == "SupremaSecure"
-    assert caps.security_level == "L1_SECURE_HARDWARE"
+    assert caps.security_level == "L1_SIMULATED"
     assert "CRYPTO_TOKEN" in caps.supported_capture_modes
 
     # Test cryptographic biometric token signing

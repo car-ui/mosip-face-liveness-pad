@@ -1,6 +1,6 @@
 # MOSIP Face Liveness Detection and Presentation Attack Detection (Decode 2026 - Problem 04)
 
-[![Tests: 61 Passed](https://img.shields.io/badge/Tests-61%20Passed-brightgreen.svg)]()
+[![Tests: 64 Passed](https://img.shields.io/badge/Tests-64%20Passed-brightgreen.svg)]()
 [![Platform: Offline-First](https://img.shields.io/badge/Architecture-100%25%20Offline-blue.svg)]()
 [![Standard: ISO/IEC 30107 & 19794-5 Aligned](https://img.shields.io/badge/Standards-ISO%2FIEC%2030107%20%7C%2019794--5-orange.svg)]()
 [![Python: 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg)]()
@@ -46,7 +46,7 @@ A robust, enterprise-grade, hardware-agnostic solution for **Face Liveness Detec
 
 6. **L0/L1 Multi-Vendor Device Abstraction**:
    * Clear inheritance hierarchy: `BaseBiometricDevice` $\rightarrow$ `L0Device` (`WebcamCaptureDevice`, `MockL0Device`) & `L1Device` (`VendorL1Adapter`).
-   * **Capability Discovery (`DeviceCapabilities`)**: Structured query of supported capture modes, resolutions, security level, and hardware capabilities.
+   * **Capability Discovery (`DeviceCapabilities`)**: Structured query of supported capture modes, resolutions, security level (`L0_BASIC`, `L0_SIMULATED`, `L1_SIMULATED`), and hardware capabilities.
    * **Comprehensive Scenario Simulator (`MockL0Device`)**: Reproducibly simulates 10 critical operational conditions for automated CI/CD:
      * `BONA_FIDE_LIVE`, `STATIC_PHOTO_ATTACK`, `SCREEN_REPLAY_ATTACK`, `NO_FACE`, `MULTIPLE_FACES`, `POOR_LIGHTING_DARK`, `POOR_LIGHTING_BRIGHT`, `POOR_LIGHTING_UNEVEN`, `BLURRY_FRAME`, `DEVICE_DISCONNECT`, `INVALID_FRAME`.
      * Supports programmable scripted actions (`BLINK`, `SMILE`, `TURN_LEFT`, `TURN_RIGHT`).
@@ -56,17 +56,17 @@ A robust, enterprise-grade, hardware-agnostic solution for **Face Liveness Detec
    * Automatic execution provider discovery via `onnxruntime.get_available_providers()` prioritizing CUDA, DirectML, OpenVINO, and CPU.
 
 8. **Secure Offline Model Updates (`SecureModelUpdateManager`)**:
-   * Model update package verification: SHA-256 integrity, HMAC-SHA256 signature verification, strict semantic version progression (anti-downgrade), atomic POSIX/Windows filesystem replacement, and automatic rollback on failure.
+   * Model update package verification: SHA-256 integrity, HMAC-SHA256 signature verification, strict semantic version progression (anti-downgrade), atomic POSIX/Windows filesystem replacement, and automatic rollback on failure. Dynamic key injection via environment variables.
 
 9. **Multi-Workflow Policy Engine**:
    * **Resident Registration**: Low-friction passive evaluation ($0.80$ threshold) with automatic active challenge escalation on uncertainty.
-   * **Operator Authentication**: High-security threshold ($0.88$) with 1 mandatory challenge and tight timeouts.
+   * **Operator Authentication**: High-security threshold ($0.88$) with 2 mandatory challenges and tight timeouts.
    * **Supervisor Authentication**: Maximum security ($0.92$) requiring 2 sequential multi-challenges for biometric override.
 
 10. **MOSIP Device Service (MDS) REST & MJPEG Service**:
     * Compliant with MOSIP Device Service architectural patterns on `http://127.0.0.1:4501/`.
     * Standard endpoints: `/info` (device discovery), `/stream` (live MJPEG overlay), `/capture` (biometric token generation with ISO 19794-5 packaging), `/configure` (runtime threshold updates), and `/switch-device`.
-    * Full Pydantic request/response schema validation with standard HTTP error codes (`400`, `408`, `503`).
+    * Configurable CORS protection defaulting to loopback interfaces with full Pydantic validation.
 
 11. **Security & Privacy Protections**:
     * **Safe Error Taxonomy**: Clear separation between internal diagnostics (`SCREEN_REPLAY_DETECTED`, `MOIRE_HARMONICS_DETECTED`) and safe user-facing instructions (`"Face verification could not be completed. Please position your face and try again."`) to prevent reverse-engineering of PAD thresholds.
@@ -87,16 +87,16 @@ A robust, enterprise-grade, hardware-agnostic solution for **Face Liveness Detec
 | **Temporal Consistency Buffer** | **REAL** | Rolling sliding frame buffer, weighted confidence, stability metrics, micro-motion jitter |
 | **Privacy Audit Logging** | **REAL** | Zero raw image persistence, structured JSON events with UUIDs and ISO 8601 timestamps |
 | **Safe Error Taxonomy** | **REAL** | Internal diagnostic codes mapped to user-facing safe guidance |
-| **MOSIP Device Service (MDS)** | **REAL** | FastAPI REST & MJPEG daemon on port 4501 with Pydantic validation & standard HTTP error codes |
+| **MOSIP Device Service (MDS)** | **REAL** | FastAPI REST & MJPEG daemon on port 4501 with configurable CORS, Pydantic validation & capability discovery |
 | **Secure Offline Model Updater** | **REAL** | SHA-256 integrity, HMAC signature verification, semantic anti-downgrade, atomic swap, rollback |
 | **Model Version & Provider Tracking** | **REAL** | `ModelMetadata` provenance, SHA-256 hash tracking, `onnxruntime` provider discovery |
 | **Desktop Client UI** | **REAL** | OpenCV HUD, Apple-style FaceID oval, cinematic laser scanner, Evaluator Diagnostic Mode |
 | **Java 21 Client Adapter** | **REAL** | HTTP/JSON MOSIP desktop client adapter connecting to MDS on port 4501 |
 | **Deterministic Mock L0 Device** | **SIMULATED** | 10 reproducible operational scenarios + programmable scripted actions for CI/CD |
-| **Vendor L1 Device Adapter** | **ARCHITECTURE-READY** | Concrete `VendorL1Adapter` demonstrating cryptographic biometric token signing & tamper alarms for vendor SDKs |
+| **Vendor L1 Device Adapter** | **SIMULATED** | Concrete `VendorL1Adapter` demonstrating cryptographic token signing & tamper alarms; actual L1 hardware requires vendor SDK |
 | **Deep Learning ONNX Weights** | **ARCHITECTURE-READY** | `ONNXModelPADBackend` implemented; loads standard `.onnx` models when dropped into path |
 | **Low-Resource Android Optimization** | **ARCHITECTURE-READY** | Documented adaptive frame subsampling & NNAPI quantization strategy; no native Android build in repo |
-| **Formal ISO Certification** | **NOT IMPLEMENTED** | System is engineered in alignment with ISO/IEC 30107 & 19794-5; formal certification requires accredited lab |
+| **Formal ISO Certification** | **NOT CLAIMED** | System is engineered in alignment with ISO/IEC 30107 & 19794-5; formal certification requires accredited lab |
 
 ---
 
@@ -139,7 +139,7 @@ livliness/
 │   ├── test_temporal.py          # 4 Sliding window, micro-motion, and stability tests
 │   ├── test_model_updater.py      # 4 Integrity, signature, anti-downgrade, and rollback tests
 │   ├── test_workflows.py          # 4 Resident, Operator, Supervisor policy tests
-│   ├── test_mds.py                # 7 MDS REST endpoint & capability discovery tests
+│   ├── test_mds.py                # 10 MDS REST endpoint, stream & capture regression tests
 │   └── test_enrollment.py         # 5 Lightweight resident enrollment & privacy tests
 ├── run_desktop_app.py             # Desktop Client UI launcher with --demo, --diagnostic, and --resident-id flags
 ├── run_mds_service.py             # MOSIP Device Service (MDS) launcher
@@ -166,12 +166,12 @@ python -m venv venv
 pip install -r requirements.txt
 ```
 
-### 3. Run the Automated Test Suite (61 Tests)
+### 3. Run the Automated Test Suite (64 Tests)
 Execute the complete unit and integration test suite:
 ```powershell
 .\venv\Scripts\python -m pytest -v
 ```
-*All 61 tests pass 100%, covering face quality assessment, passive heuristics, temporal active challenges, device abstractions, lightweight resident enrollment, privacy guarantees, offline model updates, workflow policies, and MDS REST endpoints.*
+*All 64 tests pass 100%, covering face quality assessment, passive heuristics, temporal active challenges, device abstractions, lightweight resident enrollment, privacy guarantees, offline model updates, workflow policies, and MDS REST endpoints.*
 
 ---
 
@@ -217,6 +217,31 @@ The desktop client provides dedicated flags to demonstrate all 8 core evaluator 
 * `d`: Toggle **Evaluator Diagnostic Mode** on/off (shows FPS, EAR, MAR, Yaw, and score breakdown).
 * `1`, `2`, `3`: Switch workflow policies on the fly (`1`: Resident, `2`: Operator, `3`: Supervisor).
 * `q` or `Esc`: Gracefully quit.
+
+---
+
+## 🧭 Step-by-Step Evaluator Walkthrough (Recommended Flow)
+
+Follow this 18-step sequential checklist to evaluate the complete subsystem end-to-end:
+
+1. **Start MDS Service**: Run `.\venv\Scripts\python run_mds_service.py` (daemon binds to port 4501).
+2. **Inspect Web Console**: Open browser at `http://127.0.0.1:4501/`. Verify live video stream renders with centering oval.
+3. **Device Capability Discovery**: Query `GET http://127.0.0.1:4501/info` and inspect `DeviceCapabilities` JSON (security level, vendor, resolutions).
+4. **Resident Biometric Enrollment (Live Mock)**: On web console or via CLI (`run_desktop_app.py --demo 1`), select Resident Registration (`RES-00123`).
+5. **Passive PAD Evaluation**: Observe passive multi-cue analysis evaluating quality, frequency harmonics, and chrominance in real-time.
+6. **Enrollment Completion**: Capture completes, displays `RES-00123 [COMPLETED]` with SHA-256 token hash (zero raw facial image persistence).
+7. **Static Photo Attack Simulation**: Switch device to Photo Spoof (`run_desktop_app.py --demo 2` or click web button).
+8. **Verify PAD Rejection**: Observe immediate `ATTACK_REJECTED` verdict without escalating to active challenges.
+9. **Screen Replay Attack Simulation**: Switch to Screen Replay (`run_desktop_app.py --demo 3`).
+10. **Verify Screen Glare & Moiré Rejection**: Observe high-frequency 2D DFT harmonics triggering `ATTACK_REJECTED`.
+11. **Operator Authentication Workflow**: Press `2` (or select Operator Auth). Note elevated passive threshold (0.88) and mandatory active challenge.
+12. **Supervisor Authentication Workflow**: Press `3` (or select Supervisor Auth). Note maximum security threshold (0.92) requiring multi-challenge verification.
+13. **Active Challenge Execution**: Press `n` or run `--demo 7` / `--demo 8` to observe EAR blink sequence or baseline-neutral smile hold.
+14. **Toggle Diagnostic Mode**: Press `d` to inspect live FPS, EAR, MAR, 3D Pose Yaw/Pitch, and active PAD engine (`Heuristic PAD — Active` or `ONNX`).
+15. **Vendor L1 Adapter Demonstration**: Click "Vendor L1 — Simulated Adapter" or query `/info` to see `securityLevel: L1_SIMULATED` with HMAC-SHA256 biometric signing.
+16. **Offline Model Updater**: Run model updater verification test to observe SHA-256 check, HMAC verification, anti-downgrade check, and rollback.
+17. **Run Attack Benchmark**: Run `.\venv\Scripts\python test_photo_spoof_simulation.py` to inspect APCER/BPCER developer benchmark metrics.
+18. **Verify Test Suite**: Run `.\venv\Scripts\python -m pytest -v` to confirm all 64 unit and integration tests pass 100%.
 
 ---
 

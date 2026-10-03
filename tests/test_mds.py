@@ -56,8 +56,8 @@ def test_mds_switch_to_vendor_l1(client):
     assert "DEV-L1" in data["current_device"]
 
     info = client.get("/info").json()
-    assert info["certification"] == "L1"
-    assert info["securityLevel"] == "L1_SECURE_HARDWARE"
+    assert info["certification"] == "L1_SIMULATED"
+    assert info["securityLevel"] == "L1_SIMULATED"
     assert info["vendor"] == "GenericMOSIP_Vendor"
 
 
@@ -95,6 +95,10 @@ def test_mds_capture_live_success(client):
         "resident_id": "RES-00777",
         "timeout_seconds": 10
     })
+    # Reset policy threshold back to default
+    mds_module.pipeline.policy.passive_threshold = 0.82
+    mds_module.pipeline.config.resident_policy.passive_threshold = 0.82
+
     assert response.status_code == 200
     data = response.json()
     assert data["responseStatus"] == "SUCCESS"
@@ -123,3 +127,58 @@ def test_mds_capture_timeout(client):
     assert response.status_code == 408
     data = response.json()
     assert data["responseStatus"] == "TIMEOUT"
+
+
+def test_mds_stream_endpoint(client):
+    # Tests that /stream returns HTTP 200 and a valid multipart/x-mixed-replace MJPEG stream
+    from src.mds.mds_server import stream_frames
+    mds_module.device = MockL0Device(scenario=MockScenario.BONA_FIDE_LIVE)
+    mds_module.device.connect()
+
+    response = stream_frames()
+    assert response.status_code == 200
+    assert response.media_type == "multipart/x-mixed-replace; boundary=frame"
+    assert response.body_iterator is not None
+
+
+def test_mds_capture_attack_rejection(client):
+    # Tests that static photo attacks are rejected without false acceptances
+    mds_module.device = MockL0Device(scenario=MockScenario.STATIC_PHOTO_ATTACK)
+    mds_module.device.connect()
+    mds_module.pipeline.policy.passive_threshold = 0.82
+    mds_module.pipeline.config.resident_policy.passive_threshold = 0.82
+
+    response = client.post("/capture", json={
+        "workflow": "RESIDENT_REGISTRATION",
+        "timeout_seconds": 3
+    })
+    # Should result in FAILURE / ATTACK_DETECTED or timeout rather than SUCCESS
+    assert response.status_code in (200, 408)
+    data = response.json()
+    assert data.get("responseStatus") in ("FAILURE", "TIMEOUT")
+    assert data.get("decision") != "PASSED"
+
+
+def test_mds_capture_active_challenge_mock_completion(client):
+    # Tests that escalating to active challenge in mock live mode completes successfully
+    mds_module.device = MockL0Device(scenario=MockScenario.BONA_FIDE_LIVE)
+    mds_module.device.connect()
+    # Force active challenge escalation with high passive threshold
+    mds_module.pipeline.policy.passive_threshold = 0.98
+    mds_module.pipeline.policy.min_challenges = 1
+
+    response = client.post("/capture", json={
+        "workflow": "RESIDENT_REGISTRATION",
+        "resident_id": "RES-00999",
+        "timeout_seconds": 10
+    })
+    # Reset policy threshold back to default
+    mds_module.pipeline.policy.passive_threshold = 0.82
+    mds_module.pipeline.config.resident_policy.passive_threshold = 0.82
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["responseStatus"] == "SUCCESS"
+    assert data["decision"] == "PASSED"
+    assert data["residentId"] == "RES-00999"
+    assert data["enrollmentStatus"] == "COMPLETED"

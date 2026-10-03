@@ -46,7 +46,7 @@ class ResidentEnrollmentRecord:
     status_message: str = "In Progress"
     rejection_reason: Optional[str] = None
     device_id: str = "UNKNOWN"
-    device_security_level: str = "L0_BASIC"      # "L0_BASIC" or "L1_SECURE_HARDWARE"
+    device_security_level: str = "L0_BASIC"      # "L0_BASIC", "L0_SIMULATED", "L1_SIMULATED", or "L1_SECURE_HARDWARE"
     model_backend: str = "heuristic_multi_cue"
     model_version: str = "v1.2.0-heuristic"
     model_hash: str = "N/A"

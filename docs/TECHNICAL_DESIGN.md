@@ -139,12 +139,12 @@ BaseBiometricDevice (Abstract)
 Every device provides structured metadata for MDS discovery:
 * `device_type`: `PHYSICAL_L0_WEBCAM`, `MOCK_L0_SIMULATOR`, `HARDWARE_L1_BIOMETRIC`, or `VENDOR_L1_ADAPTER`
 * `vendor`, `model`, `firmware_version`
-* `security_level`: `"L0_BASIC"` vs `"L1_SECURE_HARDWARE"`
+* `security_level`: `"L0_BASIC"`, `"L0_SIMULATED"`, `"L1_SIMULATED"` (reserved: `"L1_SECURE_HARDWARE"` for certified physical hardware)
 * `supported_capture_modes`: `["STREAM", "STILL_FRAME", "CRYPTO_TOKEN"]`
 * `liveness_capabilities`: Supported hardware/software PAD indicators
 
-### Secure L1 Hardware Integration (`VendorL1Adapter`)
-L1 devices incorporate on-chip cryptographic signing (`sign_biometric_data()`) and physical tamper detection (`verify_tamper_status()`). The `VendorL1Adapter` provides a concrete integration point where physical vendor SDKs (e.g., Suprema, Idemia, Dermalog, Mantra) attach their native C/C++ drivers.
+### Simulated L1 Hardware Integration (`VendorL1Adapter`)
+VendorL1Adapter demonstrates the integration contract and simulator behavior; actual L1 hardware requires vendor SDK/device integration. L1 devices incorporate on-chip cryptographic signing (`sign_biometric_data()`) and physical tamper detection (`verify_tamper_status()`). The `VendorL1Adapter` provides a concrete integration point where physical vendor SDKs (e.g., Suprema, Idemia, Dermalog, Mantra) attach their native C/C++ drivers.
 
 ---
 

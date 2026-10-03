@@ -269,7 +269,17 @@ class DesktopRegistrationClient:
         badge_x = self._draw_badge(canvas, self.workflow.value.replace("_", " "), (badge_x, 34),
                                     (35, 45, 65), (230, 240, 255), 0.38) + 8
         
-        dev_label = "MOCK SIMULATOR" if self.use_mock_device else "L0 WEBCAM"
+        if hasattr(self, 'device') and self.device:
+            dtype = self.device.get_device_info().device_type
+            if dtype == DeviceType.MOCK_L0_SIMULATOR:
+                dev_label = "Mock L0 — Simulation"
+            elif dtype == DeviceType.VENDOR_L1_ADAPTER:
+                dev_label = "Vendor L1 — Simulated Adapter"
+            else:
+                dev_label = "L0 Physical Webcam"
+        else:
+            dev_label = "Mock L0 — Simulation" if self.use_mock_device else "L0 Physical Webcam"
+
         badge_x = self._draw_badge(canvas, dev_label, (badge_x, 34),
                                     (30, 50, 45), (70, 230, 140), 0.38) + 8
 
@@ -369,9 +379,18 @@ class DesktopRegistrationClient:
             cv2.putText(canvas, "DIAGNOSTIC MODE [D: TOGGLE]", (dx1 + 14, dy1 + 24),
                         cv2.FONT_HERSHEY_DUPLEX, 0.42, (90, 180, 255), 1, cv2.LINE_AA)
             
+            pad_mode_label = "Heuristic PAD — Active"
+            if result.pad_result:
+                if result.pad_result.mode_used == "MODEL":
+                    pad_mode_label = "ONNX Model — Loaded"
+                elif result.pad_result.mode_used == "MODEL_UNAVAILABLE":
+                    pad_mode_label = "ONNX Model — Not Loaded"
+                else:
+                    pad_mode_label = "Heuristic PAD — Active"
+
             lines = [
                 f"Throughput: {self._fps:.1f} FPS",
-                f"PAD Mode: {result.pad_result.mode_used if result.pad_result else 'HEURISTIC'}",
+                f"Engine: {pad_mode_label}",
                 f"Passive Score: {result.pad_result.liveness_score if result.pad_result else 0.0:.3f}",
                 f"Confidence: {result.pad_result.confidence if result.pad_result else 0.0:.3f}",
                 f"EAR: {result.telemetry.get('ear', 0.0) if result.telemetry else 0.0:.3f}",
@@ -392,8 +411,8 @@ class DesktopRegistrationClient:
         cv2.putText(canvas, controls, (42, target_h - 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.38, (150, 160, 180), 1, cv2.LINE_AA)
         
-        iso_tag = "ISO/IEC 30107-3 | ISO/IEC 19794-5"
-        cv2.putText(canvas, iso_tag, (target_w - 275, target_h - 30),
+        iso_tag = "ISO/IEC 30107 & 19794-5 Aligned"
+        cv2.putText(canvas, iso_tag, (target_w - 280, target_h - 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.38, (110, 120, 140), 1, cv2.LINE_AA)
 
         # 8. SUCCESS & REJECTION MODALS

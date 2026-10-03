@@ -8,6 +8,8 @@ Conforms to the MOSIP Device Service (MDS) REST architecture:
 - POST /switch-device : Switch between Physical Webcam (L0) and Mock L0 Simulator
 """
 
+import os
+import asyncio
 import base64
 import time
 import hashlib
@@ -33,12 +35,20 @@ app = FastAPI(
     version="1.3.0"
 )
 
+# Configurable CORS: Defaults to localhost loopback interfaces for local evaluation;
+# can be customized via MOSIP_MDS_ALLOWED_ORIGINS environment variable in production.
+_allowed_origins_env = os.environ.get(
+    "MOSIP_MDS_ALLOWED_ORIGINS",
+    "http://127.0.0.1:4501,http://localhost:4501,http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:8080,http://localhost:8080"
+)
+_cors_origins = ["*"] if _allowed_origins_env == "*" else [o.strip() for o in _allowed_origins_env.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_cors_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 # Global device and pipeline instances
@@ -120,7 +130,7 @@ def index_page():
             <div class="main-grid">
                 <div class="video-card">
                     <img src="/stream" alt="Live MOSIP Video Stream">
-                    <p style="color: #8b949e; font-size: 13px; margin-top: 12px;">Conforms to ISO/IEC 30107 & ISO/IEC 19794-5 Principles</p>
+                    <p style="color: #8b949e; font-size: 13px; margin-top: 12px;">ISO/IEC 30107 & ISO/IEC 19794-5-Aligned Face Capture & Quality Assessment</p>
                 </div>
                 <div class="controls-card">
                     <div class="section-title">Workflow Profile</div>
@@ -134,10 +144,10 @@ def index_page():
                     <input type="text" id="resIdInput" value="RES-00123" style="width: 95%; padding: 8px; background: #0f1117; border: 1px solid #3a4250; color: #fff; border-radius: 6px; margin-bottom: 12px; font-weight: 600;">
 
                     <div class="section-title">Device Source</div>
-                    <button class="btn btn-secondary" onclick="switchDevice('MOCK', 'BONA_FIDE_LIVE')">Mock Simulator (Live Face)</button>
-                    <button class="btn btn-secondary" onclick="switchDevice('MOCK', 'STATIC_PHOTO_ATTACK')">Mock Simulator (Photo Spoof)</button>
-                    <button class="btn btn-secondary" onclick="switchDevice('WEBCAM', '')">Switch to Live Webcam L0</button>
-                    <button class="btn btn-secondary" onclick="switchDevice('L1', '')">Switch to Vendor L1 Adapter (Simulated)</button>
+                    <button class="btn btn-secondary" onclick="switchDevice('MOCK', 'BONA_FIDE_LIVE')">Mock L0 — Simulation (Live Face)</button>
+                    <button class="btn btn-secondary" onclick="switchDevice('MOCK', 'STATIC_PHOTO_ATTACK')">Mock L0 — Simulation (Photo Spoof)</button>
+                    <button class="btn btn-secondary" onclick="switchDevice('WEBCAM', '')">Physical L0 Webcam</button>
+                    <button class="btn btn-secondary" onclick="switchDevice('L1', '')">Vendor L1 — Simulated Adapter</button>
 
                     <div class="section-title" style="margin-top: 14px;">Biometric Capture</div>
                     <button class="btn btn-primary" onclick="triggerCapture()">Trigger POST /capture</button>
@@ -215,7 +225,7 @@ def get_device_info():
         "model": caps.model,
         "firmware": info.firmware_version,
         "serialNumber": info.serial_number,
-        "certification": "L1" if info.is_l1_secure else "L0",
+        "certification": "L1_SIMULATED" if info.device_type == DeviceType.VENDOR_L1_ADAPTER else ("L1_SECURE_HARDWARE" if info.is_l1_secure else "L0"),
         "securityLevel": caps.security_level,
         "serviceVersion": "MDS_1.3.0",
         "specVersion": "MOSIP_MDS_0.9.5",
@@ -286,16 +296,24 @@ def configure_subsystem(req: ConfigureRequest):
 def stream_frames():
     """Multipart MJPEG video stream with real-time biometric guidance overlay."""
     def frame_generator():
-        for frame in device.start_stream():
-            step_result = pipeline.process_frame(frame)
-            ui_renderer.use_mock_device = (device.get_device_info().device_type == DeviceType.MOCK_L0_SIMULATOR)
-            ui_renderer.workflow = pipeline.workflow
-            display = ui_renderer.draw_ui_overlay(frame.image, step_result)
+        try:
+            for frame in device.start_stream():
+                if not device.is_connected():
+                    break
+                step_result = pipeline.process_frame(frame)
+                ui_renderer.use_mock_device = (device.get_device_info().device_type == DeviceType.MOCK_L0_SIMULATOR)
+                ui_renderer.workflow = pipeline.workflow
+                display = ui_renderer.draw_ui_overlay(frame.image, step_result)
 
-            ret, buffer = cv2.imencode('.jpg', display)
-            if ret:
-                yield (b'--frame\r\n'
-                       b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+                ret, buffer = cv2.imencode('.jpg', display)
+                if ret:
+                    yield (b'--frame\r\n'
+                           b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+        except (GeneratorExit, asyncio.CancelledError):
+            # Client closed HTTP connection (e.g. browser navigation or disconnect)
+            pass
+        except Exception:
+            pass
 
     return StreamingResponse(frame_generator(), media_type="multipart/x-mixed-replace; boundary=frame")
 
@@ -337,8 +355,14 @@ def capture_biometric(request: CaptureRequest):
         result = pipeline.process_frame(frame)
         last_result = result
 
-        # In mock simulator mode, automatically simulate successful challenge completion
-        if isinstance(device, MockL0Device) and device.scenario == MockScenario.BONA_FIDE_LIVE:
+        # DEMO/SIMULATION ONLY — automatic challenge completion is enabled strictly for MockL0Device simulation.
+        # This ensures deterministic evaluator testing and automated CI/CD runs.
+        # It is STRICTLY disabled and never bypassed for physical webcams, real L1 hardware, or VendorL1Adapter.
+        is_mock_simulator = (
+            device.get_device_info().device_type == DeviceType.MOCK_L0_SIMULATOR
+            and isinstance(device, MockL0Device)
+        )
+        if is_mock_simulator and device.scenario == MockScenario.BONA_FIDE_LIVE:
             if result.state == PipelineState.ACTIVE_CHALLENGE and pipeline.challenge_manager.active_challenge_state:
                 pipeline.challenge_manager.active_challenge_state.is_completed = True
 

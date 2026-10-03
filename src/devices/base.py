@@ -167,7 +167,9 @@ class VendorL1Adapter(L1Device):
     """
     Vendor L1 Biometric Hardware Adapter.
     Architectural integration point for vendor biometric hardware SDKs (e.g. Suprema, Idemia, Dermalog, Mantra).
-    Provides simulated L1 cryptographic token signing and tamper verification in development environments.
+    VendorL1Adapter demonstrates the integration contract and simulator behavior; actual L1 hardware
+    requires vendor SDK/device integration. Provides simulated L1 cryptographic token signing and tamper
+    verification in development and evaluation environments.
     """
 
     def __init__(self,
@@ -202,7 +204,7 @@ class VendorL1Adapter(L1Device):
     def get_device_info(self) -> DeviceInfo:
         return DeviceInfo(
             device_id=self.device_id,
-            device_name=f"{self.vendor_name} {self.model_name}",
+            device_name=f"{self.vendor_name} {self.model_name} (Simulated L1)",
             device_type=DeviceType.VENDOR_L1_ADAPTER,
             serial_number=f"SN-{hashlib.sha256(self.device_id.encode()).hexdigest()[:8].upper()}",
             firmware_version=self.firmware_version,
@@ -217,7 +219,7 @@ class VendorL1Adapter(L1Device):
             vendor=self.vendor_name,
             model=self.model_name,
             firmware_version=self.firmware_version,
-            security_level="L1_SECURE_HARDWARE",
+            security_level="L1_SIMULATED",
             supported_capture_modes=["STREAM", "STILL_FRAME", "CRYPTO_TOKEN"],
             supported_resolutions=[(640, 480), (1280, 720), (1920, 1080)],
             liveness_capabilities={
