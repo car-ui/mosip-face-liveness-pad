@@ -17,7 +17,7 @@ A robust, enterprise-grade, hardware-agnostic solution for **Face Liveness Detec
 1. **Lightweight Resident Enrollment Experience & Strict Data Privacy**:
    * **Predictable Resident ID Tracking**: Generates or accepts standard `RES-XXXXX` tokens via `ResidentEnrollmentManager`.
    * **Live 3-Step Dynamic HUD Checklist**: Guides residents intuitively through `1. Position Face` $\rightarrow$ `2. Liveness Check` $\rightarrow$ `3. Enrolled`.
-   * **Strict Data Privacy**: Verifies liveness purely in ephemeral memory; enrollment records and structured audit logs store strictly zero raw facial images or pixel arrays, retaining only cryptographic SHA-256 biometric token hashes.
+   * **Strict Data Privacy**: Verifies liveness purely in ephemeral memory; enrollment records and structured audit logs store strictly zero raw facial images or pixel arrays, retaining only a cryptographic SHA-256 hash of the captured biometric frame payload for token verification (not a feature template vector).
 
 2. **Modular Passive PAD Engine (ISO/IEC 30107 Aligned)**:
    * **Pluggable ONNX Inference Interface**: Allows dropping in pre-trained ONNX liveness models (`.onnx`) with zero code modifications; safe fallback in `ONNX_ONLY` mode when models are missing.
@@ -75,28 +75,41 @@ A robust, enterprise-grade, hardware-agnostic solution for **Face Liveness Detec
 
 ---
 
-## 📊 Implementation Status Matrix
+## 📊 Feature Coverage Matrix (Official Problem 04 Requirements)
 
-| Component / Deliverable | Status | Nature of Implementation |
-| :--- | :--- | :--- |
-| **Resident Biometric Enrollment** | **REAL** | Lightweight enrollment manager (`RES-XXXXX`), live 3-step HUD checklist, zero raw image retention |
-| **Physical L0 Webcam Capture** | **REAL** | OpenCV / UVC hardware camera stream capture with DirectShow acceleration |
-| **ISO 19794-5 Quality Assessor** | **REAL** | Laplacian variance blur filter, mean luminance check, centering oval, single-face validation |
-| **Multi-Cue Heuristic PAD** | **REAL** | 2D Discrete Fourier Transform moiré detection, YCrCb chromatic variance, specular glare, Sobel texture |
-| **Active Challenge Geometry** | **REAL** | MediaPipe 478 landmarks, temporal EAR three-phase blink, neutral baseline smile hold, SolvePnP 3D pose |
-| **Temporal Consistency Buffer** | **REAL** | Rolling sliding frame buffer, weighted confidence, stability metrics, micro-motion jitter |
-| **Privacy Audit Logging** | **REAL** | Zero raw image persistence, structured JSON events with UUIDs and ISO 8601 timestamps |
-| **Safe Error Taxonomy** | **REAL** | Internal diagnostic codes mapped to user-facing safe guidance |
-| **MOSIP Device Service (MDS)** | **REAL** | FastAPI REST & MJPEG daemon on port 4501 with configurable CORS, Pydantic validation & capability discovery |
-| **Secure Offline Model Updater** | **REAL** | SHA-256 integrity, HMAC signature verification, semantic anti-downgrade, atomic swap, rollback |
-| **Model Version & Provider Tracking** | **REAL** | `ModelMetadata` provenance, SHA-256 hash tracking, `onnxruntime` provider discovery |
-| **Desktop Client UI** | **REAL** | OpenCV HUD, Apple-style FaceID oval, cinematic laser scanner, Evaluator Diagnostic Mode |
-| **Java 21 Client Adapter** | **REAL** | HTTP/JSON MOSIP desktop client adapter connecting to MDS on port 4501 |
-| **Deterministic Mock L0 Device** | **SIMULATED** | 10 reproducible operational scenarios + programmable scripted actions for CI/CD |
-| **Vendor L1 Device Adapter** | **SIMULATED** | Concrete `VendorL1Adapter` demonstrating cryptographic token signing & tamper alarms; actual L1 hardware requires vendor SDK |
-| **Deep Learning ONNX Weights** | **ARCHITECTURE-READY** | `ONNXModelPADBackend` implemented; loads standard `.onnx` models when dropped into path |
-| **Low-Resource Android Optimization** | **ARCHITECTURE-READY** | Documented adaptive frame subsampling & NNAPI quantization strategy; no native Android build in repo |
-| **Formal ISO Certification** | **NOT CLAIMED** | System is engineered in alignment with ISO/IEC 30107 & 19794-5; formal certification requires accredited lab |
+| Requirement | Category | Status | Implementation File | Demo / Test Verification |
+| :--- | :--- | :--- | :--- | :--- |
+| **Physical L0 Webcam Capture** | Mandatory | ✅ **REAL** | [`src/devices/webcam_device.py`](file:///c:/Users/Kartheek/Downloads/livliness/src/devices/webcam_device.py) | `python run_desktop_app.py` |
+| **L1 Device Integration** | Mandatory | 🟡 **SIMULATED** | [`src/devices/base.py`](file:///c:/Users/Kartheek/Downloads/livliness/src/devices/base.py) (`VendorL1Adapter`) | `pytest tests/test_mock_device.py -k test_vendor_l1` |
+| **ISO 19794-5 Quality Assessor** | Mandatory | ✅ **REAL** | [`src/core/face_detector.py`](file:///c:/Users/Kartheek/Downloads/livliness/src/core/face_detector.py) | `pytest tests/test_face_detector.py` |
+| **Passive Liveness Engine** | Mandatory | ✅ **REAL** | [`src/core/passive_pad.py`](file:///c:/Users/Kartheek/Downloads/livliness/src/core/passive_pad.py) | `pytest tests/test_passive_pad.py` |
+| **Presentation Attack Detection** | Mandatory | ✅ **REAL** | [`src/core/passive_pad.py`](file:///c:/Users/Kartheek/Downloads/livliness/src/core/passive_pad.py) | `python run_desktop_app.py --demo 3` |
+| **Active Liveness Challenges** | Mandatory | ✅ **REAL** | [`src/core/active_liveness.py`](file:///c:/Users/Kartheek/Downloads/livliness/src/core/active_liveness.py) | `python run_desktop_app.py --demo 2` |
+| **Resident Registration Workflow** | Mandatory | ✅ **REAL** | [`src/core/enrollment.py`](file:///c:/Users/Kartheek/Downloads/livliness/src/core/enrollment.py) | `python run_desktop_app.py --resident-id RES-00123` |
+| **Operator Authentication** | Mandatory | ✅ **REAL** | [`src/core/pipeline.py`](file:///c:/Users/Kartheek/Downloads/livliness/src/core/pipeline.py) | `python run_desktop_app.py --workflow OPERATOR_AUTHENTICATION` |
+| **Supervisor Authentication** | Mandatory | ✅ **REAL** | [`src/core/pipeline.py`](file:///c:/Users/Kartheek/Downloads/livliness/src/core/pipeline.py) | `python run_desktop_app.py --workflow SUPERVISOR_AUTHENTICATION` |
+| **Configuration & Policies** | Mandatory | ✅ **REAL** | [`src/core/config.py`](file:///c:/Users/Kartheek/Downloads/livliness/src/core/config.py) | `pytest tests/test_workflows.py` |
+| **Offline Operation** | Mandatory | ✅ **REAL** | Core pipeline (zero external network calls) | `python -m pytest -v` (100% offline) |
+| **Error Handling & Taxonomy** | Mandatory | ✅ **REAL** | [`src/core/errors.py`](file:///c:/Users/Kartheek/Downloads/livliness/src/core/errors.py) | `python run_desktop_app.py --demo 8` |
+| **Desktop UI / UX** | Mandatory | ✅ **REAL** | [`src/ui/desktop_client.py`](file:///c:/Users/Kartheek/Downloads/livliness/src/ui/desktop_client.py) | `python run_desktop_app.py --demo 1` |
+| **Multiple Facial Actions (6 Actions)** | Good-to-Have | ✅ **REAL** | [`src/core/active_liveness.py`](file:///c:/Users/Kartheek/Downloads/livliness/src/core/active_liveness.py) | `pytest tests/test_active_liveness.py` |
+| **Configurable Challenge Pools** | Good-to-Have | ✅ **REAL** | [`src/core/challenge_manager.py`](file:///c:/Users/Kartheek/Downloads/livliness/src/core/challenge_manager.py) | `pytest tests/test_active_liveness.py -k test_challenge_manager` |
+| **Workflow Policy Switching** | Good-to-Have | ✅ **REAL** | [`src/core/config.py`](file:///c:/Users/Kartheek/Downloads/livliness/src/core/config.py) | Press `1`, `2`, `3` in Desktop Client |
+| **Configurable User Guidance** | Good-to-Have | ✅ **REAL** | [`src/core/errors.py`](file:///c:/Users/Kartheek/Downloads/livliness/src/core/errors.py) | Decoupled safe end-user messages in Action Card |
+| **Diagnostic Mode HUD** | Good-to-Have | ✅ **REAL** | [`src/ui/desktop_client.py`](file:///c:/Users/Kartheek/Downloads/livliness/src/ui/desktop_client.py) | `python run_desktop_app.py --mock --diagnostic` |
+| **Multi-Vendor Capability Discovery** | Good-to-Have | ✅ **REAL** | [`src/devices/base.py`](file:///c:/Users/Kartheek/Downloads/livliness/src/devices/base.py) (`DeviceCapabilities`) | `curl -s http://127.0.0.1:4501/info` |
+| **Anonymized Operational Metrics** | Good-to-Have | ✅ **REAL** | [`src/core/audit_logger.py`](file:///c:/Users/Kartheek/Downloads/livliness/src/core/audit_logger.py) | Inspect stdout structured JSON audit events |
+| **Liveness Performance Metrics** | Good-to-Have | ✅ **REAL** | [`test_photo_spoof_simulation.py`](file:///c:/Users/Kartheek/Downloads/livliness/test_photo_spoof_simulation.py) | `python test_photo_spoof_simulation.py` |
+| **Mock L0/L1 Simulator (11 Scenarios)** | Bonus | ✅ **REAL** | [`src/devices/mock_l0_device.py`](file:///c:/Users/Kartheek/Downloads/livliness/src/devices/mock_l0_device.py) | `pytest tests/test_mock_device.py` |
+| **Automated PAD Attack Benchmarks** | Bonus | ✅ **REAL** | [`test_photo_spoof_simulation.py`](file:///c:/Users/Kartheek/Downloads/livliness/test_photo_spoof_simulation.py) | `python test_photo_spoof_simulation.py` |
+| **Interoperability Framework (MDS API)**| Bonus | ✅ **REAL** | [`src/mds/mds_server.py`](file:///c:/Users/Kartheek/Downloads/livliness/src/mds/mds_server.py) | `python run_mds_service.py` & `pytest tests/test_mds.py` |
+| **Java 21 Client Adapter** | Bonus | ✅ **REAL** | [`src/java_integration/MosipLivenessDeviceService.java`](file:///c:/Users/Kartheek/Downloads/livliness/src/java_integration/MosipLivenessDeviceService.java) | `javac src/java_integration/MosipLivenessDeviceService.java` |
+| **Model Version & Provenance** | Bonus | ✅ **REAL** | [`src/core/model_updater.py`](file:///c:/Users/Kartheek/Downloads/livliness/src/core/model_updater.py) (`ModelMetadata`) | Provenance hash attached to all audit/API outputs |
+| **Secure Offline Model Updates** | Bonus | ✅ **REAL** | [`src/core/model_updater.py`](file:///c:/Users/Kartheek/Downloads/livliness/src/core/model_updater.py) | `pytest tests/test_model_updater.py` |
+| **Hardware Acceleration Discovery** | Bonus | ✅ **REAL** | [`src/core/passive_pad.py`](file:///c:/Users/Kartheek/Downloads/livliness/src/core/passive_pad.py) | DirectML, CUDA, OpenVINO provider priority lookup |
+| **Deep Learning ONNX Weights** | Bonus | 🔵 **ARCH-READY**| [`src/core/passive_pad.py`](file:///c:/Users/Kartheek/Downloads/livliness/src/core/passive_pad.py) (`ONNXModelPADBackend`) | Drops into `assets/models/` without code change |
+| **Low-Resource Android Strategy** | Bonus | 🔵 **ARCH-READY**| Documented adaptive subsampling (10 Hz DFT) & NNAPI | [`docs/TECHNICAL_DESIGN.md`](file:///c:/Users/Kartheek/Downloads/livliness/docs/TECHNICAL_DESIGN.md#L183-L195) |
+| **Formal ISO Laboratory Certification**| Standard | ❌ **NOT CLAIMED**| Alignment with ISO/IEC 30107 & 19794-5 design principles | Formal testing requires accredited third-party lab |
 
 ---
 
@@ -177,37 +190,43 @@ Execute the complete unit and integration test suite:
 
 ## 🎬 Live Evaluator Demo Modes
 
-The desktop client provides dedicated flags to demonstrate all 8 core evaluator scenarios instantly:
+The desktop client provides dedicated flags to demonstrate all 10 core evaluator scenarios instantly:
 
 ```powershell
 # Lightweight Resident Registration (With custom or auto-generated Resident ID)
 .\venv\Scripts\python run_desktop_app.py --resident-id RES-00123
 
-# Demo 1: Bona Fide Live Subject (Natural facial capture)
+# Demo 1: Bona Fide Live Subject (High confidence passive pass)
 .\venv\Scripts\python run_desktop_app.py --demo 1
 
-# Demo 2: Photo Print Presentation Attack (Static paper presentation)
+# Demo 2: Uncertain Passive -> Dynamic Active Challenge Escalation
 .\venv\Scripts\python run_desktop_app.py --demo 2
 
-# Demo 3: Screen Replay Presentation Attack (Smartphone display with moiré + glare)
+# Demo 3: Printed Photo Presentation Attack (Heuristic PAD Rejection)
 .\venv\Scripts\python run_desktop_app.py --demo 3
 
-# Demo 4: Poor Lighting / Underexposed Subject (Low illumination rejection)
+# Demo 4: Smartphone Screen Replay Attack (Moiré grid + specular glare rejection)
 .\venv\Scripts\python run_desktop_app.py --demo 4
 
-# Demo 5: Motion Blur & Poor Focus (Laplacian sharpness rejection)
+# Demo 5: Static Photo against Active Challenge (Times out & fails)
 .\venv\Scripts\python run_desktop_app.py --demo 5
 
 # Demo 6: Multiple Faces in Frame (ISO 19794-5 single-subject enforcement)
 .\venv\Scripts\python run_desktop_app.py --demo 6
 
-# Demo 7: Active Liveness Challenge: Blink Verification (Temporal EAR cycle)
+# Demo 7: Poor Lighting Environment (Underexposed dark rejection & user guidance)
 .\venv\Scripts\python run_desktop_app.py --demo 7
 
-# Demo 8: Active Liveness Challenge: Smile Verification (Baseline-neutral delta hold)
+# Demo 8: Device Disconnect (Mid-stream hardware failure handling)
 .\venv\Scripts\python run_desktop_app.py --demo 8
 
-# Launch in Evaluator Diagnostic Mode (Displays raw FPS, EAR, MAR, Yaw, PAD score HUD):
+# Demo 9: Blurry Frame & Defocus (Laplacian sharpness quality rejection)
+.\venv\Scripts\python run_desktop_app.py --demo 9
+
+# Demo 10: No Face Present in Frame (Positioning guidance prompt)
+.\venv\Scripts\python run_desktop_app.py --demo 10
+
+# Launch directly in Evaluator Diagnostic Mode (Displays raw FPS, EAR, MAR, Yaw, PAD score HUD):
 .\venv\Scripts\python run_desktop_app.py --mock --diagnostic
 ```
 

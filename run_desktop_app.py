@@ -20,7 +20,9 @@ DEMO_MODES = {
     "5": ("Static Photo against Active Challenge (Times Out & Fails)", MockScenario.STATIC_PHOTO_ATTACK, 0.95),
     "6": ("Multiple Faces Detection (Integrity Violation Rejection)", MockScenario.MULTIPLE_FACES, 0.85),
     "7": ("Poor Lighting Environment (Quality Rejection & User Guidance)", MockScenario.POOR_LIGHTING_DARK, 0.85),
-    "8": ("Device Disconnect (Mid-stream Hardware Failure Handling)", MockScenario.DEVICE_DISCONNECT, 0.85)
+    "8": ("Device Disconnect (Mid-stream Hardware Failure Handling)", MockScenario.DEVICE_DISCONNECT, 0.85),
+    "9": ("Blurry Frame & Defocus (Sharpness Quality Rejection)", MockScenario.BLURRY_FRAME, 0.85),
+    "10": ("No Face Detected (Positioning Guidance Prompt)", MockScenario.NO_FACE, 0.85)
 }
 
 
@@ -30,8 +32,8 @@ def main():
     parser.add_argument("--scenario", type=str, default="BONA_FIDE_LIVE",
                         choices=[s.value for s in MockScenario],
                         help="Select specific mock scenario (used with --mock)")
-    parser.add_argument("--demo", type=str, default=None, choices=["1", "2", "3", "4", "5", "6", "7", "8"],
-                        help="Run an automated evaluator demonstration scenario (1 to 8)")
+    parser.add_argument("--demo", type=str, default=None, choices=[str(i) for i in range(1, 11)],
+                        help="Run an automated evaluator demonstration scenario (1 to 10)")
     parser.add_argument("--workflow", type=str, default="RESIDENT_REGISTRATION",
                         choices=["RESIDENT_REGISTRATION", "OPERATOR_AUTHENTICATION", "SUPERVISOR_AUTHENTICATION"],
                         help="Initial workflow profile")

@@ -26,13 +26,21 @@ from ..devices.webcam_device import WebcamCaptureDevice
 from ..devices.mock_l0_device import MockL0Device
 from ..core.pipeline import LivenessPipeline, PipelineState, LivenessDecision
 from ..core.config import LivenessConfig, WorkflowType, PADMode
-from ..core.errors import BiometricErrorCode
 from ..ui.desktop_client import DesktopRegistrationClient
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global device
+    device.connect()
+    yield
+    device.disconnect()
 
 app = FastAPI(
     title="MOSIP Device Service (MDS) - Face Liveness & PAD Subsystem",
     description="Local biometric device service adapter aligning with MOSIP Device Service 0.9.5 / 1.2.0 principles",
-    version="1.3.0"
+    version="1.3.0",
+    lifespan=lifespan
 )
 
 # Configurable CORS: Defaults to localhost loopback interfaces for local evaluation;
@@ -74,18 +82,6 @@ class ConfigureRequest(BaseModel):
 class DeviceSwitchRequest(BaseModel):
     device_mode: str = Field(default="MOCK", description="'MOCK' or 'WEBCAM'")
     scenario: Optional[str] = Field(default="BONA_FIDE_LIVE", description="Mock scenario if switching to MOCK")
-
-
-@app.on_event("startup")
-def startup_event():
-    global device
-    device.connect()
-
-
-@app.on_event("shutdown")
-def shutdown_event():
-    global device
-    device.disconnect()
 
 
 @app.get("/", response_class=HTMLResponse)

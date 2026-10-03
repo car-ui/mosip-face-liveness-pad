@@ -50,7 +50,7 @@ class ResidentEnrollmentRecord:
     model_backend: str = "heuristic_multi_cue"
     model_version: str = "v1.2.0-heuristic"
     model_hash: str = "N/A"
-    biometric_token_hash: Optional[str] = None   # SHA-256 hash of captured biometric template
+    biometric_token_hash: Optional[str] = None   # SHA-256 hash of captured biometric image payload (ephemeral image payload hash, not a feature template vector)
     telemetry: Dict[str, Any] = field(default_factory=dict)
 
 

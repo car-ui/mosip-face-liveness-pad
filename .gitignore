@@ -20,8 +20,11 @@ sdist/
 var/
 wheels/
 *.egg-info/
-.installed.cfg
 *.egg
+
+# Java
+*.class
+bin/
 
 # Testing & IDE
 .pytest_cache/
