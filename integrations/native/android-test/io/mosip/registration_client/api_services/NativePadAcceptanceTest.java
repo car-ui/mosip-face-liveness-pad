@@ -8,6 +8,9 @@ import android.app.Activity;
 import android.content.Context;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Build;
+import android.os.Debug;
+import android.os.SystemClock;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,6 +33,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.json.JSONObject;
 
 /** Actual Android JNI/model and acceptance API; SBI parser is an explicit test double. */
 @RunWith(AndroidJUnit4.class)
@@ -68,6 +72,48 @@ public class NativePadAcceptanceTest {
         for (int i = 0; i < input.length; i++) input[i] = i % 256;
         // Reference from Python ORT and the exact packaged model hash. Synthetic tensor only.
         assertEquals(8.380277904507238e-6, engine.scoreTensor(input), 1e-7);
+    }
+
+    @Test public void actualAndroidInferenceTimingAndMemory() throws Exception {
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        Method factory = AndroidPadCheckpoint.class.getDeclaredMethod("engine", Context.class);
+        factory.setAccessible(true);
+        NativePadEngine engine = (NativePadEngine) factory.invoke(null, context);
+        float[] input = new float[3 * 80 * 80];
+        for (int i = 0; i < input.length; i++) input[i] = i % 256;
+        for (int i = 0; i < 10; i++) engine.scoreTensor(input);
+        double[] milliseconds = new double[100];
+        for (int i = 0; i < milliseconds.length; i++) {
+            long start = SystemClock.elapsedRealtimeNanos();
+            double score = engine.scoreTensor(input);
+            milliseconds[i] = (SystemClock.elapsedRealtimeNanos() - start) / 1_000_000.0;
+            assertEquals(8.380277904507238e-6, score, 1e-7);
+        }
+        Arrays.sort(milliseconds);
+        Debug.MemoryInfo memory = new Debug.MemoryInfo();
+        Debug.getMemoryInfo(memory);
+        Runtime runtime = Runtime.getRuntime();
+        JSONObject metrics = new JSONObject();
+        metrics.put("scope", "ONNX scoreTensor only; synthetic input; no camera, face detection or full capture");
+        metrics.put("modelSha256", NativePadEngine.MODEL_SHA256);
+        metrics.put("api", Build.VERSION.SDK_INT);
+        metrics.put("abis", Arrays.toString(Build.SUPPORTED_ABIS));
+        metrics.put("deviceModel", Build.MODEL);
+        metrics.put("availableProcessors", runtime.availableProcessors());
+        metrics.put("intraOpThreads", engine.getInferenceThreads());
+        metrics.put("warmups", 10);
+        metrics.put("iterations", milliseconds.length);
+        metrics.put("p50Ms", milliseconds[49]);
+        metrics.put("p95Ms", milliseconds[94]);
+        metrics.put("minMs", milliseconds[0]);
+        metrics.put("maxMs", milliseconds[milliseconds.length - 1]);
+        metrics.put("processTotalPssKb", memory.getTotalPss());
+        metrics.put("processJavaHeapUsedBytes", runtime.totalMemory() - runtime.freeMemory());
+        metrics.put("memoryScope", "Whole instrumentation target process after benchmark, not incremental model memory");
+        Bundle results = new Bundle();
+        results.putString("facepadBenchmarkJson", metrics.toString());
+        // Keep the measured values in the final instrumentation result, not only logcat.
+        InstrumentationRegistry.getInstrumentation().addResults(results);
     }
 
     @Test public void residentApiRejectsBeforeStorage() throws Exception { exerciseApi(false); }

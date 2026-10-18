@@ -43,7 +43,7 @@ Reviewed against the supplied `ps4.pdf`, including mandatory tasks on pages 6-9,
 | Interoperability testing framework | Partial common device contract tests and portable Java gate tests. | No real cross-vendor or official native-client E2E matrix. |
 | Model version management | Implemented model provenance, checksums, signed version metadata, persisted downgrade high-water mark. | Model approval/revocation distribution and multi-process deployment need integration. |
 | Secure offline model updates | Implemented Ed25519 verification, manifest/payload integrity, version checks, atomic model replacement, retained rollback ceiling. | Public-key provisioning, revocation, disk-failure testing, and transactional metadata are deployment work. |
-| Low-resource Android optimization | Unverified. Small research model and portable Java policy code are useful starting points. | On-device inference, measured latency/RAM/energy, Camera/SBI integration, and APK E2E required. Python desktop inference is not Android optimization. |
+| Low-resource Android optimization | Partial. Actual Android ONNX inference, CPU-count-aware thread selection, split APKs, and three fresh-process timing/PSS measurements per build on a one-CPU API 34 emulator. `ANDROID_BENCHMARK.md`. | Physical ARM64 latency/RAM/energy, camera/SBI and full-workflow measurement remain unverified. Whole-process emulator PSS is not incremental model memory. |
 | Hardware acceleration | Partial ONNX provider discovery and CPU fallback. | Available GPU/NPU execution and parity must be measured on target hardware. |
 
 ## Deliverables and submission

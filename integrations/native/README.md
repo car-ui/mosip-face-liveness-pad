@@ -23,6 +23,8 @@ Android receives a completed capture URI from a separate SBI app. Adding active 
 
 ## Verification
 
+The current CPU-count-aware build passes five Android instrumentation tests. Its benchmark makes 100 timed inference calls after ten warmups, checks every score against Python, and records process memory. Three fresh processes were measured for both the previous two-thread build and the adaptive one-thread build on the one-CPU emulator. All results and limits are in [the Android benchmark report](../../docs/ANDROID_BENCHMARK.md). This adds an emulator baseline; physical ARM64 execution and energy use remain untested.
+
 Fourteen pure Java stream-framing checks pass, including consecutive parts, fragmented reads, zero-byte reads and malformed inputs. The actual patched upstream `Streamer` also passes consecutive-frame, bounded EOF and disconnect-cleanup checks. The five-module desktop reactor compiles with these changes. These are controlled stream inputs, not a physical camera demonstration.
 
 `tests/DesktopStreamLifecycleCheck.java` also exercises the actual preview worker and JavaFX `ImageView` with a synthetic JPEG. It verifies preview-thread ownership, a defensive copy of cached JPEG bytes, delayed disconnection of a replaced camera, and cache cleanup on stop. It opens no window and uses no camera. This is not the full native registration UI.

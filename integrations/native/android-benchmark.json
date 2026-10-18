@@ -1,0 +1,180 @@
+{
+  "date": "2026-10-18",
+  "environment": {
+    "type": "Android emulator, not physical phone",
+    "system_image": "Google ATD API 34 x86_64",
+    "virtual_cpus": 1,
+    "guest_memtotal_kb": 2021744,
+    "camera": "DISABLED",
+    "onnx_runtime_android": "1.23.2",
+    "provider": "CPU",
+    "host_timing_and_power_state_controlled": false
+  },
+  "method": {
+    "warmups": 10,
+    "iterations_per_process": 100,
+    "independent_processes_per_build": 3,
+    "percentiles": "Nearest rank: sorted observations 50 and 95 of 100",
+    "input": "Deterministic synthetic FP32 tensor, 1x3x80x80, input[i] = i % 256",
+    "included": "ORT tensor creation, inference and score softmax in scoreTensor",
+    "excluded": "Camera, image decoding, face detection, crop/resize, active actions, complete capture and accuracy",
+    "memory": "Whole target-process PSS and Java heap after benchmark; not incremental model footprint",
+    "sequence": "Two-thread build measured first; emulator rebooted before adaptive build; host load uncontrolled",
+    "baseline_thread_count_source": "Two threads were fixed in the baseline engine source; baseline logs predate the added thread-count field"
+  },
+  "baseline_app_sha256": "db7dc246f88bb3122a87fb441a7957b271c754d112936d9e1324dc350c238a2d",
+  "adaptive_app_sha256": "ee7511002d6a62860102bd00ff353b92f108be2528e39f7e8b89c16b04d706a5",
+  "runs": {
+    "baseline_two_threads": [
+      {
+        "run": 1,
+        "mode": "full_5_test_suite",
+        "metrics": {
+          "scope": "ONNX scoreTensor only; synthetic input; no camera, face detection or full capture",
+          "modelSha256": "5281b4a621b1a2a7570d88bc3a37ac5273ab3082b61d1e284b9847660909cbef",
+          "api": 34,
+          "abis": "[x86_64]",
+          "deviceModel": "Google ATD built for x86_64",
+          "warmups": 10,
+          "iterations": 100,
+          "p50Ms": 11.16796,
+          "p95Ms": 33.668194,
+          "minMs": 3.971473,
+          "maxMs": 45.399217,
+          "processTotalPssKb": 197772,
+          "processJavaHeapUsedBytes": 42041224,
+          "memoryScope": "Whole instrumentation target process after benchmark, not incremental model memory",
+          "intraOpThreads": 2
+        },
+        "raw_log": "android-benchmark-instrumentation.txt",
+        "raw_log_sha256": "8e4cba4f9b79c7d3ced25a9f5b0802ed91debb6a019749bcc8573f26c2e04e46"
+      },
+      {
+        "run": 2,
+        "mode": "benchmark_only_fresh_process",
+        "metrics": {
+          "scope": "ONNX scoreTensor only; synthetic input; no camera, face detection or full capture",
+          "modelSha256": "5281b4a621b1a2a7570d88bc3a37ac5273ab3082b61d1e284b9847660909cbef",
+          "api": 34,
+          "abis": "[x86_64]",
+          "deviceModel": "Google ATD built for x86_64",
+          "warmups": 10,
+          "iterations": 100,
+          "p50Ms": 40.870455,
+          "p95Ms": 45.1892,
+          "minMs": 34.512072,
+          "maxMs": 62.053655,
+          "processTotalPssKb": 169732,
+          "processJavaHeapUsedBytes": 19104240,
+          "memoryScope": "Whole instrumentation target process after benchmark, not incremental model memory",
+          "intraOpThreads": 2
+        },
+        "raw_log": "android-benchmark-run-2.txt",
+        "raw_log_sha256": "8992dbca5d090bdb824798b160a1f7dab91db77f0bdc6910c76a528a6d7afe6d"
+      },
+      {
+        "run": 3,
+        "mode": "benchmark_only_fresh_process",
+        "metrics": {
+          "scope": "ONNX scoreTensor only; synthetic input; no camera, face detection or full capture",
+          "modelSha256": "5281b4a621b1a2a7570d88bc3a37ac5273ab3082b61d1e284b9847660909cbef",
+          "api": 34,
+          "abis": "[x86_64]",
+          "deviceModel": "Google ATD built for x86_64",
+          "warmups": 10,
+          "iterations": 100,
+          "p50Ms": 40.804673,
+          "p95Ms": 46.51957,
+          "minMs": 36.254164,
+          "maxMs": 52.486763,
+          "processTotalPssKb": 170149,
+          "processJavaHeapUsedBytes": 19104240,
+          "memoryScope": "Whole instrumentation target process after benchmark, not incremental model memory",
+          "intraOpThreads": 2
+        },
+        "raw_log": "android-benchmark-run-3.txt",
+        "raw_log_sha256": "86b020dd29b8cec6be3cd83839ea89057b05d27110432096bcb31978def2e1f4"
+      }
+    ],
+    "adaptive_one_thread": [
+      {
+        "run": 1,
+        "mode": "full_5_test_suite",
+        "metrics": {
+          "scope": "ONNX scoreTensor only; synthetic input; no camera, face detection or full capture",
+          "modelSha256": "5281b4a621b1a2a7570d88bc3a37ac5273ab3082b61d1e284b9847660909cbef",
+          "api": 34,
+          "abis": "[x86_64]",
+          "deviceModel": "Google ATD built for x86_64",
+          "availableProcessors": 1,
+          "intraOpThreads": 1,
+          "warmups": 10,
+          "iterations": 100,
+          "p50Ms": 8.870818,
+          "p95Ms": 25.706071,
+          "minMs": 3.50905,
+          "maxMs": 30.075929,
+          "processTotalPssKb": 189239,
+          "processJavaHeapUsedBytes": 35241552,
+          "memoryScope": "Whole instrumentation target process after benchmark, not incremental model memory"
+        },
+        "raw_log": "android-adaptive-instrumentation.txt",
+        "raw_log_sha256": "5eeed053e2ab2ea3416ea84599b2a84bf480360329dad8ca25367df471096d0d"
+      },
+      {
+        "run": 2,
+        "mode": "benchmark_only_fresh_process",
+        "metrics": {
+          "scope": "ONNX scoreTensor only; synthetic input; no camera, face detection or full capture",
+          "modelSha256": "5281b4a621b1a2a7570d88bc3a37ac5273ab3082b61d1e284b9847660909cbef",
+          "api": 34,
+          "abis": "[x86_64]",
+          "deviceModel": "Google ATD built for x86_64",
+          "availableProcessors": 1,
+          "intraOpThreads": 1,
+          "warmups": 10,
+          "iterations": 100,
+          "p50Ms": 21.450151,
+          "p95Ms": 26.252096,
+          "minMs": 18.562441,
+          "maxMs": 66.04412,
+          "processTotalPssKb": 168994,
+          "processJavaHeapUsedBytes": 19186008,
+          "memoryScope": "Whole instrumentation target process after benchmark, not incremental model memory"
+        },
+        "raw_log": "android-adaptive-run-2.txt",
+        "raw_log_sha256": "351bb0ffd8f998e8cb34841cf5946e044d58d7544199a622a9ba1305712ab85f"
+      },
+      {
+        "run": 3,
+        "mode": "benchmark_only_fresh_process",
+        "metrics": {
+          "scope": "ONNX scoreTensor only; synthetic input; no camera, face detection or full capture",
+          "modelSha256": "5281b4a621b1a2a7570d88bc3a37ac5273ab3082b61d1e284b9847660909cbef",
+          "api": 34,
+          "abis": "[x86_64]",
+          "deviceModel": "Google ATD built for x86_64",
+          "availableProcessors": 1,
+          "intraOpThreads": 1,
+          "warmups": 10,
+          "iterations": 100,
+          "p50Ms": 21.065423,
+          "p95Ms": 23.793675,
+          "minMs": 19.255904,
+          "maxMs": 26.057877,
+          "processTotalPssKb": 168960,
+          "processJavaHeapUsedBytes": 19202392,
+          "memoryScope": "Whole instrumentation target process after benchmark, not incremental model memory"
+        },
+        "raw_log": "android-adaptive-run-3.txt",
+        "raw_log_sha256": "da6a4967880cca49ebda427a1f419149583870cde39f7c7c462cb8219f7c029e"
+      }
+    ]
+  },
+  "limitations": [
+    "One emulator and synthetic tensor; no physical ARM64 result",
+    "Uncontrolled host load; results do not establish a universal speedup",
+    "First run includes other tests; runs 2 and 3 execute only the benchmark",
+    "No energy measurement or full capture latency; debug APK remains large"
+  ]
+}

@@ -55,9 +55,9 @@ Separate ARM64 and x86_64 packages avoid shipping unused native libraries:
 gradle --no-daemon --max-workers=1 -Dorg.gradle.jvmargs="-Xmx2048m -XX:+UseSerialGC" -Psplit-per-abi=true -Ptarget-platform=android-arm64,android-x64 :app:assembleDebug
 ```
 
-The caller patch makes the upstream release ABI list conditional so it does not conflict with Flutter's explicit split settings. The resulting ARM64 debug package is 219,846,672 bytes, compared with 503,198,515 bytes for the universal debug package. This is a packaging reduction, not a runtime RAM, power or accuracy measurement. ARM64 physical-device execution remains untested.
+The caller patch makes the upstream release ABI list conditional so it does not conflict with Flutter's explicit split settings. The initial split-build ARM64 debug package was 219,846,672 bytes, compared with 503,198,515 bytes for the universal debug package. This is a packaging reduction, not a runtime RAM, power or accuracy measurement. ARM64 physical-device execution remains untested.
 
-`validation.json` records build and execution results. The app APK's signature, ZIP integrity, packaged model hash, model license and PAD class descriptors were checked. It is a large debug APK with four native ABIs, not an optimized phone release. Emulator execution uses an isolated API 34 Google ATD x86_64 image, one virtual CPU and 2048 MB RAM. The emulator raised the requested memory to that amount. Its camera is disabled, and its data/configuration live on D: without changing the user's existing AVD data.
+`validation.json` records build and execution results. The app APK's signature, ZIP integrity, packaged model hash, model license and PAD class descriptors were checked. The initial universal APK has four native ABIs. The split packages contain one ABI each and remain large debug builds. Emulator execution uses an isolated API 34 Google ATD x86_64 image, one virtual CPU and 2048 MB RAM. The emulator raised the requested memory to that amount. Its camera is disabled, and its data/configuration live on D: without changing the user's existing AVD data.
 
 Run the focused instrumentation class after installing the app and test APKs:
 
@@ -68,3 +68,5 @@ adb shell am instrument -w -r -e class io.mosip.registration_client.api_services
 The SBI parser and client repositories are test doubles. Android JNI libraries, ONNX inference, ISO decoding, and `BiometricsDetailsApi.parseRCaptureResponse` execute in the actual app process. Neither an emulator nor a portrait fixture establishes physical presentation-attack accuracy.
 
 The first instrumentation attempt had one test-fixture failure because the mocked Activity did not supply its asset manager and cache directory. The fixture now supplies those real target-application resources. A fresh-process run passed all four tests. The model and capture acceptance code were not bypassed to obtain that result.
+
+The current CPU-count-aware build passes five instrumentation tests in 17.635 seconds, plus two further benchmark-only fresh-process runs. It uses one intra-op thread on the one-CPU emulator. Both native clients rebuild successfully with that shared engine change. The current ARM64 debug package is 220,254,144 bytes. The x86_64 app and instrumentation APK were installed and tested together; ARM64 remains untested on hardware. See `docs/ANDROID_BENCHMARK.md` for every timing/PSS observation and the limits of the measurements.

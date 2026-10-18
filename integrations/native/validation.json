@@ -18,7 +18,7 @@
       ]
     },
     "desktop-nasa-controller-check.txt": {
-      "sha256": "fa5c9e274fc0a0731e739983be3778dafd66b6afc19f9e09db73fb6419233e9d",
+      "sha256": "b35cb59a90efb05d1cce5c6cd9709ceaba679007cf30008a6322ac9b3aad6fb5",
       "results": [
         "PASS actual upstream Streamer: consecutive frames, bounded EOF rejection and disconnect cleanup",
         "PASS registration checkpoint rejects decoded blank ISO: NO_FACE",
@@ -31,7 +31,7 @@
       "passive_clear_for_fixture": false
     },
     "desktop-stream-lifecycle.txt": {
-      "sha256": "637e65861af0a9058b1851c4cfd0ffee3e28467990a9428ca57014ccea1959f4",
+      "sha256": "54362e4f41501fdb1a91704f62c393c35901c63dafd1dd877ba935678c9b4a97",
       "results": [
         "PASS actual Streamer preview on JavaFX thread and exact JPEG cache with defensive copy",
         "PASS camera replacement survives delayed EOF from the previous reader",
@@ -39,6 +39,13 @@
         "Evidence scope: actual upstream Streamer and JavaFX ImageView; synthetic JPEG, no physical camera or full client UI"
       ],
       "scope": "Actual upstream Streamer and JavaFX ImageView; controlled streams and synthetic JPEG, not full native UI E2E"
+    },
+    "adaptive-native-engine": {
+      "results": [
+        "PASS actual ONNX Java/Python parity; blank and malformed rejection; invalid tensor rejection. liveScore=0.9918094405237123",
+        "PASS model tampering rejection"
+      ],
+      "scope": "Real Java/Python ONNX parity after CPU-count-aware thread selection"
     }
   },
   "android_build": "PASS_APP_AND_TEST_APKS",
@@ -187,5 +194,53 @@
     "tests_failed": 0,
     "seconds": 11.35,
     "scope": "Changed simulator photo; three rejection control-flow tests now inject explicit attack verdicts. No model thresholds changed."
-  }
+  },
+  "android_adaptive_instrumentation": {
+    "status": "PASS",
+    "tests": 5,
+    "time_seconds": 17.635,
+    "api": 34,
+    "abi": "x86_64",
+    "virtual_cpus": 1,
+    "intra_op_threads": 1,
+    "result_log": "evidence/android-adaptive-instrumentation.txt",
+    "benchmark_report": "android-benchmark.json",
+    "additional_fresh_process_benchmark_runs": 2,
+    "scope": "Actual Android JNI, ISO decoding, acceptance API and synthetic-tensor timing; SBI parser/repositories are test doubles, no camera",
+    "result_sha256": "5eeed053e2ab2ea3416ea84599b2a84bf480360329dad8ca25367df471096d0d"
+  },
+  "adaptive_apks": [
+    {
+      "file": "registration-client-pad-arm64-v8a-adaptive-debug.apk",
+      "bytes": 220254144,
+      "sha256": "e19d0e61b6e7ae463abd807cc081333b5801d1d95601f7a535fc83ed081ac1da",
+      "abi": "arm64-v8a",
+      "zip_integrity": "PASS",
+      "runtime_notices": "PASS",
+      "model_hash": "PASS",
+      "signature_verification": "PASS_APKSIGNER_35",
+      "physical_device_tested": false
+    },
+    {
+      "file": "registration-client-pad-x86_64-adaptive-debug.apk",
+      "bytes": 258090171,
+      "sha256": "ee7511002d6a62860102bd00ff353b92f108be2528e39f7e8b89c16b04d706a5",
+      "abi": "x86_64",
+      "zip_integrity": "PASS",
+      "runtime_notices": "PASS",
+      "model_hash": "PASS",
+      "signature_verification": "PASS_APKSIGNER_35",
+      "physical_device_tested": false
+    },
+    {
+      "file": "registration-client-pad-adaptive-androidTest.apk",
+      "bytes": 1957626,
+      "sha256": "5a6ab20fdf2cf643f590b5633ba27af61df1dd26dd2a5cbcf2ee8f34fbefaf8b",
+      "type": "instrumentation",
+      "zip_integrity": "PASS",
+      "signature_verification": "PASS_APKSIGNER_35",
+      "physical_device_tested": false
+    }
+  ],
+  "desktop_adaptive_reactor_compile": "PASS"
 }

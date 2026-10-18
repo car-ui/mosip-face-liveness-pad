@@ -20,6 +20,7 @@ public final class NativePadEngine implements AutoCloseable {
     private final OrtSession session;
     private final CascadeClassifier detector;
     private final String inputName;
+    private final int inferenceThreads;
 
     public static final class Decision {
         public final boolean accepted;
@@ -34,12 +35,16 @@ public final class NativePadEngine implements AutoCloseable {
         if (!MODEL_SHA256.equals(sha256(model))) throw new IOException("PAD model checksum mismatch");
         detector = new CascadeClassifier(cascadePath.toString());
         if (detector.empty()) throw new IOException("PAD face detector unavailable");
+        inferenceThreads = Math.max(1, Math.min(2, Runtime.getRuntime().availableProcessors()));
         try (OrtSession.SessionOptions options = new OrtSession.SessionOptions()) {
-            options.setIntraOpNumThreads(2);
+            options.setIntraOpNumThreads(inferenceThreads);
+            options.setInterOpNumThreads(1);
             session = environment.createSession(model, options);
         }
         inputName = session.getInputNames().iterator().next();
     }
+
+    public int getInferenceThreads() { return inferenceThreads; }
 
     public static String sha256(byte[] bytes) throws Exception {
         StringBuilder result = new StringBuilder();

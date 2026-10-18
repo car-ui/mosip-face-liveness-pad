@@ -39,6 +39,9 @@ jobs:
       run: |
         python -m pytest -q --junitxml=output/local/test-results.xml
 
+    - name: Verify packaged native evidence
+      run: python scripts/verify_native_evidence.py
+
     - name: Set up Java
       uses: actions/setup-java@v4
       with:

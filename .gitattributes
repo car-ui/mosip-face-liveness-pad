@@ -1,3 +1,4 @@
 *.patch text eol=lf -whitespace
 integrations/native/assets/*.xml text eol=lf
 *.iso binary
+integrations/native/evidence/*.txt text eol=lf

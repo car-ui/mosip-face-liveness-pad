@@ -1,0 +1,24 @@
+INSTRUMENTATION_STATUS: class=io.mosip.registration_client.api_services.NativePadAcceptanceTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=
+io.mosip.registration_client.api_services.NativePadAcceptanceTest:
+INSTRUMENTATION_STATUS: test=actualAndroidInferenceTimingAndMemory
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=io.mosip.registration_client.api_services.NativePadAcceptanceTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=1
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=actualAndroidInferenceTimingAndMemory
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: facepadBenchmarkJson={"scope":"ONNX scoreTensor only; synthetic input; no camera, face detection or full capture","modelSha256":"5281b4a621b1a2a7570d88bc3a37ac5273ab3082b61d1e284b9847660909cbef","api":34,"abis":"[x86_64]","deviceModel":"Google ATD built for x86_64","availableProcessors":1,"intraOpThreads":1,"warmups":10,"iterations":100,"p50Ms":21.065423,"p95Ms":23.793675,"minMs":19.255904,"maxMs":26.057877,"processTotalPssKb":168960,"processJavaHeapUsedBytes":19202392,"memoryScope":"Whole instrumentation target process after benchmark, not incremental model memory"}
+INSTRUMENTATION_RESULT: stream=
+
+Time: 2.524
+
+OK (1 test)
+
+
+INSTRUMENTATION_CODE: -1
