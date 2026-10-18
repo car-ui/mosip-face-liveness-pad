@@ -4,11 +4,11 @@
   "python": "3.11.15",
   "dependencyInstallation": "Fresh virtual environment from requirements.lock.txt",
   "pytest": {
-    "tests": "117",
+    "tests": "119",
     "errors": "0",
     "failures": "0",
     "skipped": "0",
-    "time": "22.610"
+    "time": "30.364"
   },
   "java": {
     "release": 8,
@@ -20,5 +20,11 @@
     "maximumAbsoluteLogitDifference": 2.6226043701171875e-06
   },
   "physicalAttackDatasetEvaluated": false,
-  "officialNativeClientE2EVerified": false
+  "officialNativeClientE2EVerified": false,
+  "sourceExtraction": {
+    "commit": "ad9be3392396fc2d02a122b16df6a4e0eb8f4cb7",
+    "trackedFilesVerified": 80,
+    "archiveSha256": "b42ba00aec2b96cb8a13a4ee264d01c05e874ab78f6194b51b9c9eb27bb90559"
+  },
+  "githubCi": "https://github.com/car-ui/mosip-face-liveness-pad/actions/runs/39144395667"
 }

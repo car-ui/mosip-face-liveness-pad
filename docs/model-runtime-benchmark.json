@@ -1,0 +1,12 @@
+{
+  "scope": "Warm CPU model evaluation on one synthetic 80x80 crop; includes model preprocessing; excludes face detection, camera IO and full capture. Not Android performance or PAD accuracy.",
+  "platform": "Windows",
+  "python": "3.11.15",
+  "provider": "CPUExecutionProvider",
+  "inferenceThreads": 2,
+  "warmups": 10,
+  "samples": 100,
+  "p50Ms": 2.626599991344847,
+  "p95Ms": 3.7006200007454026,
+  "modelSha256": "5281b4a621b1a2a7570d88bc3a37ac5273ab3082b61d1e284b9847660909cbef"
+}

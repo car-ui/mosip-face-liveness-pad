@@ -1,12 +1,12 @@
 # Validation evidence
 
-Local checks were run on Windows on 18 October 2026 with CPython 3.11.15 and the declared runtime dependencies. The source initially contained 64 tests; the revised suite contains 117. The latest completed run passed all 117 tests in a fresh dependency environment in 22.63 seconds. A Starlette warning notes its future TestClient preference for `httpx2`; the currently pinned `httpx` TestClient checks pass.
+Local checks were run on Windows on 18 October 2026 with CPython 3.11.15 and the declared runtime dependencies. The source initially contained 64 tests; the revised suite contains 119. The latest completed run passed all 119 tests from a fresh source ZIP extraction and dependency environment in 30.40 seconds. A Starlette warning notes its future TestClient preference for `httpx2`; the currently pinned `httpx` TestClient checks pass.
 
 ## Commands and scope
 
 | Check | Observed result | What it establishes |
 |---|---|---|
-| `python -m pytest -q --junitxml=tmp/test-results.xml` | 117 passed | Python regression properties, detector fixtures, API contracts, model contract, update verification. Injected-score tests are labelled explicitly. |
+| `python -m pytest -q --junitxml=tmp/test-results.xml` | 119 passed | Python regression properties, detector fixtures, API contracts, model contract, update verification. Injected-score tests are labelled explicitly. |
 | `javac --release 8 ...` followed by `java NativeCaptureGateTest` | 20 checks passed | Portable policy/transport checks, including session binding, required action counts, replayed sequence rejection, exact-payload and single-use acceptance. |
 | `scripts/export_minifasnet.py` | Six conversion comparisons passed; maximum absolute logit difference `2.6226043701171875e-06` | ONNX/PyTorch conversion parity on deterministic tensors. Not attack accuracy. |
 | Packaged ONNX tests | Model loads, BGR 0..255 input verified, class index 1 verified, altered manifest checksum rejected | Packaged inference contract and basic runtime execution. |
@@ -25,4 +25,8 @@ API checks cover bearer/origin/hostname rejection, one capture owner, nonmutatin
 
 No physical L1 device, native MOSIP client E2E, human active-challenge completion, independent PAD dataset, ISO conformance evaluation, or Android performance/energy measurement is established by these checks. No camera subject or attack session is manufactured from a simulator label. The dataset evaluation tool has denominator tests, but it has not been run on a consented representative physical attack dataset.
 
-CI is configured for Linux and Windows, including the Python suite and Java checks. Remote CI status must be checked for the actual pushed commit. Local passing results must not be described as a completed remote run.
+GitHub Actions run [39144395667](https://github.com/car-ui/mosip-face-liveness-pad/actions/runs/39144395667) completed successfully for code commit `ad9be3392396fc2d02a122b16df6a4e0eb8f4cb7`. Both `test (ubuntu-latest)` and `test (windows-latest)` succeeded. The status was read from GitHub's authenticated API. The source ZIP for that commit contained 80 tracked files plus its release manifest, passed ZIP integrity and all 80 per-file SHA-256 checks, and passed all 119 Python tests after fresh extraction. Final evidence-only commits can change document/archive hashes without changing the tested implementation.
+
+## CPU model timing
+
+A separate warm benchmark ran 100 evaluations after ten warmups using one synthetic 80x80 crop, ONNX Runtime CPU, and two inference threads. Median evaluation time was 2.63 ms and p95 was 3.70 ms. This includes model preprocessing but excludes camera IO, face detection, full-workflow latency, Android performance, and attack accuracy. Exact measurements are in `model-runtime-benchmark.json`.
