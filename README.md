@@ -2,7 +2,7 @@
 
 An offline research prototype for MOSIP Decode 2026, Problem 04. It processes camera frames, checks face quality and passive PAD, and asks for randomly selected facial actions when policy requires them. An attack, engine error, or failed challenge prevents the prototype from returning a captured image.
 
-The repository includes a local browser console, an OpenCV desktop demo, a mock device, workflow policies, an ONNX adapter, offline signed model updates, automated tests, and native client patches. The patched official desktop client compiles, and synthetic ISO captures are rejected inside its resident and authentication controllers. **Native integration remains incomplete.** Active evidence, live client UI flows, Android device execution, physical L1 hardware, ISO conformance, and real presentation attack accuracy still need validation. See the [requirement-by-requirement evidence matrix](docs/REQUIREMENTS_MATRIX.md) before presenting coverage claims.
+The repository includes a local browser console, an OpenCV desktop demo, a mock device, workflow policies, an ONNX adapter, offline signed model updates, automated tests, and native client patches. The patched official desktop client compiles, and synthetic ISO captures are rejected inside its resident and authentication controllers. The patched Android app builds, with four passing emulator tests covering actual ONNX inference and rejection before storage. **Native integration remains incomplete.** Active evidence, complete live client UI flows, physical Android/L1 hardware, ISO conformance, and real presentation attack accuracy still need validation. See the [requirement-by-requirement evidence matrix](docs/REQUIREMENTS_MATRIX.md) before presenting coverage claims.
 
 ## Run locally
 

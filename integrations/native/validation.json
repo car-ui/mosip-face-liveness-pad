@@ -18,7 +18,7 @@
       ]
     },
     "desktop-controller-check.log": {
-      "sha256": "20117318c6389b3582ee9b67449e638d690ef142354030dd81e99eeeb4135933",
+      "sha256": "dd21f0ad56548d5f215250a78dd56dd9ee0fd0edbfd2ee69c025774ab84c95a1",
       "results": [
         "PASS registration checkpoint rejects decoded blank ISO: NO_FACE",
         "PASS upstream GenericBiometricsController rejects blank ISO before returning candidates for storage",
@@ -28,7 +28,7 @@
       ]
     }
   },
-  "android_build": "PENDING",
+  "android_build": "PASS_APP_AND_TEST_APKS",
   "native_ui_rejection": "NOT_TESTED",
   "physical_attacks": "DEFERRED_BY_USER",
   "active_challenge_integration": "NOT_CONNECTED_FAIL_CLOSED",
@@ -37,5 +37,89 @@
     "GenericBiometricsController.rCapture: resident/exception photo",
     "BiometricsController.rCapture: operator onboarding",
     "BaseController.captureAndValidateFace: operator/supervisor"
-  ]
+  ],
+  "ci": {
+    "commit": "dc8df97194043439212eca430b25cff6a8fd4a2d",
+    "linux_and_windows_native_engine": "PASS",
+    "main_run": "https://github.com/car-ui/mosip-face-liveness-pad/actions/runs/39147682153",
+    "branch_run": "https://github.com/car-ui/mosip-face-liveness-pad/actions/runs/39147682197"
+  },
+  "android_instrumentation": {
+    "status": "PASS",
+    "tests": 4,
+    "time_seconds": 17.673,
+    "api": 34,
+    "abi": "x86_64",
+    "system_image": "Google ATD",
+    "virtual_cpus": 1,
+    "ram_mb": 2048,
+    "camera": "DISABLED",
+    "result_log": "evidence/android-instrumentation.txt",
+    "result_sha256": "d9620b97af6d5ef6043461514a4e1e4a2ea174bdd56b086374bae23b382d5e68",
+    "scope": "Actual ONNX inference, ISO decoding and BiometricsDetailsApi; SBI parser and repositories are test doubles"
+  },
+  "fixtures": {
+    "blank-face.iso": {
+      "sha256": "94d916ccc2bd18227d432c79a8b8da100ed606e1d27d6ce40e13393d3cafa37e",
+      "description": "Synthetic black JPEG encoded by MOSIP FaceEncoder; no person or identity data"
+    }
+  },
+  "android_apk": {
+    "bytes": 503198515,
+    "sha256": "53d6e9a2d4581527d371fd99d3a2defeb3d314bd99203525a1e1c1dcdb9442f6",
+    "packaged_model_sha256": "5281b4a621b1a2a7570d88bc3a37ac5273ab3082b61d1e284b9847660909cbef",
+    "native_classes_in_dex": true,
+    "model_license_in_apk": true,
+    "dex_files": 31,
+    "native_libraries": [
+      "lib/arm64-v8a/libonnxruntime.so",
+      "lib/arm64-v8a/libonnxruntime4j_jni.so",
+      "lib/arm64-v8a/libopencv_java4.so",
+      "lib/armeabi-v7a/libonnxruntime.so",
+      "lib/armeabi-v7a/libonnxruntime4j_jni.so",
+      "lib/armeabi-v7a/libopencv_java4.so",
+      "lib/x86/libonnxruntime.so",
+      "lib/x86/libonnxruntime4j_jni.so",
+      "lib/x86/libopencv_java4.so",
+      "lib/x86_64/libonnxruntime.so",
+      "lib/x86_64/libonnxruntime4j_jni.so",
+      "lib/x86_64/libopencv_java4.so"
+    ],
+    "signature_verification": "PASS_APKSIGNER_35",
+    "debug_universal_all_abis": true,
+    "file": "registration-client-pad-debug.apk"
+  },
+  "split_apks": [
+    {
+      "file": "registration-client-pad-arm64-v8a-debug.apk",
+      "abi": "arm64-v8a",
+      "bytes": 219846672,
+      "sha256": "eee851712b6ac9d041995d718591e963b8dad83cb71770cbe20d49aceb493a43",
+      "zip_integrity": "PASS",
+      "model_hash": "PASS",
+      "abi_filter": "PASS",
+      "runtime": "NOT_TESTED_PHYSICAL_DEVICE",
+      "signature_verification": "PASS_APKSIGNER_35"
+    },
+    {
+      "file": "registration-client-pad-x86_64-debug.apk",
+      "abi": "x86_64",
+      "bytes": 257682699,
+      "sha256": "3d043dcc02798820f952d380a2e4f05bed79462918452bee8b2b4fdce58d8a3d",
+      "zip_integrity": "PASS",
+      "model_hash": "PASS",
+      "abi_filter": "PASS",
+      "runtime": "PASS_4_API34_INSTRUMENTATION_TESTS",
+      "signature_verification": "PASS_APKSIGNER_35"
+    }
+  ],
+  "android_split_instrumentation": {
+    "status": "PASS",
+    "tests": 4,
+    "time_seconds": 14.829,
+    "result_log": "evidence/android-split-instrumentation.txt",
+    "result_sha256": "c9f7a6b847059516f3975d4a9a2ec2f7669b44057cfff650bae4901f210bb9b1",
+    "camera": "DISABLED"
+  },
+  "packaging_reduction_arm64_percent": 56.31
 }

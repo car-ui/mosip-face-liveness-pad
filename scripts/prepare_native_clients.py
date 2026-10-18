@@ -29,7 +29,14 @@ def prepare(platform: str, checkout: Path):
     resources = module / ("assets/facepad" if platform == "android" else "resources/facepad")
     resources.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(ROOT / "assets/models/minifasnet_v2.onnx", resources / "minifasnet_v2.onnx")
+    shutil.copyfile(ROOT / "assets/models/minifasnet_v2.onnx.json", resources / "minifasnet_v2.onnx.json")
+    shutil.copyfile(ROOT / "third_party/Silent-Face-Anti-Spoofing-LICENSE.txt", resources / "MODEL-LICENSE.txt")
     shutil.copyfile(base / "assets/haarcascade_frontalface_default.xml", resources / "haarcascade_frontalface_default.xml")
+    if platform == "android":
+        tests = module.parent / "androidTest"
+        shutil.copytree(base / "android-test", tests / "java", dirs_exist_ok=True)
+        (tests / "assets").mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(base / "tests/fixtures/blank-face.iso", tests / "assets/blank-face.iso")
     print(f"Prepared {platform} {PINS[platform]} in {checkout}")
 
 

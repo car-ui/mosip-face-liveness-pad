@@ -47,11 +47,11 @@ SLIDES = [
      'Show the current test report. Do not say unit tests prove real attack resistance. Explain the audit chain needs a separate trusted checkpoint.'),
     ("Ready for evaluation, with explicit gaps",
      '<table><thead><tr><th>Available now</th><th>Still required</th></tr></thead><tbody>'
-     '<tr><td>Offline research engine and guided console</td><td>Official Desktop and Android client integration</td></tr>'
+     '<tr><td>Native capture rejection tests</td><td>Live camera and complete active flows</td></tr>'
      '<tr><td>Webcam interface and L0/L1 simulators</td><td>Physical L1 and multiple vendor validation</td></tr>'
      '<tr><td>Tested policy logic and a dataset evaluator</td><td>Consented subjects, real attacks, fixed test thresholds</td></tr>'
-     '<tr><td>Small model and portable Java gate</td><td>Measured Android RAM, latency, power, and thermal behavior</td></tr></tbody></table>',
-     'Be candid about the mandatory gaps. If the team later demonstrates native integration, update this slide with the exact builds, devices, and measured results.'),
+     '<tr><td>Android APK and offline model execution</td><td>Measured Android RAM, latency, power, and thermal behavior</td></tr></tbody></table>',
+     'Pinned desktop controllers reject synthetic ISO captures. Four Android emulator tests cover model inference and rejection before storage. The SBI parser and identity matcher are explicit test doubles. Full native camera/UI flows and active evidence remain incomplete.'),
     ("The next proof belongs in the real client",
      '<p class="lead">On Desktop and Android, show a real attack being rejected before the client accepts a face or completes authentication.</p>'
      '<div class="final-check"><span>Same session</span><span>Same verified image</span><span>No bypass path</span></div>'

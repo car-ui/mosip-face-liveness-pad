@@ -1,6 +1,6 @@
 # Native client integration contract
 
-The prototype contains a Python research service and independent Java components. Pinned native caller patches and in-process ONNX adapters are now in [`integrations/native`](../integrations/native/README.md). The patched desktop reactor compiles, and a synthetic ISO test exercises its actual operator/supervisor controller before identity matching. Live client UI rejection and physical attack testing remain unverified. Active evidence is not connected to these new adapters, so operator/supervisor captures fail closed. The following contract records the remaining work needed for complete integration.
+The prototype contains a Python research service and independent Java components. Pinned native caller patches and in-process ONNX adapters are now in [`integrations/native`](../integrations/native/README.md). The patched desktop reactor compiles, and synthetic ISO tests exercise its actual resident and operator/supervisor controllers. The Android app and test APKs build, with four passing emulator tests covering actual ONNX inference and rejection before resident/operator-onboarding storage. Complete live client UI workflows and physical attack testing remain unverified. Active evidence is not connected to these adapters, so operator/supervisor captures fail closed. The following contract records the remaining work needed for complete integration.
 
 ## Verified components
 

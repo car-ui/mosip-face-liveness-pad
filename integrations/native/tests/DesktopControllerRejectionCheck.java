@@ -38,6 +38,7 @@ public final class DesktopControllerRejectionCheck extends BaseController {
         convert.setInputBytes(jpeg.toByteArray()); convert.setImageType(0);
         BiometricsDto biometric = new BiometricsDto();
         biometric.setAttributeISO(FaceEncoder.convertFaceImageToISO(convert));
+        if (args.length == 2) Files.write(Paths.get(args[1]), biometric.getAttributeISO());
         biometric.setBioAttribute("face"); biometric.setQualityScore(99.0);
         List<BiometricsDto> candidates = new ArrayList<>(); candidates.add(biometric);
         // Registration checkpoint must reject the same ISO candidate before storage.
@@ -75,7 +76,7 @@ public final class DesktopControllerRejectionCheck extends BaseController {
         }
         if (captures.get() != 2 || matches.get() != 0) throw new AssertionError("Matcher called despite rejection");
         System.out.println("PASS upstream BaseController operator/supervisor rejection: captures=2, identityMatcherCalls=0");
-        if (args.length == 1) {
+        if (args.length >= 1) {
             // Existing repository portrait fixture, not a physical attack or a camera capture.
             convert.setInputBytes(Files.readAllBytes(Paths.get(args[0])));
             biometric.setAttributeISO(FaceEncoder.convertFaceImageToISO(convert));
