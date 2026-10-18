@@ -1,0 +1,103 @@
+name: Native Android camera SBI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/native-android.yml'
+      - 'scripts/run_native_android_ci.py'
+      - 'scripts/prepare_native_clients.py'
+      - 'integrations/native/common/**'
+      - 'integrations/native/camera-sbi/**'
+      - 'integrations/native/camera-sbi-test/**'
+      - 'integrations/native/camera-sbi.patch'
+      - 'assets/models/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/native-android.yml'
+      - 'scripts/run_native_android_ci.py'
+      - 'scripts/prepare_native_clients.py'
+      - 'integrations/native/common/**'
+      - 'integrations/native/camera-sbi/**'
+      - 'integrations/native/camera-sbi-test/**'
+      - 'integrations/native/camera-sbi.patch'
+      - 'assets/models/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-camera-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  camera-sbi:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+      - name: Set up Java
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
+        with:
+          gradle-version: '8.5'
+      - name: Prepare exact upstream revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init "$RUNNER_TEMP/camera-sbi"
+          git -C "$RUNNER_TEMP/camera-sbi" remote add origin https://github.com/mosip/android-camera-mds.git
+          git -C "$RUNNER_TEMP/camera-sbi" fetch --depth=1 origin d1ec22a542294b798f5b9c5bb97428deabb2064b
+          git -C "$RUNNER_TEMP/camera-sbi" checkout --detach FETCH_HEAD
+          python scripts/prepare_native_clients.py camera-sbi "$RUNNER_TEMP/camera-sbi"
+          printf 'sdk.dir=%s\n' "$ANDROID_HOME" > "$RUNNER_TEMP/camera-sbi/local.properties"
+      - name: Build application and tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p output/local/native-android
+          sdkmanager 'platforms;android-34' 'build-tools;35.0.0'
+          gradle -p "$RUNNER_TEMP/camera-sbi" --no-daemon --max-workers=2 \
+            '-Dorg.gradle.jvmargs=-Xmx2048m -XX:+UseSerialGC' \
+            :app:assembleDebug :app:assembleDebugAndroidTest \
+            2>&1 | tee output/local/native-android/build.log
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Execute camera-disabled instrumentation
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 34
+          target: google_atd
+          arch: x86_64
+          avd-name: facepad-ci
+          cores: 2
+          ram-size: 2048M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none -camera-front none
+          script: python scripts/run_native_android_ci.py --avd-name facepad-ci --apk "$RUNNER_TEMP/camera-sbi/app/build/outputs/apk/debug/app-debug.apk" --test-apk "$RUNNER_TEMP/camera-sbi/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk" --output output/local/native-android
+      - name: Preserve logs and package checksums
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-camera-sbi-${{ github.sha }}
+          path: output/local/native-android/
+          if-no-files-found: warn
+          retention-days: 14
