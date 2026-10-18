@@ -17,15 +17,18 @@
         "PASS model tampering rejection"
       ]
     },
-    "desktop-controller-check.log": {
-      "sha256": "dd21f0ad56548d5f215250a78dd56dd9ee0fd0edbfd2ee69c025774ab84c95a1",
+    "desktop-nasa-controller-check.txt": {
+      "sha256": "fa5c9e274fc0a0731e739983be3778dafd66b6afc19f9e09db73fb6419233e9d",
       "results": [
+        "PASS actual upstream Streamer: consecutive frames, bounded EOF rejection and disconnect cleanup",
         "PASS registration checkpoint rejects decoded blank ISO: NO_FACE",
         "PASS upstream GenericBiometricsController rejects blank ISO before returning candidates for storage",
         "PASS upstream BaseController operator/supervisor rejection: captures=2, identityMatcherCalls=0",
-        "PASS high-passive-score portrait still rejected for operator/supervisor: ACTIVE_CHALLENGE_REQUIRED; identityMatcherCalls=0",
+        "PASS recorded NASA portrait rejected for operator/supervisor: ACTIVE_CHALLENGE_REQUIRED; identityMatcherCalls=0; passiveClear=false",
         "Evidence scope: synthetic ISO + actual upstream controller/model, no live UI or physical attack."
-      ]
+      ],
+      "fixture_sha256": "88431cd9653ccd539741b555fb0a46b61558b301d4110412b5bc28b5e3ea6cb5",
+      "passive_clear_for_fixture": false
     }
   },
   "android_build": "PASS_APP_AND_TEST_APKS",
@@ -121,5 +124,58 @@
     "result_sha256": "c9f7a6b847059516f3975d4a9a2ec2f7669b44057cfff650bae4901f210bb9b1",
     "camera": "DISABLED"
   },
-  "packaging_reduction_arm64_percent": 56.31
+  "packaging_reduction_arm64_percent": 56.31,
+  "historical_desktop_checks": {
+    "sha256": "dd21f0ad56548d5f215250a78dd56dd9ee0fd0edbfd2ee69c025774ab84c95a1",
+    "results": [
+      "PASS registration checkpoint rejects decoded blank ISO: NO_FACE",
+      "PASS upstream GenericBiometricsController rejects blank ISO before returning candidates for storage",
+      "PASS upstream BaseController operator/supervisor rejection: captures=2, identityMatcherCalls=0",
+      "PASS high-passive-score portrait still rejected for operator/supervisor: ACTIVE_CHALLENGE_REQUIRED; identityMatcherCalls=0",
+      "Evidence scope: synthetic ISO + actual upstream controller/model, no live UI or physical attack."
+    ],
+    "scope": "Earlier check used an inherited portrait removed because its provenance was undocumented. Use the current attributed-fixture check for reproduction."
+  },
+  "stream_framing": {
+    "status": "PASS",
+    "pure_java_checks": 14,
+    "actual_upstream_streamer": "PASS_CONSECUTIVE_FRAMES_EOF_AND_DISCONNECT_CLEANUP",
+    "live_camera": "NOT_TESTED",
+    "desktop_reactor_compile": "PASS",
+    "prepare_from_clean_pin": "PASS"
+  },
+  "notices_apks": [
+    {
+      "file": "registration-client-pad-arm64-v8a-notices-debug.apk",
+      "bytes": 219852032,
+      "sha256": "36882891ed945207fe7d49cc9eb2b6f9b88c4d750713381943db603465778be6",
+      "abi": "arm64-v8a",
+      "zip_integrity": "PASS",
+      "runtime_license_assets": "PASS",
+      "model_hash": "PASS",
+      "physical_device_tested": false,
+      "signature_verification": "PASS_APKSIGNER_35",
+      "dex_jni_model_vs_emulator_tested_package": "BYTE_IDENTICAL",
+      "execution": "NOT_RERUN_NOTICE_ONLY_REPACKAGE"
+    },
+    {
+      "file": "registration-client-pad-x86_64-notices-debug.apk",
+      "bytes": 257688059,
+      "sha256": "2933da07ddb8b74c2d02b1c2b4b1d07a353a14335b6e6653d0f8c9d3a99fec18",
+      "abi": "x86_64",
+      "zip_integrity": "PASS",
+      "runtime_license_assets": "PASS",
+      "model_hash": "PASS",
+      "physical_device_tested": false,
+      "signature_verification": "PASS_APKSIGNER_35",
+      "dex_jni_model_vs_emulator_tested_package": "BYTE_IDENTICAL",
+      "execution": "NOT_RERUN_NOTICE_ONLY_REPACKAGE"
+    }
+  ],
+  "python_fixture_revision": {
+    "tests_passed": 120,
+    "tests_failed": 0,
+    "seconds": 11.35,
+    "scope": "Changed simulator photo; three rejection control-flow tests now inject explicit attack verdicts. No model thresholds changed."
+  }
 }

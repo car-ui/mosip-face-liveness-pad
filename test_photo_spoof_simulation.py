@@ -1,14 +1,7 @@
-"""
-Presentation Attack Simulation & Prototype Evaluation Benchmark
-Evaluates the MOSIP Liveness & PAD pipeline against:
-1. 2D Printed photograph presentations
-2. Smartphone & Tablet screen replay attacks
-3. Injected specular reflections & high-frequency moiré patterns
-4. Bona fide live presentations
-5. Multiple faces & abnormal lighting anomalies
+"""Developer simulation of pipeline decisions on a recorded photo and effects.
 
-Reports experimental benchmark metrics (APCER & BPCER prototype evaluation)
-in accordance with ISO/IEC 30107-3 reporting standards without claiming unaccredited lab certification.
+No input is a physical attack or a bona fide live subject. Results describe
+fixture behavior only, and cannot estimate APCER, BPCER or ISO compliance.
 """
 
 import os
@@ -76,12 +69,12 @@ def evaluate_sample_stream(name: str,
     # Decision correctness
     if expected_attack:
         is_correct = not is_accepted
-        outcome_label = "BLOCKED (True Negative)" if is_correct else "VULNERABILITY (False Acceptance)"
+        outcome_label = "FIXTURE REJECTED" if is_correct else "FIXTURE ACCEPTED"
     else:
         is_correct = is_accepted
-        outcome_label = "ACCEPTED (True Positive)" if is_correct else "REJECTED (False Rejection)"
+        outcome_label = "SIMULATED SUCCESS" if is_correct else "SIMULATED SUCCESS NOT REACHED"
 
-    print(f"  * Expected Result  : {'ATTACK PRESENTATION' if expected_attack else 'BONA FIDE LIVE'}")
+    print(f"  * Expected Result  : {'REJECT SIMULATED INPUT' if expected_attack else 'SIMULATED ACCEPTANCE'}")
     print(f"  * Pipeline State   : {final_result.state.value}")
     print(f"  * Decision Verdict : {final_result.decision.value}")
     print(f"  * Avg Latency      : {avg_latency:.2f} ms/frame (~{1000.0/max(0.1, avg_latency):.1f} FPS)")
@@ -99,20 +92,18 @@ def evaluate_sample_stream(name: str,
 
 def main():
     print("=" * 75)
-    print("MOSIP BIOMETRIC PRESENTATION ATTACK DETECTION BENCHMARK SUITE")
-    print("ISO/IEC 30107-3 Prototype Evaluation Protocol (Local Developer Benchmark)")
+    print("MOSIP PIPELINE DEVELOPER SIMULATION")
+    print("Recorded photo and synthetic effects; no physical or live-person evaluation")
     print("=" * 75)
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
     sample_photos = [
-        ("Printed Photo: Obama (Smiling)", os.path.join(base_dir, "tests", "sample_images", "obama.jpg")),
-        ("Printed Photo: Biden (Portrait)", os.path.join(base_dir, "tests", "sample_images", "biden.jpg")),
-        ("Printed Photo: Neutral Subject", os.path.join(base_dir, "tests", "sample_images", "sample_0.jpg")),
+        ("Recorded NASA photo with synthetic noise", os.path.join(base_dir, "tests", "sample_images", "astronaut.png")),
     ]
 
     results = []
 
-    # 1. Real photograph presentations from disk
+    # 1. Recorded photograph read from disk, not a printed-photo presentation.
     for label, path in sample_photos:
         if os.path.exists(path):
             img = cv2.imread(path)
@@ -132,7 +123,7 @@ def main():
     mock_dev_screen = MockL0Device(scenario=MockScenario.SCREEN_REPLAY_ATTACK)
     mock_dev_screen.connect()
     res_screen = evaluate_sample_stream(
-        "Smartphone Display Replay Attack (Moiré + Glare)",
+        "Synthetic replay effects on recorded photo",
         lambda i: mock_dev_screen.read_frame()[1].image,
         total_frames=70,
         expected_attack=True
@@ -144,7 +135,7 @@ def main():
     mock_dev_static = MockL0Device(scenario=MockScenario.STATIC_PHOTO_ATTACK)
     mock_dev_static.connect()
     res_static = evaluate_sample_stream(
-        "Static 2D Display Attack (Rigid Surface)",
+        "Synthetic static-photo scenario",
         lambda i: mock_dev_static.read_frame()[1].image,
         total_frames=70,
         expected_attack=True
@@ -152,11 +143,11 @@ def main():
     results.append(res_static)
     mock_dev_static.disconnect()
 
-    # 4. Bona Fide Live Presentation
+    # 4. Simulated success scenario. The source remains a recorded photograph.
     mock_dev_live = MockL0Device(scenario=MockScenario.BONA_FIDE_LIVE)
     mock_dev_live.connect()
     res_live = evaluate_sample_stream(
-        "Bona Fide Live Subject (Natural Micro-movement)",
+        "Simulated success scenario using photo motion",
         lambda i: mock_dev_live.read_frame()[1].image,
         total_frames=45,
         expected_attack=False,
@@ -170,24 +161,18 @@ def main():
     detected_attacks = sum(1 for r in results if r["expected_attack"] and not r["is_accepted"])
     false_acceptances = sum(1 for r in results if r["expected_attack"] and r["is_accepted"])
 
-    total_bona_fide = sum(1 for r in results if not r["expected_attack"])
-    accepted_bona_fide = sum(1 for r in results if not r["expected_attack"] and r["is_accepted"])
-    false_rejections = sum(1 for r in results if not r["expected_attack"] and not r["is_accepted"])
-
     mean_fps = 1000.0 / np.mean([r["avg_latency_ms"] for r in results])
 
     print("\n" + "=" * 75)
-    print("EXPERIMENTAL EVALUATION SUMMARY (Prototype Metrics)")
+    print("SIMULATED FIXTURE RESULTS")
     print("=" * 75)
-    print(f"Attack samples tested             : {total_attacks}")
-    print(f"Attacks Successfully Blocked      : {detected_attacks} / {total_attacks} ({(detected_attacks/max(1, total_attacks))*100.0:.1f}%)")
-    print(f"Attack Presentation Error (APCER) : {(false_acceptances/max(1, total_attacks))*100.0:.1f}%")
-    print(f"Bona fide samples tested          : {total_bona_fide}")
-    print(f"Bona Fide Presentation Err (BPCER): {(false_rejections/max(1, total_bona_fide))*100.0:.1f}%")
-    print(f"Mean Pipeline Throughput          : {mean_fps:.1f} FPS (Target >= 25 FPS)")
+    print(f"Rejection fixtures                : {total_attacks}")
+    print(f"Rejection fixtures rejected       : {detected_attacks} / {total_attacks}")
+    print(f"Rejection fixtures accepted       : {false_acceptances}")
+    print(f"Mean simulated throughput         : {mean_fps:.1f} FPS")
     print("=" * 75)
-    print("DISCLAIMER: Experimental local benchmark — not formal ISO evaluation.")
-    print("Metrics reflect local experimental testing against developer test fixtures.")
+    print("No live subjects or physical attacks were tested.")
+    print("These results cannot estimate population accuracy, APCER or BPCER.")
     print("=" * 75 + "\n")
 
 

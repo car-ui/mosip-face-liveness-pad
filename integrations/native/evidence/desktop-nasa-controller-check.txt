@@ -1,0 +1,6 @@
+PASS actual upstream Streamer: consecutive frames, bounded EOF rejection and disconnect cleanup
+PASS registration checkpoint rejects decoded blank ISO: NO_FACE
+PASS upstream GenericBiometricsController rejects blank ISO before returning candidates for storage
+PASS upstream BaseController operator/supervisor rejection: captures=2, identityMatcherCalls=0
+PASS recorded NASA portrait rejected for operator/supervisor: ACTIVE_CHALLENGE_REQUIRED; identityMatcherCalls=0; passiveClear=false
+Evidence scope: synthetic ISO + actual upstream controller/model, no live UI or physical attack.

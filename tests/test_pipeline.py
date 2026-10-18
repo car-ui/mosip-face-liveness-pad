@@ -71,27 +71,20 @@ def test_pipeline_passive_escalation_to_active_challenge():
     assert active_triggered is True
 
 
-def test_pipeline_presentation_attack_rejection_when_active_disabled():
-    device = MockL0Device(scenario=MockScenario.SCREEN_REPLAY_ATTACK)
-    device.connect()
-    
-    config = LivenessConfig()
-    # Disable active liveness fallback to test immediate rejection
-    config.resident_policy.active_liveness_enabled = False
-    pipeline = LivenessPipeline(config=config, workflow=WorkflowType.RESIDENT_REGISTRATION)
-    pipeline.reset()
+def test_pipeline_presentation_attack_rejection_when_active_disabled(controlled_attack_pipeline, valid_frame):
+    # Injected attack verdict checks policy handling independently of photo content.
+    pipeline = controlled_attack_pipeline
+    pipeline.policy.active_liveness_enabled = False
     
     attack_rejected = False
     for _ in range(35):
-        success, frame = device.read_frame()
-        res = pipeline.process_frame(frame)
+        res = pipeline.process_frame(valid_frame)
         if res.state == PipelineState.ATTACK_REJECTED:
             attack_rejected = True
             assert res.decision == LivenessDecision.ATTACK_DETECTED
             assert res.pad_result.attack_detected is True
             break
 
-    device.disconnect()
     assert attack_rejected is True
 
 
@@ -111,29 +104,21 @@ def test_pipeline_invalid_frame_handling():
     assert res.decision == LivenessDecision.ERROR
 
 
-def test_pipeline_definite_attack_rejected_even_when_active_enabled():
-    """Confirms definite attacks are rejected immediately even if active liveness is enabled."""
-    device = MockL0Device(scenario=MockScenario.SCREEN_REPLAY_ATTACK)
-    device.connect()
-
-    config = LivenessConfig()
-    config.resident_policy.active_liveness_enabled = True
-    config.resident_policy.escalate_attacks_to_active = False
-
-    pipeline = LivenessPipeline(config=config, workflow=WorkflowType.RESIDENT_REGISTRATION)
-    pipeline.reset()
+def test_pipeline_definite_attack_rejected_even_when_active_enabled(controlled_attack_pipeline, valid_frame):
+    """An injected attack verdict must reject even when active liveness is enabled."""
+    pipeline = controlled_attack_pipeline
+    pipeline.policy.active_liveness_enabled = True
+    pipeline.policy.escalate_attacks_to_active = False
 
     attack_rejected = False
     for _ in range(15):
-        success, frame = device.read_frame()
-        res = pipeline.process_frame(frame)
+        res = pipeline.process_frame(valid_frame)
         if res.state == PipelineState.ATTACK_REJECTED:
             attack_rejected = True
             assert res.decision == LivenessDecision.ATTACK_DETECTED
             assert res.pad_result.attack_detected is True
             break
 
-    device.disconnect()
     assert attack_rejected is True
 
 

@@ -50,6 +50,8 @@ jobs:
       run: |
         javac --release 8 -d output/local/java src/java_integration/*.java tests/java/NativeCaptureGateTest.java
         java -cp output/local/java NativeCaptureGateTest
+        javac --release 8 -d output/local/java integrations/native/common/io/mosip/facepad/BoundedMjpegReader.java integrations/native/tests/BoundedMjpegReaderCheck.java
+        java -cp output/local/java BoundedMjpegReaderCheck
 
     - name: Set up desktop native runtime
       uses: actions/setup-java@v4

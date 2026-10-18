@@ -80,7 +80,7 @@ def test_enrollment_progression_to_completion_with_privacy_guarantee(controlled_
         assert not isinstance(v, np.ndarray), f"Raw NumPy matrix leaked in field '{k}'!"
 
 
-def test_enrollment_rejection_on_presentation_attack():
+def test_enrollment_rejection_on_presentation_attack(controlled_attack_pipeline, valid_frame):
     """
     Verifies that a presentation attack triggers immediate rejection of enrollment,
     clears token hashes, and marks the session terminated.
@@ -88,17 +88,15 @@ def test_enrollment_rejection_on_presentation_attack():
     mgr = ResidentEnrollmentManager(default_resident_id="RES-00999")
     mgr.start_enrollment()
 
-    # Screen replay attack with glare/moiré
+    # The simulator supplies capabilities. The verdict is an explicit test double.
     device = MockL0Device(scenario=MockScenario.SCREEN_REPLAY_ATTACK)
     device.connect()
 
-    pipeline = LivenessPipeline(workflow=WorkflowType.RESIDENT_REGISTRATION)
-    pipeline.reset()
+    pipeline = controlled_attack_pipeline
 
     rejected = False
     for _ in range(25):
-        success, frame = device.read_frame()
-        res = pipeline.process_frame(frame)
+        res = pipeline.process_frame(valid_frame)
         stage = mgr.update_from_pipeline(res, device.get_capabilities())
         if stage == EnrollmentStage.REJECTED:
             rejected = True

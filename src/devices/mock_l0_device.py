@@ -52,9 +52,13 @@ class MockL0Device(L0Device):
         self._load_base_assets()
 
     def _load_base_assets(self) -> None:
-        """Loads a clean realistic test image if available locally, otherwise generates synthetic skin."""
+        """Load the attributed static NASA fixture, otherwise use a synthetic drawing.
+
+        Every scenario remains simulated, including BONA_FIDE_LIVE. Moving this
+        photograph cannot establish real liveness or physical attack accuracy.
+        """
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        sample_path = os.path.join(base_dir, "tests", "sample_images", "sample_0.jpg")
+        sample_path = os.path.join(base_dir, "tests", "sample_images", "astronaut.png")
         if os.path.exists(sample_path):
             img = cv2.imread(sample_path)
             if img is not None:

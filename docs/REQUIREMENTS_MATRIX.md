@@ -56,7 +56,7 @@ Reviewed against the supplied `ps4.pdf`, including mandatory tasks on pages 6-9,
 | Working prototype | Local browser and desktop demos | Hardware liveness demonstration with the deployed model. |
 | Pitch presentation | `pitch/index.html` | Team identity, final measured results, rehearsal. |
 | Optional demo video | Recording script in `DEMO_AND_SUBMISSION.md` | Record and verify a real 2-5 minute demo; no recording is claimed here. |
-| Test data and results | Existing fixtures, synthetic tests, validation report, private dataset evaluator | Resolve inherited sample-image licenses; collect consented test subjects/attacks. |
+| Test data and results | Attributed NASA static fixture, synthetic tests, validation report, private dataset evaluator | Review landmark-model distribution terms; collect consented test subjects/attacks. |
 | API and installation instructions | `README.md`, `API.md`, OpenAPI, dependency lock | Clean-machine native target setup. |
 | Student credentials, cloud links, submission email | User-controlled external submission | Do not put student IDs or credentials in the public repository. |
 

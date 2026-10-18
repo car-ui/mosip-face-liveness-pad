@@ -24,10 +24,24 @@ index 45403104ff..08c9c7e50e 100644
  		if (match && isPacketAuth) {
  			addOperatorBiometrics(biometrics, isReviewer);
 diff --git a/registration/registration-client/src/main/java/io/mosip/registration/controller/device/BiometricsController.java b/registration/registration-client/src/main/java/io/mosip/registration/controller/device/BiometricsController.java
-index 6e8fae980b..67c3aefbdd 100644
+index 6e8fae980b..2b9e96790c 100644
 --- a/registration/registration-client/src/main/java/io/mosip/registration/controller/device/BiometricsController.java
 +++ b/registration/registration-client/src/main/java/io/mosip/registration/controller/device/BiometricsController.java
-@@ -1285,7 +1285,11 @@ public class BiometricsController extends BaseController /* implements Initializ
+@@ -951,7 +951,12 @@ public class BiometricsController extends BaseController /* implements Initializ
+ 						InputStream urlStream = bioService.getStream(mdmBioDevice,
+ 								isFace(currentModality) ? RegistrationConstants.FACE_FULLFACE : currentModality);
+ 
+-						boolean isStreamStarted = urlStream != null && urlStream.read() != -1;
++						if (urlStream != null) {
++                            urlStream = new java.io.BufferedInputStream(urlStream);
++                            urlStream.mark(1);
++                        }
++                        boolean isStreamStarted = urlStream != null && urlStream.read() != -1;
++                        if (isStreamStarted) urlStream.reset();
+ 						if (!isStreamStarted) {
+ 							LOGGER.info(LOG_REG_BIOMETRIC_CONTROLLER, APPLICATION_NAME, APPLICATION_ID,
+ 									"URL Stream was null for : " + System.currentTimeMillis());
+@@ -1285,7 +1290,11 @@ public class BiometricsController extends BaseController /* implements Initializ
  		LOGGER.debug(LOG_REG_BIOMETRIC_CONTROLLER, APPLICATION_NAME, APPLICATION_ID,
  				"exceptionBioAttributes passed to mock/real MDM >>> " + exceptionBioAttributes);
  
@@ -41,10 +55,24 @@ index 6e8fae980b..67c3aefbdd 100644
  	}
  
 diff --git a/registration/registration-client/src/main/java/io/mosip/registration/controller/device/GenericBiometricsController.java b/registration/registration-client/src/main/java/io/mosip/registration/controller/device/GenericBiometricsController.java
-index e3e0bf37d1..cac7dc6996 100644
+index e3e0bf37d1..84a7d93960 100644
 --- a/registration/registration-client/src/main/java/io/mosip/registration/controller/device/GenericBiometricsController.java
 +++ b/registration/registration-client/src/main/java/io/mosip/registration/controller/device/GenericBiometricsController.java
-@@ -752,7 +752,7 @@ public class GenericBiometricsController extends BaseController {
+@@ -506,7 +506,12 @@ public class GenericBiometricsController extends BaseController {
+ 					InputStream urlStream = bioService.getStream(mdmBioDevice,
+ 							isFace(currentModality) ? RegistrationConstants.FACE_FULLFACE : currentModality.name());
+ 
+-					boolean isStreamStarted = urlStream != null && urlStream.read() != -1;
++					if (urlStream != null) {
++                            urlStream = new java.io.BufferedInputStream(urlStream);
++                            urlStream.mark(1);
++                        }
++                        boolean isStreamStarted = urlStream != null && urlStream.read() != -1;
++                        if (isStreamStarted) urlStream.reset();
+ 					if (!isStreamStarted) {
+ 						LOGGER.info("URL Stream was null at : {} ", System.currentTimeMillis());
+ 						deviceSpecificationFactory.initializeDeviceMap(true);
+@@ -752,7 +757,7 @@ public class GenericBiometricsController extends BaseController {
  		return isValid;
  	}
  
@@ -53,7 +81,7 @@ index e3e0bf37d1..cac7dc6996 100644
  		LOGGER.info("Finding exception bio attributes");
  		List<String> exceptionBioAttributes = new LinkedList<>();
  		int count = 1;
-@@ -777,7 +777,11 @@ public class GenericBiometricsController extends BaseController {
+@@ -777,7 +782,11 @@ public class GenericBiometricsController extends BaseController {
  				io.mosip.registration.context.ApplicationContext.getStringValueFromApplicationMap(
  						RegistrationConstants.SERVER_ACTIVE_PROFILE),
  				Integer.valueOf(getCaptureTimeOut()), count, (int) bioService.getMDMQualityThreshold(modality));
@@ -66,3 +94,299 @@ index e3e0bf37d1..cac7dc6996 100644
  
  	}
  
+diff --git a/registration/registration-client/src/main/java/io/mosip/registration/controller/device/Streamer.java b/registration/registration-client/src/main/java/io/mosip/registration/controller/device/Streamer.java
+index 105567a999..6ec977f710 100644
+--- a/registration/registration-client/src/main/java/io/mosip/registration/controller/device/Streamer.java
++++ b/registration/registration-client/src/main/java/io/mosip/registration/controller/device/Streamer.java
+@@ -3,197 +3,107 @@ package io.mosip.registration.controller.device;
+ import java.io.ByteArrayInputStream;
+ import java.io.IOException;
+ import java.io.InputStream;
+-import java.io.StringWriter;
+-
++import java.util.concurrent.atomic.AtomicBoolean;
+ import org.springframework.stereotype.Component;
+-
++import io.mosip.facepad.BoundedMjpegReader;
+ import io.mosip.kernel.core.logger.spi.Logger;
+ import io.mosip.registration.config.AppConfig;
+ import io.mosip.registration.context.SessionContext;
++import javafx.application.Platform;
+ import javafx.scene.image.Image;
+ import javafx.scene.image.ImageView;
+ 
+ @Component
+ public class Streamer {
+-
+-	private static final Logger LOGGER = AppConfig.getLogger(Streamer.class);
+-
+-	private InputStream urlStream;
+-
+-	public void setUrlStream(InputStream inputStream) {
+-
+-		if (urlStream != null) {
+-			try {
+-				urlStream.close();
+-			} catch (IOException exception) {
+-				LOGGER.error("Failed to close the stream",exception);
+-			} finally {
+-				urlStream = null;
+-				imageBytes = null;
+-			}
+-		}
+-
+-		if (inputStream != null) {
+-			this.urlStream = inputStream;
+-			isRunning = true;
+-		} else {
+-			this.urlStream = null;
+-			isRunning = false;
+-		}
+-
+-	}
+-
+-	public InputStream getUrlStream() {
+-		return urlStream;
+-	}
+-
+-	private boolean isRunning = true;
+-
+-	private final String CONTENT_LENGTH = "Content-Length:";
+-
+-	private Thread streamer_thread = null;
+-
+-	public byte[] imageBytes = null;
+-
+-	// Last streaming image
+-	private static Image streamImage;
+-
+-	// Image View, which UI need to be shown
+-	private static ImageView imageView;
+-
+-	// Set Streaming image
+-	public void setStreamImage(Image streamImage) {
+-		this.streamImage = streamImage;
+-	}
+-
+-	// Get Streaming image
+-	public Image getStreamImage() {
+-		return streamImage;
+-	}
+-
+-	public byte[] getStreamImageBytes() {
+-		return imageBytes;
+-	}
+-
+-	// Set ImageView
+-	public static void setImageView(ImageView imageView) {
+-		Streamer.imageView = imageView;
+-	}
+-
+-	// Set Streaming image to ImageView
+-	public void setStreamImageToImageView() {
+-		imageView.setImage(streamImage);
+-	}
+-
+-	public void startStream(InputStream inputStream, ImageView streamImage, ImageView scanImage) {
+-
+-		LOGGER.info("Streamer Thread initiation started for : {}", System.currentTimeMillis());
+-
+-		streamer_thread = new Thread(new Runnable() {
+-
+-			public void run() {
+-
+-				setUrlStream(inputStream);
+-
+-				while (null != urlStream) {
+-					try {
+-						imageBytes = retrieveNextImage(urlStream);
+-						ByteArrayInputStream imageStream = new ByteArrayInputStream(imageBytes);
+-						Image img = new Image(imageStream);
+-						streamImage.setImage(img);
+-						if (null != scanImage) {
+-							setStreamImage(img);
+-						}
+-					} catch (Throwable t) {
+-						LOGGER.error("Failed in streamer_thread", t);
+-						urlStream = null;
+-					}
+-				}
+-			}
+-		}, "STREAMER_THREAD");
+-
+-		streamer_thread.start();
+-
+-		LOGGER.info("Streamer Thread initiated completed for : {}", System.currentTimeMillis());
+-
+-	}
+-
+-	/**
+-	 * Using the urlStream get the next JPEG image as a byte[]
+-	 *
+-	 * @return byte[] of the JPEG
+-	 * @throws IOException
+-	 */
+-	public byte[] retrieveNextImage(InputStream urlStream) throws IOException {
+-
+-		int currByte = -1;
+-
+-		boolean captureContentLength = false;
+-		StringWriter contentLengthStringWriter = new StringWriter(128);
+-		StringWriter headerWriter = new StringWriter(128);
+-
+-		int contentLength = 0;
+-
+-		while ((currByte = urlStream.read()) > -1) {
+-			if (captureContentLength) {
+-				if (currByte == 10 || currByte == 13) {
+-					contentLength = Integer.parseInt(contentLengthStringWriter.toString().replace(" ", ""));
+-					break;
+-				}
+-				contentLengthStringWriter.write(currByte);
+-
+-			} else {
+-				headerWriter.write(currByte);
+-				String tempString = headerWriter.toString();
+-				int indexOf = tempString.indexOf(CONTENT_LENGTH);
+-				if (indexOf > 0) {
+-					captureContentLength = true;
+-				}
+-			}
+-		}
+-
+-		// 255 indicates the start of the jpeg image
+-		while (urlStream.read() != 255) {
+-
+-		}
+-
+-		// && urlStream.read()!=-1
+-		// if(urlStream.read()==-1) {
+-		// throw new RuntimeException("No stream available");
+-		// }
+-
+-		// rest is the buffer
+-		byte[] imageBytes = new byte[contentLength + 1];
+-		// since we ate the original 255 , shove it back in
+-		imageBytes[0] = (byte) 255;
+-		int offset = 1;
+-		int numRead = 0;
+-		while (offset < imageBytes.length
+-				&& (numRead = urlStream.read(imageBytes, offset, imageBytes.length - offset)) >= 0) {
+-			offset += numRead;
+-		}
+-
+-		return imageBytes;
+-	}
+-
+-	/**
+-	 * Stop the loop, and allow it to clean up
+-	 */
+-	public synchronized void stop() {
+-
+-		// Enable Auto-Logout
+-		SessionContext.setAutoLogout(true);
+-
+-		if (streamer_thread != null) {
+-			try {
+-				isRunning = false;
+-				if (urlStream != null)
+-					urlStream.close();
+-				streamer_thread = null;
+-			} catch (IOException e) {
+-				LOGGER.error("Failed to close the stream thread", e);
+-			}
+-		}
+-	}
+-
++    private static final Logger LOGGER = AppConfig.getLogger(Streamer.class);
++    private volatile InputStream urlStream;
++    private long generation;
++    private Thread streamer_thread;
++    public volatile byte[] imageBytes;
++    private static volatile Image streamImage;
++    private static volatile ImageView imageView;
++
++    public synchronized void setUrlStream(InputStream inputStream) {
++        InputStream previous = urlStream;
++        generation++;
++        urlStream = inputStream;
++        imageBytes = null;
++        streamImage = null;
++        if (previous != null && previous != inputStream) close(previous);
++    }
++
++    private static void close(InputStream input) {
++        try { input.close(); }
++        catch (IOException e) { LOGGER.error("Failed to close camera stream", e); }
++    }
++
++    public InputStream getUrlStream() { return urlStream; }
++    public void setStreamImage(Image image) { streamImage = image; }
++    public Image getStreamImage() { return streamImage; }
++    public byte[] getStreamImageBytes() {
++        byte[] current = imageBytes;
++        return current == null ? null : current.clone();
++    }
++    public static void setImageView(ImageView view) { imageView = view; }
++    public void setStreamImageToImageView() {
++        Image image = streamImage;
++        ImageView view = imageView;
++        if (view != null) Platform.runLater(() -> view.setImage(image));
++    }
++
++    private synchronized boolean current(InputStream input, long token) {
++        return urlStream == input && generation == token;
++    }
++
++    public synchronized void startStream(InputStream inputStream, ImageView preview, ImageView scanImage) {
++        setUrlStream(inputStream);
++        if (inputStream == null) return;
++        final long token = generation;
++        final AtomicBoolean updatePending = new AtomicBoolean();
++        streamer_thread = new Thread(() -> {
++            try {
++                while (current(inputStream, token) && !Thread.currentThread().isInterrupted()) {
++                    byte[] frame = retrieveNextImage(inputStream);
++                    Image image = new Image(new ByteArrayInputStream(frame));
++                    if (image.isError()) throw new IOException("Camera JPEG could not be decoded");
++                    synchronized (Streamer.this) {
++                        if (!current(inputStream, token)) break;
++                        imageBytes = frame;
++                        if (scanImage != null) streamImage = image;
++                    }
++                    // Bound the JavaFX queue when the camera is faster than rendering.
++                    if (preview != null && updatePending.compareAndSet(false, true)) {
++                        Platform.runLater(() -> {
++                            try {
++                                synchronized (Streamer.this) {
++                                    if (current(inputStream, token)) preview.setImage(image);
++                                }
++                            } finally { updatePending.set(false); }
++                        });
++                    }
++                }
++            } catch (IOException | RuntimeException e) {
++                if (current(inputStream, token)) LOGGER.error("Camera stream stopped", e);
++            } finally {
++                synchronized (Streamer.this) {
++                    // An older reader must never close or clear a replacement session.
++                    if (current(inputStream, token)) setUrlStream(null);
++                }
++                close(inputStream);
++            }
++        }, "STREAMER_THREAD");
++        streamer_thread.setDaemon(true);
++        streamer_thread.start();
++    }
++
++    public byte[] retrieveNextImage(InputStream input) throws IOException {
++        return BoundedMjpegReader.readFrame(input);
++    }
++
++    public synchronized void stop() {
++        SessionContext.setAutoLogout(true);
++        setUrlStream(null);
++        if (streamer_thread != null) streamer_thread.interrupt();
++        streamer_thread = null;
++    }
+ }

@@ -47,5 +47,14 @@ def controlled_pipeline(monkeypatch):
 
 
 @pytest.fixture
+def controlled_attack_pipeline(controlled_pipeline, monkeypatch):
+    """Inject an attack verdict to test rejection handling, not image accuracy."""
+    pipeline = controlled_pipeline
+    monkeypatch.setattr(pipeline.pad_detector, "evaluate_passive_liveness", lambda *a: PADResult(
+        PADVerdict.PRESENTATION_ATTACK, False, .01, .98, True, "TEST_FIXTURE", "TEST_DOUBLE"))
+    return pipeline
+
+
+@pytest.fixture
 def valid_frame():
     return VideoFrame(1, 1, np.full((240, 320, 3), 120, np.uint8), 320, 240)

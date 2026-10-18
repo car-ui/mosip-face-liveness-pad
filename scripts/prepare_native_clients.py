@@ -31,6 +31,8 @@ def prepare(platform: str, checkout: Path):
     shutil.copyfile(ROOT / "assets/models/minifasnet_v2.onnx", resources / "minifasnet_v2.onnx")
     shutil.copyfile(ROOT / "assets/models/minifasnet_v2.onnx.json", resources / "minifasnet_v2.onnx.json")
     shutil.copyfile(ROOT / "third_party/Silent-Face-Anti-Spoofing-LICENSE.txt", resources / "MODEL-LICENSE.txt")
+    shutil.copyfile(ROOT / "third_party/ONNX-Runtime-LICENSE.txt", resources / "ONNX-Runtime-LICENSE.txt")
+    shutil.copyfile(ROOT / "third_party/OpenCV-LICENSE.txt", resources / "OpenCV-LICENSE.txt")
     shutil.copyfile(base / "assets/haarcascade_frontalface_default.xml", resources / "haarcascade_frontalface_default.xml")
     if platform == "android":
         tests = module.parent / "androidTest"

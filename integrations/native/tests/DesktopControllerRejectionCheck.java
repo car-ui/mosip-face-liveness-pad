@@ -1,5 +1,6 @@
 import io.mosip.registration.controller.BaseController;
 import io.mosip.registration.controller.device.GenericBiometricsController;
+import io.mosip.registration.controller.device.Streamer;
 import io.mosip.registration.enums.Modality;
 import io.mosip.registration.constants.RegistrationConstants;
 import io.mosip.registration.context.ApplicationContext;
@@ -25,6 +26,37 @@ public final class DesktopControllerRejectionCheck extends BaseController {
         field.setAccessible(true); field.set(target, value);
     }
     public static void main(String[] args) throws Exception {
+        // Exercise the actual upstream Streamer delegation without a UI or camera.
+        Streamer stream = new Streamer();
+        byte[] markers = {(byte)255, (byte)216, 1, 2, (byte)255, (byte)217};
+        ByteArrayOutputStream multipart = new ByteArrayOutputStream();
+        for (int i = 0; i < 2; i++) {
+            multipart.write("\r\n--camera\r\nContent-Length: 6\r\n\r\n".getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+            multipart.write(markers);
+        }
+        InputStream parts = new ByteArrayInputStream(multipart.toByteArray());
+        for (int i = 0; i < 2; i++) {
+            if (!Arrays.equals(markers, stream.retrieveNextImage(parts))) throw new AssertionError("Stream frame corrupted");
+        }
+        java.util.concurrent.ExecutorService reader = java.util.concurrent.Executors.newSingleThreadExecutor(task -> {
+            Thread thread = new Thread(task); thread.setDaemon(true); return thread;
+        });
+        try {
+            boolean rejected = reader.submit(() -> {
+                try { stream.retrieveNextImage(parts); return false; }
+                catch (EOFException expected) { return true; }
+            }).get(2, java.util.concurrent.TimeUnit.SECONDS);
+            if (!rejected) throw new AssertionError("Camera disconnect accepted");
+        } finally { reader.shutdownNow(); }
+        final boolean[] closed = {false};
+        stream.setUrlStream(new ByteArrayInputStream(new byte[0]) {
+            public void close() { closed[0] = true; }
+        });
+        stream.imageBytes = markers;
+        stream.setUrlStream(null);
+        if (!closed[0] || stream.getUrlStream() != null || stream.getStreamImageBytes() != null)
+            throw new AssertionError("Camera session retained after disconnect");
+        System.out.println("PASS actual upstream Streamer: consecutive frames, bounded EOF rejection and disconnect cleanup");
         ApplicationContext.getInstance();
         Map<String,Object> policy = new HashMap<>();
         policy.put(RegistrationConstants.SERVER_ACTIVE_PROFILE, "Developer");
@@ -77,10 +109,17 @@ public final class DesktopControllerRejectionCheck extends BaseController {
         if (captures.get() != 2 || matches.get() != 0) throw new AssertionError("Matcher called despite rejection");
         System.out.println("PASS upstream BaseController operator/supervisor rejection: captures=2, identityMatcherCalls=0");
         if (args.length >= 1) {
-            // Existing repository portrait fixture, not a physical attack or a camera capture.
-            convert.setInputBytes(Files.readAllBytes(Paths.get(args[0])));
+            // Attributed static NASA fixture, not a physical attack or a camera capture.
+            ByteArrayOutputStream portraitJpeg = new ByteArrayOutputStream();
+            if (!ImageIO.write(ImageIO.read(Paths.get(args[0]).toFile()), "jpg", portraitJpeg))
+                throw new IOException("Cannot encode portrait fixture as JPEG");
+            convert.setInputBytes(portraitJpeg.toByteArray());
             biometric.setAttributeISO(FaceEncoder.convertFaceImageToISO(convert));
-            DesktopPadCheckpoint.requireClear(candidates, false);
+            boolean passiveClear = false;
+            try { DesktopPadCheckpoint.requireClear(candidates, false); passiveClear = true; }
+            catch (IOException expected) {
+                if (!expected.getMessage().contains("ACTIVE_CHALLENGE_REQUIRED")) throw expected;
+            }
             for (boolean reviewer : new boolean[]{false,true}) {
                 try { controller.captureAndValidateFace("SYNTHETIC-TEST-ONLY", true, reviewer); throw new AssertionError("Active evidence bypassed"); }
                 catch (IOException expected) {
@@ -88,7 +127,7 @@ public final class DesktopControllerRejectionCheck extends BaseController {
                 }
             }
             if (captures.get() != 4 || matches.get() != 0) throw new AssertionError("Matcher called without active evidence");
-            System.out.println("PASS high-passive-score portrait still rejected for operator/supervisor: ACTIVE_CHALLENGE_REQUIRED; identityMatcherCalls=0");
+            System.out.println("PASS recorded NASA portrait rejected for operator/supervisor: ACTIVE_CHALLENGE_REQUIRED; identityMatcherCalls=0; passiveClear=" + passiveClear);
         }
         System.out.println("Evidence scope: synthetic ISO + actual upstream controller/model, no live UI or physical attack.");
     }
