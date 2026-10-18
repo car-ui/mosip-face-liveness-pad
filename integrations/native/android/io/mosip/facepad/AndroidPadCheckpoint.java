@@ -1,0 +1,63 @@
+package io.mosip.facepad;
+
+import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import com.gemalto.jp2.JP2Decoder;
+import io.mosip.biometrics.util.face.FaceBDIR;
+import io.mosip.registration.clientmanager.dto.registration.BiometricsDto;
+import java.io.*;
+import java.util.List;
+import org.opencv.android.OpenCVLoader;
+import org.opencv.android.Utils;
+import org.opencv.core.Mat;
+import org.opencv.imgproc.Imgproc;
+
+/** Offline checkpoint for the exact SBI result, before any registration/onboarding storage. */
+public final class AndroidPadCheckpoint {
+    private static NativePadEngine engine;
+    private AndroidPadCheckpoint() { }
+
+    private static synchronized NativePadEngine engine(Context context) throws Exception {
+        if (engine == null) {
+            if (!OpenCVLoader.initLocal()) throw new IOException("OpenCV unavailable");
+            File cascade = new File(context.getCacheDir(), "facepad-cascade.xml");
+            try (InputStream input = context.getAssets().open("facepad/haarcascade_frontalface_default.xml");
+                 OutputStream output = new FileOutputStream(cascade)) { copy(input, output); }
+            try (InputStream input = context.getAssets().open("facepad/minifasnet_v2.onnx");
+                 ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+                copy(input, output);
+                engine = new NativePadEngine(output.toByteArray(), cascade.toPath());
+            } finally { cascade.delete(); }
+        }
+        return engine;
+    }
+
+    private static void copy(InputStream input, OutputStream output) throws IOException {
+        byte[] buffer = new byte[8192]; int count;
+        while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+    }
+
+    public static void requireClear(Context context, List<BiometricsDto> biometrics, boolean activeRequired) throws IOException {
+        if (biometrics == null || biometrics.size() != 1) throw new IOException("PAD: expected one face capture");
+        Bitmap bitmap = null;
+        Mat rgba = null, bgr = null;
+        try {
+            NativePadEngine evaluator = engine(context);
+            rgba = new Mat(); bgr = new Mat();
+            // SBI signature and transaction validation run upstream before this method.
+            byte[] iso = java.util.Base64.getUrlDecoder().decode(biometrics.get(0).getBioValue());
+            byte[] encoded = new FaceBDIR(new DataInputStream(new ByteArrayInputStream(iso)))
+                    .getRepresentation().getRepresentationData().getImageData().getImage();
+            bitmap = BitmapFactory.decodeByteArray(encoded, 0, encoded.length);
+            if (bitmap == null) bitmap = new JP2Decoder(encoded).decode();
+            if (bitmap == null) throw new IOException("PAD: image decoding failed");
+            Utils.bitmapToMat(bitmap, rgba);
+            Imgproc.cvtColor(rgba, bgr, Imgproc.COLOR_RGBA2BGR);
+            NativePadEngine.Decision decision = evaluator.evaluateBgr(bgr, activeRequired);
+            if (!decision.accepted) throw new IOException("PAD rejected face capture: " + decision.reason);
+        } catch (IOException e) { throw e; }
+        catch (Exception | LinkageError e) { throw new IOException("PAD unavailable; face capture rejected", e); }
+        finally { if (bitmap != null) bitmap.recycle(); if (rgba != null) rgba.release(); if (bgr != null) bgr.release(); }
+    }
+}

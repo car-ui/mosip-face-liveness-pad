@@ -1,0 +1,38 @@
+diff --git a/android/app/build.gradle b/android/app/build.gradle
+index 8e17558..ec88a27 100644
+--- a/android/app/build.gradle
++++ b/android/app/build.gradle
+@@ -147,6 +147,8 @@ flutter {
+ }
+ 
+ dependencies {
++    implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.23.2'
++    implementation 'org.opencv:opencv:4.12.0'
+     coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:${rootProject.ext.desugarJdkLibsVersion}"
+ 
+     implementation "javax.inject:javax.inject:${rootProject.ext.javaxInjectVersion}"
+diff --git a/android/app/src/main/java/io/mosip/registration_client/api_services/BiometricsDetailsApi.java b/android/app/src/main/java/io/mosip/registration_client/api_services/BiometricsDetailsApi.java
+index 640ac66..d774f54 100644
+--- a/android/app/src/main/java/io/mosip/registration_client/api_services/BiometricsDetailsApi.java
++++ b/android/app/src/main/java/io/mosip/registration_client/api_services/BiometricsDetailsApi.java
+@@ -1075,6 +1075,9 @@ public class BiometricsDetailsApi implements BiometricsPigeon.BiometricsApi {
+                     : registrationService.getRegistrationDto().getCaptureTransactionId();
+             List<BiometricsDto> biometricsDtoList = biometricsService.handleRCaptureResponse(currentModality, respData,
+                     getExceptionAttributes(), transactionId, isOperatorOnboarding);
++            if (currentModality == Modality.FACE || currentModality == Modality.EXCEPTION_PHOTO) {
++                io.mosip.facepad.AndroidPadCheckpoint.requireClear(activity, biometricsDtoList, isOperatorOnboarding);
++            }
+             // if attempts is zero, there is no need to maintain the counter
+             if (fieldId.equals(OPERATOR_BIOMETRICS)) {
+                 removeDuplicatesFromOperatorBiometricList(currentModality);
+@@ -1127,6 +1130,10 @@ public class BiometricsDetailsApi implements BiometricsPigeon.BiometricsApi {
+                 biometricResult.success("Ok");
+             }
+ 
++        } catch (java.io.IOException e) {
++            auditManagerService.audit(AuditEvent.R_CAPTURE_PARSE_FAILED, Components.REGISTRATION, "PAD_REJECTED");
++            Toast.makeText(activity.getApplicationContext(), e.getMessage(), Toast.LENGTH_LONG).show();
++            if (biometricResult != null) biometricResult.error(e);
+         } catch (BiometricsServiceException e) {
+             auditManagerService.audit(AuditEvent.R_CAPTURE_PARSE_FAILED, Components.REGISTRATION, e.getMessage());
+             Log.e(TAG, "R-Capture failed: " + e.getErrorCode(), e);

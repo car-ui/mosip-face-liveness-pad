@@ -1,0 +1,30 @@
+# Native capture checkpoints
+
+This directory adds an offline, in-process PAD checkpoint to pinned MOSIP client sources. It supplements the Python prototype. It does not establish a completed live registration, a live client UI rejection, or physical attack accuracy.
+
+| Client | Upstream | Commit |
+| --- | --- | --- |
+| Android | `mosip/android-registration-client`, v1.1.1 | `8f4643a694f3b5e66e0491f077a8630ab5667658` |
+| Desktop | `mosip/registration-client`, release-1.2.0 | `935306e2fd38bff2803697468e595026b1d18cec` |
+
+Run `python scripts/prepare_native_clients.py desktop PATH_TO_CLEAN_CHECKOUT`, or use `android` for Android. The preparer checks the exact commit and refuses a dirty checkout. It applies the small caller patch, installs the shared Java engine and platform adapter, and copies the packaged ONNX model and face detector into application resources.
+
+## Acceptance paths
+
+Desktop checks resident face and exception-photo candidates in `BiometricsController` before deduplication, registration storage, or the success alert. `BaseController.captureAndValidateFace` checks operator and supervisor captures before the identity matcher. Android checks `BiometricsDetailsApi.parseRCaptureResponse` after existing SBI signature/transaction validation and before registration or operator-onboarding storage. Rejection completes the Flutter callback with an error and shows a reason.
+
+The engine verifies the model SHA-256, requires exactly one detected face, uses the MiniFASNet 2.7x context crop, raw BGR channels, and the model's live output index. Invalid images, unavailable native libraries, model corruption and inference errors reject the capture. Model scores at or below 0.45 reject as an attack. Scores below 0.85 require active evidence. These are research thresholds, not measured operating points.
+
+**Active evidence is not supplied by these adapters yet.** Operator/supervisor face authentication and operator onboarding therefore reject with `ACTIVE_CHALLENGE_REQUIRED` even if the passive model returns a high score. This is a deliberately incomplete, fail-closed integration. It must not be described as functional operator authentication or successful active liveness. Resident candidates with high passive scores may pass this checkpoint. The model has known replay weaknesses described in `docs/MODEL_CARD.md`.
+
+Android receives a completed capture URI from a separate SBI app. Adding active challenges requires cooperation with the app that owns that camera session. A recorded capture alone cannot prove a requested action happened during the current challenge. Desktop also still needs its live stream connected to challenge evaluation and the exact final candidate.
+
+## Verification
+
+The desktop reactor compiled with Java 11 after adding the checkpoints. On this memory-constrained machine only, the upstream compiler's 1 GB initial / 2 GB maximum heap was reduced to 64 MB / 384 MB. That build-only adjustment is not part of the caller patch.
+
+`tests/NativePadEngineCheck.java` executes actual Java ONNX inference and compares a raw input tensor with Python, then checks blank/malformed rejection, invalid tensor rejection and model checksum enforcement. `tests/DesktopControllerRejectionCheck.java` converts a synthetic blank JPEG to an ISO face record and checks the registration adapter and the actual patched upstream `BaseController`. Its SBI and identity matcher are explicit test doubles. The operator and supervisor calls must reject before the matcher is called. These checks do not exercise the native UI or physical presentation attacks.
+
+Use Java 11 for the desktop runtime. The cached ONNX Runtime 1.30.0 native library crashed during environment initialization with this machine's Android Studio JBR 21; the same check passed with Temurin 11. Android uses ONNX Runtime Android 1.23.2 and OpenCV 4.12.0 and needs separate build/device evidence.
+
+The Haar XML retains its Intel/OpenCV redistribution notice inside the file. Client patches target MPL-2.0 upstream sources. The packaged PAD model's provenance and license are documented in `assets/models` and `docs/MODEL_CARD.md`.

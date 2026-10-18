@@ -1,6 +1,6 @@
 # Native client integration contract
 
-The supplied prototype contains a Python research service and independent Java components. It does not contain verified changes to the official MOSIP Registration Clients. The following contract identifies the implementation and evidence needed to connect them without bypassing liveness.
+The prototype contains a Python research service and independent Java components. Pinned native caller patches and in-process ONNX adapters are now in [`integrations/native`](../integrations/native/README.md). The patched desktop reactor compiles, and a synthetic ISO test exercises its actual operator/supervisor controller before identity matching. Live client UI rejection and physical attack testing remain unverified. Active evidence is not connected to these new adapters, so operator/supervisor captures fail closed. The following contract records the remaining work needed for complete integration.
 
 ## Verified components
 

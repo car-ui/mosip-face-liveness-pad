@@ -1,0 +1,34 @@
+{
+  "date": "2026-10-18",
+  "desktop_upstream_commit": "935306e2fd38bff2803697468e595026b1d18cec",
+  "android_upstream_commit": "8f4643a694f3b5e66e0491f077a8630ab5667658",
+  "desktop_reactor_compile": "PASS",
+  "runtime": "Temurin 11.0.32.1+1",
+  "build_only_heap_adjustment": {
+    "initial_mb": 64,
+    "maximum_mb": 384
+  },
+  "model_sha256": "5281b4a621b1a2a7570d88bc3a37ac5273ab3082b61d1e284b9847660909cbef",
+  "checks": {
+    "native-engine-jdk11.log": {
+      "sha256": "27f0887eaf86a189fe7bd192a9a5029101438a5ca96c6f9b77a9d157449304c4",
+      "results": [
+        "PASS actual ONNX Java/Python parity; blank and malformed rejection; invalid tensor rejection. liveScore=0.9918094405237123",
+        "PASS model tampering rejection"
+      ]
+    },
+    "desktop-controller-check.log": {
+      "sha256": "200f0a61f7139252d0a6e80f2550f2081c31f3a87ced3530137652b75fb90bfe",
+      "results": [
+        "PASS registration checkpoint rejects decoded blank ISO: NO_FACE",
+        "PASS upstream BaseController operator/supervisor rejection: captures=2, identityMatcherCalls=0",
+        "Evidence scope: synthetic ISO + actual upstream controller/model, no live UI or physical attack."
+      ]
+    }
+  },
+  "android_build": "PENDING",
+  "native_ui_rejection": "NOT_TESTED",
+  "physical_attacks": "DEFERRED_BY_USER",
+  "active_challenge_integration": "NOT_CONNECTED_FAIL_CLOSED",
+  "identity_matcher": "TEST_DOUBLE_NOT_CALLED_AFTER_REJECTION"
+}

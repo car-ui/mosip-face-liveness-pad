@@ -1,0 +1,40 @@
+diff --git a/registration/registration-client/pom.xml b/registration/registration-client/pom.xml
+index a039aeb1b6..8b5a5d28b5 100644
+--- a/registration/registration-client/pom.xml
++++ b/registration/registration-client/pom.xml
+@@ -19,6 +19,8 @@
+ 
+ 
+ 	<dependencies>
++        <dependency><groupId>com.microsoft.onnxruntime</groupId><artifactId>onnxruntime</artifactId><version>1.30.0</version></dependency>
++        <dependency><groupId>org.openpnp</groupId><artifactId>opencv</artifactId><version>4.5.3-4</version></dependency>
+ 		<dependency>
+ 			<groupId>io.mosip.registration</groupId>
+ 			<artifactId>registration-services</artifactId>
+diff --git a/registration/registration-client/src/main/java/io/mosip/registration/controller/BaseController.java b/registration/registration-client/src/main/java/io/mosip/registration/controller/BaseController.java
+index 45403104ff..08c9c7e50e 100644
+--- a/registration/registration-client/src/main/java/io/mosip/registration/controller/BaseController.java
++++ b/registration/registration-client/src/main/java/io/mosip/registration/controller/BaseController.java
+@@ -1692,6 +1692,7 @@ public class BaseController {
+ 
+ 		List<BiometricsDto> biometrics = bioService.captureModalityForAuth(mdmRequestDto);
+ 
++        io.mosip.facepad.DesktopPadCheckpoint.requireClear(biometrics, true);
+ 		boolean match = authenticationService.authValidator(userId, SingleType.FACE.value(), biometrics);
+ 		if (match && isPacketAuth) {
+ 			addOperatorBiometrics(biometrics, isReviewer);
+diff --git a/registration/registration-client/src/main/java/io/mosip/registration/controller/device/BiometricsController.java b/registration/registration-client/src/main/java/io/mosip/registration/controller/device/BiometricsController.java
+index 6e8fae980b..a3eb350bdb 100644
+--- a/registration/registration-client/src/main/java/io/mosip/registration/controller/device/BiometricsController.java
++++ b/registration/registration-client/src/main/java/io/mosip/registration/controller/device/BiometricsController.java
+@@ -1096,6 +1096,10 @@ public class BiometricsController extends BaseController /* implements Initializ
+ 						return;
+ 					}
+ 
++                    if (isFace(currentModality) || isExceptionPhoto(currentModality)) {
++                        io.mosip.facepad.DesktopPadCheckpoint.requireClear(mdsCapturedBiometricsList,
++                                getRegistrationDTOFromSession() == null);
++                    }
+ 					LOGGER.debug("Started local de-dup validation");// validate local de-dup check
+ 					if(identifyInLocalGallery(mdsCapturedBiometricsList,
+ 							Biometric.getSingleTypeByModality(isFace(currentModality) || isExceptionPhoto(currentModality) ?
