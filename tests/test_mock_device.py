@@ -15,7 +15,7 @@ def test_mock_device_lifecycle():
     
     info = device.get_device_info()
     assert info.device_type == DeviceType.MOCK_L0_SIMULATOR
-    assert info.is_l1_secure is True
+    assert info.is_l1_secure is False
     
     # Test frame read
     success, frame = device.read_frame()

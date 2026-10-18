@@ -1,0 +1,24 @@
+{
+  "date": "2026-10-18",
+  "platform": "Windows",
+  "python": "3.11.15",
+  "dependencyInstallation": "Fresh virtual environment from requirements.lock.txt",
+  "pytest": {
+    "tests": "117",
+    "errors": "0",
+    "failures": "0",
+    "skipped": "0",
+    "time": "22.610"
+  },
+  "java": {
+    "release": 8,
+    "runtime": 21,
+    "checksPassed": 20
+  },
+  "modelConversion": {
+    "tensors": 6,
+    "maximumAbsoluteLogitDifference": 2.6226043701171875e-06
+  },
+  "physicalAttackDatasetEvaluated": false,
+  "officialNativeClientE2EVerified": false
+}

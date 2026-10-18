@@ -1,431 +1,328 @@
-"""
-MOSIP Device Service (MDS) Server
-Conforms to the MOSIP Device Service (MDS) REST architecture:
-- GET  /info       : Device discovery, status, L0/L1 level, digital ID
-- GET  /stream     : Multipart JPEG video frame stream with real-time UI guidance overlay
-- POST /capture    : Biometric capture endpoint returning ISO biometric data & PAD token
-- POST /configure  : Runtime configuration for thresholds and workflows
-- POST /switch-device : Switch between Physical Webcam (L0) and Mock L0 Simulator
-"""
-
-import os
-import asyncio
+"""Loopback research API. This service is not a certified MOSIP SBI implementation."""
 import base64
-import time
+import copy
 import hashlib
+import os
+import secrets
+import threading
+import time
+from contextlib import asynccontextmanager
+from dataclasses import asdict
+from pathlib import Path
+from typing import Optional, Literal
+
 import cv2
-import numpy as np
-from fastapi import FastAPI, Response, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any, List
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from ..devices.base import FaceCaptureDevice, DeviceType, DeviceStatus, MockScenario, VendorL1Adapter
+from ..devices.base import DeviceType, MockScenario, VendorL1Adapter
 from ..devices.webcam_device import WebcamCaptureDevice
 from ..devices.mock_l0_device import MockL0Device
-from ..core.pipeline import LivenessPipeline, PipelineState, LivenessDecision
-from ..core.config import LivenessConfig, WorkflowType, PADMode
-from ..ui.desktop_client import DesktopRegistrationClient
-from contextlib import asynccontextmanager
+from ..core.pipeline import LivenessPipeline, PipelineState
+from ..core.config import LivenessConfig, WorkflowType, PADMode, ChallengeType
+from ..core.metrics import OperationalMetrics
+
+API_TOKEN = os.environ.get("MOSIP_MDS_API_TOKEN") or secrets.token_urlsafe(32)
+device = MockL0Device()
+_packaged_model = Path(__file__).resolve().parents[2] / "assets/models/minifasnet_v2.onnx"
+_model_path = os.environ.get("MOSIP_PAD_MODEL", str(_packaged_model))
+_model_present = Path(_model_path).is_file()
+pipeline = LivenessPipeline(LivenessConfig(
+    onnx_model_path=_model_path if _model_present else None,
+    pad_mode=PADMode(os.environ.get("MOSIP_PAD_MODE", "ONNX" if _model_present or "MOSIP_PAD_MODEL" in os.environ else "HEURISTIC")),
+))
+metrics = OperationalMetrics()
+_device_lock = threading.RLock()
+_capture_lock = threading.Lock()
+_latest_jpeg = None
+_status = {"state": "IDLE", "guidance": "Choose a device and start verification.", "progress": 0}
+_origins = ["http://127.0.0.1:4501", "http://localhost:4501"]
+
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    global device
+async def lifespan(app):
     device.connect()
-    yield
-    device.disconnect()
-
-app = FastAPI(
-    title="MOSIP Device Service (MDS) - Face Liveness & PAD Subsystem",
-    description="Local biometric device service adapter aligning with MOSIP Device Service 0.9.5 / 1.2.0 principles",
-    version="1.3.0",
-    lifespan=lifespan
-)
-
-# Configurable CORS: Defaults to localhost loopback interfaces for local evaluation;
-# can be customized via MOSIP_MDS_ALLOWED_ORIGINS environment variable in production.
-_allowed_origins_env = os.environ.get(
-    "MOSIP_MDS_ALLOWED_ORIGINS",
-    "http://127.0.0.1:4501,http://localhost:4501,http://127.0.0.1:3000,http://localhost:3000,http://127.0.0.1:8080,http://localhost:8080"
-)
-_cors_origins = ["*"] if _allowed_origins_env == "*" else [o.strip() for o in _allowed_origins_env.split(",") if o.strip()]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=_cors_origins,
-    allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"],
-)
-
-# Global device and pipeline instances
-device: FaceCaptureDevice = MockL0Device()
-pipeline = LivenessPipeline()
-ui_renderer = DesktopRegistrationClient(use_mock_device=True)
+    try:
+        yield
+    finally:
+        device.disconnect()
+        pipeline._captured_biometric = None
+        pipeline.active_detector.close()
 
 
-class CaptureRequest(BaseModel):
-    workflow: str = Field(default="RESIDENT_REGISTRATION", description="RESIDENT_REGISTRATION, OPERATOR_AUTHENTICATION, or SUPERVISOR_AUTHENTICATION")
-    resident_id: Optional[str] = Field(default=None, description="Resident identifier for registration workflow (e.g. RES-00123)")
-    timeout_seconds: int = Field(default=15, ge=2, le=60, description="Session timeout in seconds")
+app = FastAPI(title="Face liveness research API", version="2.0.0", lifespan=lifespan,
+              description="Custom offline research API. No claim of MOSIP SBI conformance.")
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1", "testserver"])
+app.add_middleware(CORSMiddleware, allow_origins=_origins, allow_credentials=False,
+                   allow_methods=["GET", "POST"], allow_headers=["Content-Type", "Authorization"])
 
 
-class ConfigureRequest(BaseModel):
-    passive_threshold: Optional[float] = Field(default=None, ge=0.1, le=0.99)
+@app.middleware("http")
+async def private_responses(request, call_next):
+    response = await call_next(request)
+    for name, value in {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
+                        "Referrer-Policy": "no-referrer", "X-Frame-Options": "DENY"}.items():
+        response.headers[name] = value
+    return response
+
+
+_bearer = HTTPBearer(auto_error=False, scheme_name="LocalApiToken")
+
+
+def authorize(request: Request, credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer)):
+    if request.headers.get("origin") and request.headers["origin"] not in _origins:
+        raise HTTPException(403, "This origin is not allowed.")
+    if credentials is None or not secrets.compare_digest(credentials.credentials, API_TOKEN):
+        raise HTTPException(401, "A local API bearer token is required.")
+
+
+class StrictRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class CaptureRequest(StrictRequest):
+    workflow: str = "RESIDENT_REGISTRATION"
+    resident_id: Optional[str] = Field(default=None, max_length=64)
+    timeout_seconds: int = Field(default=15, ge=2, le=60)
+
+
+class ConfigureRequest(StrictRequest):
+    liveness_enabled: Optional[bool] = None
+    guidance_messages: Optional[dict[str, str]] = Field(default=None, max_length=16)
+    workflow: WorkflowType = WorkflowType.RESIDENT_REGISTRATION
+    passive_threshold: Optional[float] = Field(default=None, ge=0.46, le=0.99)
     min_challenges: Optional[int] = Field(default=None, ge=1, le=5)
-    challenge_timeout: Optional[float] = Field(default=None, ge=2.0, le=30.0)
-    max_retries: Optional[int] = Field(default=None, ge=1, le=5)
-    pad_mode: Optional[str] = Field(default=None, description="AUTO, HEURISTIC, or ONNX")
+    challenge_timeout: Optional[float] = Field(default=None, ge=2, le=30)
+    max_retries: Optional[int] = Field(default=None, ge=0, le=5)
+    pad_mode: Optional[PADMode] = None
+    active_liveness_enabled: Optional[bool] = None
+    require_active_challenges: Optional[bool] = None
+    supported_challenges: Optional[list[ChallengeType]] = Field(default=None, min_length=1, max_length=6)
+
+    @field_validator("guidance_messages")
+    @classmethod
+    def valid_guidance(cls, value):
+        if value is not None and any(k not in {s.value for s in PipelineState} or len(v) > 300 for k, v in value.items()):
+            raise ValueError("Use pipeline state names and guidance of at most 300 characters")
+        return value
 
 
-class DeviceSwitchRequest(BaseModel):
-    device_mode: str = Field(default="MOCK", description="'MOCK' or 'WEBCAM'")
-    scenario: Optional[str] = Field(default="BONA_FIDE_LIVE", description="Mock scenario if switching to MOCK")
+class DeviceSwitchRequest(StrictRequest):
+    device_mode: Literal["MOCK", "WEBCAM", "L1"] = "MOCK"
+    scenario: MockScenario = MockScenario.BONA_FIDE_LIVE
 
 
 @app.get("/", response_class=HTMLResponse)
 def index_page():
-    return """
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <title>MOSIP Liveness & PAD Console</title>
-        <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f1117; color: #e1e4ea; margin: 0; padding: 24px; }
-            .container { max-width: 1040px; margin: 0 auto; }
-            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #2d3139; padding-bottom: 16px; margin-bottom: 24px; }
-            .logo { font-size: 24px; font-weight: 700; color: #ff5722; }
-            .badge { background: #262c36; color: #00e676; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 600; }
-            .main-grid { display: grid; grid-template-columns: 1fr 340px; gap: 24px; }
-            .video-card { background: #181b22; border-radius: 12px; padding: 16px; border: 1px solid #262c36; text-align: center; }
-            .video-card img { width: 100%; max-height: 480px; border-radius: 8px; border: 1px solid #333a46; }
-            .controls-card { background: #181b22; border-radius: 12px; padding: 20px; border: 1px solid #262c36; }
-            .section-title { font-size: 13px; text-transform: uppercase; color: #8b949e; letter-spacing: 0.5px; margin-bottom: 8px; font-weight: 600; }
-            .btn { width: 100%; padding: 11px; border-radius: 6px; border: none; font-weight: 600; font-size: 13px; cursor: pointer; margin-bottom: 8px; transition: 0.2s; }
-            .btn-primary { background: #ff5722; color: #fff; }
-            .btn-primary:hover { background: #f4511e; }
-            .btn-secondary { background: #262c36; color: #e1e4ea; border: 1px solid #3a4250; }
-            .btn-secondary:hover { background: #323a46; }
-            .metric-box { background: #0f1117; padding: 10px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #262c36; }
-            .metric-label { font-size: 11px; color: #8b949e; }
-            .metric-val { font-size: 16px; font-weight: 600; margin-top: 4px; color: #00e676; }
-            select { width: 100%; padding: 9px; background: #0f1117; border: 1px solid #3a4250; color: #fff; border-radius: 6px; margin-bottom: 14px; }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <div>
-                    <span class="logo">MOSIP DEC{}DE</span>
-                    <span style="color: #8b949e; margin-left: 12px; font-size: 15px;">Face Liveness & PAD Subsystem</span>
-                </div>
-                <span class="badge">● L0/L1 MDS ONLINE</span>
-            </div>
-            <div class="main-grid">
-                <div class="video-card">
-                    <img src="/stream" alt="Live MOSIP Video Stream">
-                    <p style="color: #8b949e; font-size: 13px; margin-top: 12px;">ISO/IEC 30107 & ISO/IEC 19794-5-Aligned Face Capture & Quality Assessment</p>
-                </div>
-                <div class="controls-card">
-                    <div class="section-title">Workflow Profile</div>
-                    <select id="wfSelect">
-                        <option value="RESIDENT_REGISTRATION">Resident Registration</option>
-                        <option value="OPERATOR_AUTHENTICATION">Operator Authentication</option>
-                        <option value="SUPERVISOR_AUTHENTICATION">Supervisor Authentication</option>
-                    </select>
-
-                    <div class="section-title">Resident ID (Enrollment)</div>
-                    <input type="text" id="resIdInput" value="RES-00123" style="width: 95%; padding: 8px; background: #0f1117; border: 1px solid #3a4250; color: #fff; border-radius: 6px; margin-bottom: 12px; font-weight: 600;">
-
-                    <div class="section-title">Device Source</div>
-                    <button class="btn btn-secondary" onclick="switchDevice('MOCK', 'BONA_FIDE_LIVE')">Mock L0 — Simulation (Live Face)</button>
-                    <button class="btn btn-secondary" onclick="switchDevice('MOCK', 'STATIC_PHOTO_ATTACK')">Mock L0 — Simulation (Photo Spoof)</button>
-                    <button class="btn btn-secondary" onclick="switchDevice('WEBCAM', '')">Physical L0 Webcam</button>
-                    <button class="btn btn-secondary" onclick="switchDevice('L1', '')">Vendor L1 — Simulated Adapter</button>
-
-                    <div class="section-title" style="margin-top: 14px;">Biometric Capture</div>
-                    <button class="btn btn-primary" onclick="triggerCapture()">Trigger POST /capture</button>
-
-                    <div class="section-title" style="margin-top: 14px;">Capture Result</div>
-                    <div class="metric-box">
-                        <div class="metric-label">Status</div>
-                        <div class="metric-val" id="resStatus">Ready</div>
-                    </div>
-                    <div class="metric-box">
-                        <div class="metric-label">Decision</div>
-                        <div class="metric-val" id="resDecision" style="font-size: 13px; color: #fff;">-</div>
-                    </div>
-                    <div class="metric-box">
-                        <div class="metric-label">Enrollment Record</div>
-                        <div class="metric-val" id="resEnroll" style="font-size: 13px; color: #fff;">-</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <script>
-            async function switchDevice(mode, scenario) {
-                await fetch('/switch-device', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({device_mode: mode, scenario: scenario})
-                });
-                location.reload();
-            }
-            async function triggerCapture() {
-                const wf = document.getElementById('wfSelect').value;
-                const residentId = document.getElementById('resIdInput').value;
-                document.getElementById('resStatus').innerText = 'Capturing...';
-                document.getElementById('resStatus').style.color = '#ff9800';
-                try {
-                    const res = await fetch('/capture', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({workflow: wf, resident_id: residentId, timeout_seconds: 15})
-                    });
-                    const data = await res.json();
-                    document.getElementById('resStatus').innerText = data.responseStatus;
-                    document.getElementById('resDecision').innerText = data.decision || data.reason || 'Completed';
-                    document.getElementById('resEnroll').innerText = (data.residentId ? data.residentId + ' [' + (data.enrollmentStatus || 'DONE') + ']' : '-');
-                    if (data.responseStatus === 'SUCCESS') {
-                        document.getElementById('resStatus').style.color = '#00e676';
-                    } else {
-                        document.getElementById('resStatus').style.color = '#f44336';
-                    }
-                } catch(e) {
-                    document.getElementById('resStatus').innerText = 'ERROR';
-                    document.getElementById('resStatus').style.color = '#f44336';
-                }
-            }
-        </script>
-    </body>
-    </html>
-    """
+    return Path(__file__).with_name("console.html").read_text(encoding="utf-8").replace("__API_TOKEN__", API_TOKEN)
 
 
 @app.get("/info")
 def get_device_info():
-    """
-    MOSIP Device Discovery endpoint (/info).
-    Reports device hardware specifications, capabilities, and security level.
-    """
-    info = device.get_device_info()
-    caps = device.get_capabilities()
-    return {
-        "deviceId": info.device_id,
-        "deviceSubId": [1],
-        "deviceStatus": info.status.value,
-        "deviceType": info.device_type.value,
-        "vendor": caps.vendor,
-        "model": caps.model,
-        "firmware": info.firmware_version,
-        "serialNumber": info.serial_number,
-        "certification": "L1_SIMULATED" if info.device_type == DeviceType.VENDOR_L1_ADAPTER else ("L1_SECURE_HARDWARE" if info.is_l1_secure else "L0"),
-        "securityLevel": caps.security_level,
-        "serviceVersion": "MDS_1.3.0",
-        "specVersion": "MOSIP_MDS_0.9.5",
-        "purpose": ["REGISTRATION", "AUTH"],
-        "supportedCaptureModes": caps.supported_capture_modes,
-        "supportedResolutions": caps.supported_resolutions,
-        "livenessCapability": {
-            "passivePAD": caps.liveness_capabilities.get("passive_pad", True),
-            "padOperationalMode": pipeline.pad_detector.operational_mode,
-            "activeChallenges": ["BLINK", "SMILE", "TURN_LEFT", "TURN_RIGHT"],
-            "hardwareLiveness": caps.liveness_capabilities.get("hardware_liveness", False),
-            "offlineCapable": True
-        }
-    }
+    with _device_lock:
+        info, caps = device.get_device_info(), device.get_capabilities()
+        return {"deviceId": info.device_id, "deviceStatus": info.status.value,
+            "deviceType": info.device_type.value, "vendor": caps.vendor, "model": caps.model,
+            "securityLevel": caps.security_level, "certification": "NOT_CERTIFIED",
+            "supportedCaptureModes": caps.supported_capture_modes,
+            "supportedResolutions": caps.supported_resolutions, "serviceVersion": "2.0.0",
+            "specVersion": "CUSTOM_RESEARCH_API_2", "nativeMosipIntegrationVerified": False,
+            "simulation": info.device_type in (DeviceType.MOCK_L0_SIMULATOR, DeviceType.VENDOR_L1_ADAPTER),
+            "captureBusy": _capture_lock.locked(),
+            "livenessCapability": {"passivePAD": True,
+                "padOperationalMode": pipeline.pad_detector.operational_mode,
+                "padModelAvailable": pipeline.pad_detector._onnx_backend.is_available(),
+                "activeChallenges": [c.value for c in pipeline.config.supported_challenges],
+                "hardwareLiveness": False, "offlineCapable": True}}
 
 
-@app.post("/switch-device")
+@app.get("/status")
+def capture_status():
+    with _device_lock:
+        return dict(_status)
+
+
+@app.get("/metrics")
+def operational_metrics():
+    return metrics.snapshot()
+
+
+@app.get("/configuration")
+def configuration():
+    return asdict(pipeline.config)
+
+
+@app.post("/switch-device", dependencies=[Depends(authorize)])
 def switch_device(req: DeviceSwitchRequest):
-    """Switch between Physical Webcam (L0), Vendor L1 Adapter, and Mock L0 Simulator."""
-    global device
-    device.disconnect()
-    mode = req.device_mode.upper()
-    if mode == "WEBCAM":
-        device = WebcamCaptureDevice(0)
-    elif mode in ("L1", "L1_VENDOR", "VENDOR_L1"):
-        device = VendorL1Adapter()
-    else:
-        try:
-            scenario_enum = MockScenario(req.scenario)
-        except ValueError:
-            scenario_enum = MockScenario.BONA_FIDE_LIVE
-        device = MockL0Device(scenario=scenario_enum)
+    global device, _latest_jpeg, _status
+    if not _capture_lock.acquire(blocking=False):
+        raise HTTPException(409, "Finish the current capture before changing devices.")
+    try:
+        with _device_lock:
+            if req.device_mode == "WEBCAM" and isinstance(device, WebcamCaptureDevice):
+                if not device.is_connected() and not device.connect():
+                    raise HTTPException(503, "Camera unavailable. Check its connection and permissions.")
+                pipeline.reset()
+                _latest_jpeg = None
+                return {"status": "SUCCESS", "current_device": device.get_device_info().device_id}
+            candidate = (WebcamCaptureDevice(0) if req.device_mode == "WEBCAM" else
+                         VendorL1Adapter() if req.device_mode == "L1" else MockL0Device(scenario=req.scenario))
+            if not candidate.connect():
+                candidate.disconnect()
+                raise HTTPException(503, "Camera unavailable. Check its connection and permissions.")
+            device.disconnect()
+            device = candidate
+            pipeline.reset()
+            _latest_jpeg = None
+            _status = {"state": "IDLE", "guidance": "Device ready. Start verification.", "progress": 0}
+            return {"status": "SUCCESS", "current_device": device.get_device_info().device_id}
+    finally:
+        _capture_lock.release()
 
-    device.connect()
-    return {"status": "SUCCESS", "current_device": device.get_device_info().device_id}
 
-
-@app.post("/configure")
+@app.post("/configure", dependencies=[Depends(authorize)])
 def configure_subsystem(req: ConfigureRequest):
-    """Update runtime thresholds and policies."""
-    if req.passive_threshold is not None:
-        pipeline.policy.passive_threshold = req.passive_threshold
-    if req.min_challenges is not None:
-        pipeline.policy.min_challenges = req.min_challenges
-    if req.challenge_timeout is not None:
-        pipeline.policy.challenge_timeout_seconds = req.challenge_timeout
-    if req.max_retries is not None:
-        pipeline.policy.max_retries = req.max_retries
-    if req.pad_mode is not None:
-        try:
-            pipeline.pad_detector.mode = PADMode(req.pad_mode.upper())
-        except ValueError:
-            pass
-
-    return {
-        "status": "SUCCESS",
-        "configured_policy": {
-            "passive_threshold": pipeline.policy.passive_threshold,
-            "min_challenges": pipeline.policy.min_challenges,
-            "challenge_timeout": pipeline.policy.challenge_timeout_seconds,
-            "max_retries": pipeline.policy.max_retries,
-            "pad_mode": pipeline.pad_detector.operational_mode
-        }
-    }
+    if not _capture_lock.acquire(blocking=False):
+        raise HTTPException(409, "Finish capture before changing policy.")
+    try:
+        with _device_lock:
+            config = copy.deepcopy(pipeline.config)
+            if req.liveness_enabled is not None:
+                config.liveness_enabled = req.liveness_enabled
+            if req.guidance_messages is not None:
+                config.guidance_messages = req.guidance_messages
+            policy = config.get_policy(req.workflow)
+            changes = req.model_dump(exclude_none=True)
+            for name in ("passive_threshold", "min_challenges", "max_retries",
+                         "active_liveness_enabled", "require_active_challenges"):
+                if name in changes:
+                    setattr(policy, name, changes[name])
+            if req.challenge_timeout is not None:
+                policy.challenge_timeout_seconds = req.challenge_timeout
+            policy.max_challenges = max(policy.max_challenges, policy.min_challenges)
+            if policy.require_active_challenges and not policy.active_liveness_enabled:
+                raise HTTPException(422, "Required active challenges cannot be disabled.")
+            if req.supported_challenges is not None:
+                config.supported_challenges = list(dict.fromkeys(req.supported_challenges))
+            if req.pad_mode is not None:
+                config.pad_mode = req.pad_mode
+            pipeline.config = config
+            pipeline.pad_detector.mode = config.pad_mode
+            pipeline.set_workflow(req.workflow)
+            return {"status": "SUCCESS", "configured_policy": {**asdict(policy),
+                "challenge_timeout": policy.challenge_timeout_seconds,
+                "pad_mode": pipeline.pad_detector.operational_mode,
+                "supported_challenges": config.supported_challenges}}
+    finally:
+        _capture_lock.release()
 
 
 @app.get("/stream")
 def stream_frames():
-    """Multipart MJPEG video stream with real-time biometric guidance overlay."""
-    def frame_generator():
-        try:
-            for frame in device.start_stream():
-                if not device.is_connected():
-                    break
-                step_result = pipeline.process_frame(frame)
-                ui_renderer.use_mock_device = (device.get_device_info().device_type == DeviceType.MOCK_L0_SIMULATOR)
-                ui_renderer.workflow = pipeline.workflow
-                display = ui_renderer.draw_ui_overlay(frame.image, step_result)
-
-                ret, buffer = cv2.imencode('.jpg', display)
-                if ret:
-                    yield (b'--frame\r\n'
-                           b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-        except (GeneratorExit, asyncio.CancelledError):
-            # Client closed HTTP connection (e.g. browser navigation or disconnect)
-            pass
-        except Exception:
-            pass
-
-    return StreamingResponse(frame_generator(), media_type="multipart/x-mixed-replace; boundary=frame")
+    """Preview observes capture output without advancing liveness decisions."""
+    def frames():
+        while device.is_connected():
+            with _device_lock:
+                jpeg = _latest_jpeg if _capture_lock.locked() else None
+                if not _capture_lock.locked():
+                    ok, frame = device.read_frame()
+                    if ok and frame is not None and frame.image.size:
+                        encoded, buf = cv2.imencode(".jpg", frame.image)
+                        if encoded:
+                            jpeg = buf.tobytes()
+            if jpeg:
+                yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + jpeg + b"\r\n"
+            time.sleep(1 / 15)
+    return StreamingResponse(frames(), media_type="multipart/x-mixed-replace; boundary=frame")
 
 
-@app.post("/capture")
+@app.post("/capture", dependencies=[Depends(authorize)])
 def capture_biometric(request: CaptureRequest):
-    """
-    MOSIP Biometric Capture Endpoint.
-    Executes hybrid Passive -> Active verification loop.
-    Returns ISO/IEC 19794-5-aligned image representation and PAD token on success.
-    """
+    global _latest_jpeg, _status
     try:
         wf = WorkflowType(request.workflow)
     except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid workflow '{request.workflow}'. Allowed: {[w.value for w in WorkflowType]}"
-        )
-
-    if not device.is_connected():
-        if not device.connect():
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Biometric capture device is disconnected or unavailable."
-            )
-
-    pipeline.set_workflow(wf)
-    pipeline.reset()
-
-    start_time = time.time()
-    last_result = None
-
-    while (time.time() - start_time) < request.timeout_seconds:
-        success, frame = device.read_frame()
-        if not success or frame is None:
-            time.sleep(0.02)
-            continue
-
-        result = pipeline.process_frame(frame)
-        last_result = result
-
-        # DEMO/SIMULATION ONLY — automatic challenge completion is enabled strictly for MockL0Device simulation.
-        # This ensures deterministic evaluator testing and automated CI/CD runs.
-        # It is STRICTLY disabled and never bypassed for physical webcams, real L1 hardware, or VendorL1Adapter.
-        is_mock_simulator = (
-            device.get_device_info().device_type == DeviceType.MOCK_L0_SIMULATOR
-            and isinstance(device, MockL0Device)
-        )
-        if is_mock_simulator and device.scenario == MockScenario.BONA_FIDE_LIVE:
-            if result.state == PipelineState.ACTIVE_CHALLENGE and pipeline.challenge_manager.active_challenge_state:
-                pipeline.challenge_manager.active_challenge_state.is_completed = True
-
-        if result.state == PipelineState.CAPTURE_SUCCESS:
-            _, buffer = cv2.imencode('.jpg', result.captured_face_image)
-            img_b64 = base64.b64encode(buffer).decode('utf-8')
-            token_hash = hashlib.sha256(result.captured_face_image.tobytes()).hexdigest()
-            meta = result.pad_result.model_metadata if result.pad_result else None
-            
-            return {
-                "responseStatus": "SUCCESS",
-                "decision": result.decision.value,
-                "residentId": request.resident_id or "RES-00123",
-                "enrollmentStatus": "COMPLETED" if wf == WorkflowType.RESIDENT_REGISTRATION else "AUTHENTICATED",
-                "biometrics": [{
-                    "specVersion": "ISO_19794_5",
-                    "specFormat": "ISO/IEC 19794-5-aligned representation (Application JPEG/Base64)",
-                    "data": img_b64,
-                    "mimeType": "image/jpeg",
-                    "tokenHash": token_hash,
-                    "livenessVerified": True,
-                    "passiveConfidence": result.pad_result.liveness_score if result.pad_result else 0.92,
-                    "presentationAttackDetected": False
-                }],
-                "telemetry": {
-                    "totalDurationSeconds": round(time.time() - start_time, 2),
-                    "challengesCompleted": [c.value for c in pipeline.challenge_manager.completed_challenges],
-                    "workflow": wf.value,
-                    "padMode": result.pad_result.mode_used if result.pad_result else "HEURISTIC",
-                    "modelProvenance": {
-                        "backend": meta.backend_name if meta else "heuristic_multi_cue",
-                        "version": meta.version if meta else "v1.2.0-heuristic",
-                        "modelHash": meta.model_hash if meta else "N/A",
-                        "provider": meta.inference_provider if meta else "CPU"
-                    }
-                }
-            }
-
-        elif result.state in (PipelineState.ATTACK_REJECTED, PipelineState.MAX_RETRIES_EXCEEDED):
-            return JSONResponse(
-                status_code=status.HTTP_200_OK,
-                content={
-                    "responseStatus": "FAILURE",
-                    "decision": result.decision.value,
-                    "residentId": request.resident_id or "RES-00123",
-                    "enrollmentStatus": "REJECTED" if result.state == PipelineState.ATTACK_REJECTED else "FAILED",
-                    "reason": result.status_text,
-                    "detailedGuidance": result.detailed_guidance,
-                    "attackType": result.pad_result.attack_type if result.pad_result else "UNKNOWN",
-                    "biometrics": []
-                }
-            )
-
-        time.sleep(0.01)
-
-    # Session timeout
-    return JSONResponse(
-        status_code=status.HTTP_408_REQUEST_TIMEOUT,
-        content={
-            "responseStatus": "TIMEOUT",
-            "decision": LivenessDecision.FAILED.value,
-            "reason": "Biometric capture session timed out.",
-            "biometrics": []
-        }
-    )
+        raise HTTPException(400, "Unknown capture workflow.")
+    if not _capture_lock.acquire(blocking=False):
+        raise HTTPException(409, "Another capture is already running.")
+    start = time.monotonic()
+    outcome, retries, challenge_seconds = "ERROR", 0, 0.0
+    try:
+        with _device_lock:
+            if not device.is_connected() and not device.connect():
+                raise HTTPException(503, "The capture device is unavailable.")
+            pipeline.set_workflow(wf)
+            simulation = device.get_device_info().device_type in (DeviceType.MOCK_L0_SIMULATOR, DeviceType.VENDOR_L1_ADAPTER)
+        challenge_start = None
+        while time.monotonic() - start < request.timeout_seconds:
+            with _device_lock:
+                ok, frame = device.read_frame()
+                if not ok or frame is None:
+                    outcome = "DEVICE_ERROR"
+                    return JSONResponse(status_code=503, content={"responseStatus": outcome,
+                        "reason": "Camera disconnected. Reconnect and start again.", "biometrics": [], "simulation": simulation})
+                result = pipeline.process_frame(frame)
+                retries = pipeline.challenge_manager.current_retry
+                encoded, buf = cv2.imencode(".jpg", frame.image) if frame.image.size else (False, None)
+                if encoded:
+                    _latest_jpeg = buf.tobytes()
+                challenge = pipeline.challenge_manager.active_challenge_state
+                _status = {"state": result.state.value, "guidance": result.detailed_guidance,
+                    "prompt": challenge.feedback_message if challenge else result.status_text,
+                    "progress": result.progress, "retry": retries, "maxRetries": pipeline.policy.max_retries,
+                    "simulation": simulation}
+                if result.state == PipelineState.ACTIVE_CHALLENGE and challenge_start is None:
+                    challenge_start = time.monotonic()
+                if challenge_start is not None:
+                    challenge_seconds = time.monotonic() - challenge_start
+                if result.state == PipelineState.CAPTURE_SUCCESS:
+                    encoded, image = cv2.imencode(".jpg", result.captured_face_image)
+                    if not encoded:
+                        raise HTTPException(503, "Captured image could not be encoded.")
+                    payload, pad = image.tobytes(), result.pad_result
+                    outcome = "SUCCESS"
+                    return {"responseStatus": outcome, "decision": result.decision.value,
+                        "residentId": request.resident_id, "simulation": simulation, "identityMatchPerformed": False,
+                        "enrollmentStatus": "CAPTURED" if wf == WorkflowType.RESIDENT_REGISTRATION else "LIVENESS_VERIFIED",
+                        "biometrics": [{"specVersion": "APPLICATION_JPEG", "mimeType": "image/jpeg",
+                            "data": base64.b64encode(payload).decode("ascii"),
+                            "tokenHash": hashlib.sha256(payload).hexdigest(), "livenessVerified": True,
+                            "passiveConfidence": pad.liveness_score if pad else None, "presentationAttackDetected": False}],
+                        "telemetry": {"workflow": wf.value, "totalDurationSeconds": time.monotonic() - start,
+                            "challengesCompleted": [c.value for c in pipeline.challenge_manager.completed_challenges],
+                            "padMode": pad.mode_used if pad else "UNKNOWN",
+                            "modelProvenance": asdict(pad.model_metadata) if pad and pad.model_metadata else None}}
+                if result.state in (PipelineState.ATTACK_REJECTED, PipelineState.MAX_RETRIES_EXCEEDED, PipelineState.DEVICE_ERROR):
+                    outcome = "FAILURE"
+                    return {"responseStatus": outcome, "decision": result.decision.value,
+                        "reason": "Face verification could not be completed. Start a new session.",
+                        "biometrics": [], "simulation": simulation}
+            time.sleep(0.01)
+        outcome = "TIMEOUT"
+        return JSONResponse(status_code=408, content={"responseStatus": outcome,
+            "reason": "Verification timed out. Follow the prompt and try again.", "biometrics": []})
+    except HTTPException:
+        raise
+    except Exception:
+        outcome = "ERROR"
+        return JSONResponse(status_code=503, content={"responseStatus": outcome,
+            "reason": "The capture device or engine is unavailable. Restart capture and check the device.",
+            "biometrics": []})
+    finally:
+        with _device_lock:
+            pipeline._captured_biometric = None
+            _latest_jpeg = None
+            _status = {**_status, "state": outcome, "progress": 1 if outcome == "SUCCESS" else 0}
+        metrics.record(outcome, time.monotonic() - start, retries, challenge_seconds)
+        _capture_lock.release()
 
 
-def start_server(host: str = "127.0.0.1", port: int = 4501):
+def start_server(host="127.0.0.1", port=4501):
+    if host not in ("127.0.0.1", "localhost"):
+        raise ValueError("The research service must bind to loopback.")
     import uvicorn
     uvicorn.run(app, host=host, port=port)

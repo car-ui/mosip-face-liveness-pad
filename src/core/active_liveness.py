@@ -5,7 +5,7 @@ Uses MediaPipe FaceLandmarker with 52 Blendshapes & Facial Landmark Geometry:
 - Real-time Smile Detection via dynamic relative baseline delta sustained across N frames
 - Facial-Landmark Geometric Head-Pose Estimation via temporal transitions (CENTER -> TURN -> CENTER)
 
-100% Offline, high performance (~30 FPS on CPU).
+Runs locally. Target-device latency and action accuracy require measurement.
 """
 
 from dataclasses import dataclass, field
@@ -60,10 +60,16 @@ class ActiveLivenessDetector:
             options = vision.FaceLandmarkerOptions(
                 base_options=base_options,
                 output_face_blendshapes=True,
-                num_faces=1
+                num_faces=2
             )
             self._landmarker = vision.FaceLandmarker.create_from_options(options)
         except Exception:
+            self._landmarker = None
+
+    def close(self) -> None:
+        """Release native inference threads when a client or test session ends."""
+        if self._landmarker is not None:
+            self._landmarker.close()
             self._landmarker = None
 
     def calculate_ear(self, landmarks_2d: np.ndarray, eye_indices: List[int]) -> float:
@@ -206,6 +212,12 @@ class ActiveLivenessDetector:
             return state
 
         if not telemetry["landmarks_detected"]:
+            state.stage = "INIT"
+            state.baseline_value = None
+            state.baseline_frames_recorded = 0
+            state.consecutive_action_frames = 0
+            state.action_detected = False
+            state.progress = 0.0
             state.feedback_message = "Face not clearly visible. Look at the camera."
             return state
 
@@ -213,6 +225,19 @@ class ActiveLivenessDetector:
 
         # Record initial baseline expression across first 4 frames
         if state.baseline_frames_recorded < 4:
+            # Establish the requested starting pose before recognizing a transition.
+            if target == ChallengeType.BLINK and (telemetry["ear"] <= .27 or telemetry["blink_score"] >= .25):
+                state.feedback_message = "Open your eyes and face the camera before blinking."
+                return state
+            if target == ChallengeType.SMILE and telemetry["smile_score"] > .35:
+                state.feedback_message = "Relax your expression before smiling."
+                return state
+            if target in (ChallengeType.TURN_LEFT, ChallengeType.TURN_RIGHT) and abs(telemetry["yaw"]) > 7.5:
+                state.feedback_message = "Look straight at the camera before turning."
+                return state
+            if target in (ChallengeType.LOOK_UP, ChallengeType.LOOK_DOWN) and abs(telemetry["pitch"]) > 7.5:
+                state.feedback_message = "Look straight at the camera before moving your head."
+                return state
             state.baseline_frames_recorded += 1
             if target == ChallengeType.SMILE:
                 state.baseline_value = telemetry["smile_score"]
@@ -237,6 +262,9 @@ class ActiveLivenessDetector:
 
             # Stage 0: Initial open state
             if state.stage in ("INIT", "RECORDING_BASELINE"):
+                if ear <= .27 or blink_score >= .25:
+                    state.feedback_message = "Open your eyes before blinking."
+                    return state
                 state.stage = "WAITING_CLOSING"
                 state.progress = 0.2
                 state.feedback_message = "Please blink naturally"
@@ -366,28 +394,27 @@ class ActiveLivenessDetector:
                     state.progress = 0.8
                     state.feedback_message = "Now return your head to CENTER..."
 
-        # 5. LOOK UP: Pitch adjustment
-        elif target == ChallengeType.LOOK_UP:
+        # Pitch actions require a neutral baseline, a sustained turn, and a return.
+        elif target in (ChallengeType.LOOK_UP, ChallengeType.LOOK_DOWN):
             pitch = telemetry["pitch"]
-            if pitch < -10.0:
+            direction = -1 if target == ChallengeType.LOOK_UP else 1
+            delta = direction * (pitch - state.baseline_value)
+            if state.stage != "PITCH_MOVED":
+                if delta > 10:
+                    state.consecutive_action_frames += 1
+                else:
+                    state.consecutive_action_frames = 0
+                if state.consecutive_action_frames >= 3:
+                    state.stage = "PITCH_MOVED"
+                    state.progress = .7
+                    state.feedback_message = "Now return your head to center."
+                else:
+                    state.feedback_message = "Please look slightly up." if direction == -1 else "Please look slightly down."
+            elif abs(pitch - state.baseline_value) < 7.5:
                 state.stage = "VERIFIED"
                 state.action_detected = True
                 state.is_completed = True
                 state.progress = 1.0
-                state.feedback_message = "Look up verified! Hold still."
-            else:
-                state.feedback_message = "Please look slightly up"
-
-        # 6. LOOK DOWN: Pitch adjustment
-        elif target == ChallengeType.LOOK_DOWN:
-            pitch = telemetry["pitch"]
-            if pitch > 10.0:
-                state.stage = "VERIFIED"
-                state.action_detected = True
-                state.is_completed = True
-                state.progress = 1.0
-                state.feedback_message = "Look down verified! Hold still."
-            else:
-                state.feedback_message = "Please look slightly down"
+                state.feedback_message = "Head movement verified. Hold still."
 
         return state

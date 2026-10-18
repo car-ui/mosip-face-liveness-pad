@@ -127,7 +127,7 @@ class TemporalLivenessBuffer:
         variance = float(np.var(scores))
 
         # Micro-motion analysis across face centers or landmarks
-        # Live subjects naturally exhibit involuntary micro-saccades and physiological drift (~0.4 - 3.5px)
+        # Face-center variation is a rough motion cue, not proof of physiological liveness
         # Static printed photos clamped on stands or paused screen replays have near-zero center variance
         centers = np.array([r.face_center for r in self._buffer])
         if len(centers) >= 5:

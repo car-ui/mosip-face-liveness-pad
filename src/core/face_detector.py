@@ -53,11 +53,7 @@ class FaceQualityAssessor:
         self.face_cascade = cv2.CascadeClassifier(cascade_path)
 
     def detect_faces(self, frame: np.ndarray, known_box: Optional[Tuple[int, int, int, int]] = None) -> List[DetectedFace]:
-        if known_box is not None:
-            kx, ky, kw, kh = known_box
-            if kw > 30 and kh > 30:
-                return [DetectedFace(x=kx, y=ky, w=kw, h=kh, confidence=0.98)]
-
+        # A tracked box cannot establish that no second face is present.
         # Fast downscaled Haar detection for 30+ FPS
         h, w = frame.shape[:2]
         scale = 0.5

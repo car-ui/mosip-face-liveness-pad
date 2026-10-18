@@ -34,7 +34,7 @@ def test_enrollment_manager_initialization_and_custom_id():
     assert mgr.resident_id == "RES-67890"
 
 
-def test_enrollment_progression_to_completion_with_privacy_guarantee():
+def test_enrollment_progression_to_completion_with_privacy_guarantee(controlled_pipeline, valid_frame):
     """
     Verifies that a bona fide live subject completes enrollment, generates an encrypted
     token hash, and strictly DOES NOT retain raw facial image bytes in the record.
@@ -46,21 +46,12 @@ def test_enrollment_progression_to_completion_with_privacy_guarantee():
     device = MockL0Device(scenario=MockScenario.BONA_FIDE_LIVE)
     device.connect()
 
-    config = LivenessConfig()
-    config.resident_policy.passive_threshold = 0.50  # Allows fast direct passive pass
-    pipeline = LivenessPipeline(config=config, workflow=WorkflowType.RESIDENT_REGISTRATION)
-    pipeline.reset()
-
-    # Step through frames until capture completes
-    enrolled = False
-    for _ in range(40):
-        success, frame = device.read_frame()
-        assert success is True
-        res = pipeline.process_frame(frame)
-        stage = mgr.update_from_pipeline(res, device.get_capabilities())
-        if stage == EnrollmentStage.ENROLLED:
-            enrolled = True
-            break
+    # Injected inference exercises enrollment record handling, not real PAD accuracy.
+    pipeline = controlled_pipeline
+    for _ in range(25):
+        res = pipeline.process_frame(valid_frame)
+    stage = mgr.update_from_pipeline(res, device.get_capabilities())
+    enrolled = stage == EnrollmentStage.ENROLLED
 
     device.disconnect()
     assert enrolled is True
@@ -140,30 +131,16 @@ def test_enrollment_session_reset_and_next_resident():
     assert mgr.passive_completed is False
 
 
-def test_audit_log_privacy_zero_raw_biometric_leakage():
-    """
-    Audits the structured JSON events emitted by the pipeline during capture.
-    Ensures zero raw biometric image arrays or base64 face buffers are leaked into logs.
-    """
-    device = MockL0Device(scenario=MockScenario.BONA_FIDE_LIVE)
-    device.connect()
-
-    config = LivenessConfig()
-    config.resident_policy.passive_threshold = 0.70
-    pipeline = LivenessPipeline(config=config, workflow=WorkflowType.RESIDENT_REGISTRATION)
-    pipeline.reset()
-
-    for _ in range(35):
-        success, frame = device.read_frame()
-        res = pipeline.process_frame(frame)
-        if res.state == PipelineState.CAPTURE_SUCCESS:
-            break
-
-    device.disconnect()
-    assert pipeline.state == PipelineState.CAPTURE_SUCCESS
-
-    # Verify that captured face image exists in memory for processing
-    assert pipeline._captured_biometric is not None
-
-    # Inspect pipeline session events
-    assert pipeline.session_id is not None
+def test_audit_log_privacy_zero_raw_biometric_leakage(controlled_pipeline, valid_frame, caplog):
+    import json
+    pipeline = controlled_pipeline
+    for _ in range(25):
+        result = pipeline.process_frame(valid_frame)
+    assert result.state == PipelineState.CAPTURE_SUCCESS
+    entries = [json.loads(record.message) for record in caplog.records if record.name == "MOSIP_BiometricAudit"]
+    assert entries
+    assert any(e["eventType"] == "CAPTURE_SUCCESS" for e in entries)
+    for entry in entries:
+        assert "data:image" not in json.dumps(entry)
+        assert "captured_face_image" not in json.dumps(entry)
+        assert len(entry["entryHash"]) == 64

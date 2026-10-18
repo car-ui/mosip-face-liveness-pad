@@ -7,7 +7,7 @@ from src.core.model_updater import SecureModelUpdateManager, ModelUpdatePackage
 
 def test_model_updater_integrity_verification():
     with tempfile.TemporaryDirectory() as tmpdir:
-        updater = SecureModelUpdateManager(models_directory=tmpdir)
+        updater = SecureModelUpdateManager(models_directory=tmpdir, allow_insecure_test_key=True)
         payload = b"FAKE_ONNX_MODEL_BINARY_DATA_V1"
         sha256 = hashlib.sha256(payload).hexdigest()
 
@@ -22,13 +22,13 @@ def test_model_updater_signature_verification():
         payload = b"SECURE_MODEL_DATA_PAYLOAD"
 
         package = updater.generate_signed_package("model_anti_spoof", "2.0.0", payload)
-        assert updater.verify_signature(payload, package.signature) is True
+        assert updater.verify_signature(updater._manifest_bytes(package), package.signature) is True
         assert updater.verify_signature(payload, "deadbeef" * 8) is False
 
 
 def test_model_updater_version_anti_downgrade():
     with tempfile.TemporaryDirectory() as tmpdir:
-        updater = SecureModelUpdateManager(models_directory=tmpdir)
+        updater = SecureModelUpdateManager(models_directory=tmpdir, allow_insecure_test_key=True)
 
         # 2.0.0 is newer than 1.0.0
         assert updater.validate_version("2.0.0", "1.0.0") is True
@@ -41,7 +41,7 @@ def test_model_updater_version_anti_downgrade():
 
 def test_model_updater_atomic_install_and_rollback():
     with tempfile.TemporaryDirectory() as tmpdir:
-        updater = SecureModelUpdateManager(models_directory=tmpdir)
+        updater = SecureModelUpdateManager(models_directory=tmpdir, allow_insecure_test_key=True)
         target_name = "anti_spoof_v1.onnx"
         initial_payload = b"INITIAL_MODEL_DATA_VERSION_1"
         updated_payload = b"UPDATED_MODEL_DATA_VERSION_2"

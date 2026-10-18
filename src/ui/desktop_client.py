@@ -10,6 +10,8 @@ Features a sleek glassmorphic biometric kiosk interface:
 """
 
 import sys
+import os
+from pathlib import Path
 import time
 import cv2
 import numpy as np
@@ -19,7 +21,7 @@ from ..devices.base import FaceCaptureDevice, DeviceType, MockScenario
 from ..devices.webcam_device import WebcamCaptureDevice
 from ..devices.mock_l0_device import MockL0Device
 from ..core.pipeline import LivenessPipeline, PipelineState, PipelineStepResult
-from ..core.config import WorkflowType, LivenessConfig
+from ..core.config import WorkflowType, LivenessConfig, PADMode
 from ..core.enrollment import ResidentEnrollmentManager, EnrollmentStage
 
 
@@ -30,7 +32,10 @@ class DesktopRegistrationClient:
                  initial_workflow: WorkflowType = WorkflowType.RESIDENT_REGISTRATION,
                  diagnostic_mode: bool = False,
                  resident_id: Optional[str] = None):
-        self.config = LivenessConfig()
+        model = os.environ.get("MOSIP_PAD_MODEL", str(Path(__file__).resolve().parents[2] / "assets/models/minifasnet_v2.onnx"))
+        available = Path(model).is_file()
+        self.config = LivenessConfig(onnx_model_path=model if available else None,
+            pad_mode=PADMode(os.environ.get("MOSIP_PAD_MODE", "ONNX" if available or "MOSIP_PAD_MODEL" in os.environ else "HEURISTIC")))
         self.workflow = initial_workflow
         self.pipeline = LivenessPipeline(self.config, self.workflow)
         self.enrollment_manager = ResidentEnrollmentManager(default_resident_id=resident_id)
@@ -46,17 +51,13 @@ class DesktopRegistrationClient:
 
     def toggle_device(self):
         """Switches dynamically between Physical Webcam and Mock L0 Simulator."""
+        candidate = WebcamCaptureDevice(0) if self.use_mock_device else MockL0Device()
+        if not candidate.connect():
+            candidate.disconnect()
+            raise RuntimeError("Selected device unavailable. The current source was retained.")
         self.device.disconnect()
+        self.device = candidate
         self.use_mock_device = not self.use_mock_device
-        if self.use_mock_device:
-            self.device = MockL0Device()
-        else:
-            self.device = WebcamCaptureDevice(0)
-        
-        if not self.device.connect():
-            self.use_mock_device = True
-            self.device = MockL0Device()
-            self.device.connect()
         self.pipeline.reset()
 
     def set_workflow(self, wf: WorkflowType):
@@ -411,7 +412,7 @@ class DesktopRegistrationClient:
         cv2.putText(canvas, controls, (42, target_h - 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.38, (150, 160, 180), 1, cv2.LINE_AA)
         
-        iso_tag = "ISO/IEC 30107 & 19794-5 Aligned"
+        iso_tag = "Research prototype | ISO conformance not evaluated"
         cv2.putText(canvas, iso_tag, (target_w - 280, target_h - 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.38, (110, 120, 140), 1, cv2.LINE_AA)
 
@@ -438,13 +439,13 @@ class DesktopRegistrationClient:
                 cv2.putText(canvas, f"Resident ID: {self.enrollment_manager.resident_id}  •  Status: ENROLLED", (m_x1 + 86, m_y1 + 64),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.44, (120, 230, 160), 1, cv2.LINE_AA)
                 rec = self.enrollment_manager.current_record
-                tok_str = (rec.biometric_token_hash[:16] + "...") if rec and rec.biometric_token_hash else "SHA-256 Token Signed"
+                tok_str = (rec.biometric_token_hash[:16] + "...") if rec and rec.biometric_token_hash else "Capture digest"
                 cv2.putText(canvas, f"Liveness: Verified  •  Token: {tok_str}", (m_x1 + 86, m_y1 + 88),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.40, (170, 210, 190), 1, cv2.LINE_AA)
                 cv2.putText(canvas, "Press [R] to Enroll Next Resident  |  [Q] Exit", (m_x1 + 86, m_y1 + 114),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.38, (160, 175, 190), 1, cv2.LINE_AA)
             else:
-                cv2.putText(canvas, "BIOMETRIC AUTHENTICATED", (m_x1 + 85, m_y1 + 46),
+                cv2.putText(canvas, "LIVENESS CHECK PASSED", (m_x1 + 85, m_y1 + 46),
                             cv2.FONT_HERSHEY_DUPLEX, 0.68, (255, 255, 255), 2, cv2.LINE_AA)
                 cv2.putText(canvas, "Liveness Confirmed • Token Encrypted", (m_x1 + 86, m_y1 + 76),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.44, (120, 220, 150), 1, cv2.LINE_AA)
@@ -469,7 +470,7 @@ class DesktopRegistrationClient:
                         cv2.FONT_HERSHEY_DUPLEX, 0.56, (255, 255, 255), 1, cv2.LINE_AA)
             cv2.putText(canvas, f"Resident ID: {self.enrollment_manager.resident_id}  •  Status: TERMINATED", (m_x1 + 86, m_y1 + 68),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.44, (120, 120, 240), 1, cv2.LINE_AA)
-            cv2.putText(canvas, "Biometric presentation attack detected. Press [R] to restart.", (m_x1 + 86, m_y1 + 96),
+            cv2.putText(canvas, "Verification incomplete. Press [R] to restart.", (m_x1 + 86, m_y1 + 96),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.38, (180, 180, 200), 1, cv2.LINE_AA)
 
         return canvas
@@ -477,10 +478,9 @@ class DesktopRegistrationClient:
     def start(self, max_frames: Optional[int] = None):
         print(f"Connecting to capture device: {self.device.get_device_info().device_name}...")
         if not self.device.connect():
-            print("Primary device failed to open, switching to Mock L0 simulator...")
-            self.device = MockL0Device()
-            self.device.connect()
-            self.use_mock_device = True
+            self.device.disconnect()
+            self.pipeline.active_detector.close()
+            raise RuntimeError("Camera unavailable. Reconnect it, or explicitly select --mock for simulation.")
 
         cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
         cv2.resizeWindow(self.window_name, 960, 720)
@@ -503,8 +503,8 @@ class DesktopRegistrationClient:
             while self.is_running:
                 success, frame = self.device.read_frame()
                 if not success or frame is None:
-                    time.sleep(0.01)
-                    continue
+                    print("Capture device disconnected. Verification stopped.")
+                    break
 
                 processed_frames += 1
                 if max_frames and processed_frames >= max_frames:
@@ -541,6 +541,8 @@ class DesktopRegistrationClient:
 
         finally:
             self.device.disconnect()
+            self.pipeline._captured_biometric = None
+            self.pipeline.active_detector.close()
             cv2.destroyAllWindows()
             print("MOSIP Face Liveness Client exited safely.")
 

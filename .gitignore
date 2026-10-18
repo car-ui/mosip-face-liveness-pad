@@ -6,6 +6,13 @@ __pycache__/
 .Python
 env/
 venv/
+.venv/
+tmp/
+*.log
+*.onnx
+!assets/models/minifasnet_v2.onnx
+!tests/fixtures/*.onnx
+output/local/
 ENV/
 build/
 develop-eggs/

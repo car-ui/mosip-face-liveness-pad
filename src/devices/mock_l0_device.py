@@ -46,7 +46,7 @@ class MockL0Device(L0Device):
             device_type=DeviceType.MOCK_L0_SIMULATOR,
             serial_number="MOCK-MDS-9999",
             firmware_version="2.5.0-ci",
-            is_l1_secure=True,
+            is_l1_secure=False,
             status=DeviceStatus.DISCONNECTED
         )
         self._load_base_assets()

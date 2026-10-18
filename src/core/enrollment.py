@@ -6,7 +6,7 @@ biometric verification progression, token hash generation, and privacy-preservin
 Privacy Guarantee:
 No raw facial images are stored in enrollment records or audit logs.
 Biometric frames exist transiently in volatile memory only during the active verification cycle
-and are immediately discarded upon feature extraction.
+and are held by the prototype pipeline until reset or client shutdown.
 """
 
 import time

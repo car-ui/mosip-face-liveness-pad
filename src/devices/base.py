@@ -1,6 +1,6 @@
 """
 Common Face Capture Device Interface and Multi-Vendor Interoperability Framework
-Conforms to MOSIP Device Service (MDS) hardware abstraction requirements:
+Research device abstraction intended for future MOSIP integration:
 - Complete vendor neutrality and device interoperability
 - Decouples biometric processing from physical capture hardware
 - Distinct L0 and L1 device abstraction hierarchy
@@ -208,7 +208,7 @@ class VendorL1Adapter(L1Device):
             device_type=DeviceType.VENDOR_L1_ADAPTER,
             serial_number=f"SN-{hashlib.sha256(self.device_id.encode()).hexdigest()[:8].upper()}",
             firmware_version=self.firmware_version,
-            is_l1_secure=True,
+            is_l1_secure=False,
             status=DeviceStatus.CONNECTED if self._is_connected else DeviceStatus.DISCONNECTED
         )
 
@@ -225,7 +225,7 @@ class VendorL1Adapter(L1Device):
             liveness_capabilities={
                 "passive_pad": True,
                 "active_challenge": True,
-                "hardware_liveness": True,
+                "hardware_liveness": False,
                 "subdermal_ir": False
             }
         )

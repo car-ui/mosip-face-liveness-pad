@@ -11,7 +11,7 @@ Supports:
 3. Model versioning and cryptographic SHA-256 hash tracking
 4. Multi-cue deterministic physical heuristic engine fallback
 5. Explicit execution mode reporting ('MODEL' or 'HEURISTIC')
-6. Calibrated confidence scoring and clear 4-way classification:
+6. Heuristic confidence scores and explicit 4-way classification:
    - BONA_FIDE_LIVE
    - UNCERTAIN
    - PRESENTATION_ATTACK
@@ -25,6 +25,7 @@ import os
 import cv2
 import numpy as np
 import hashlib
+import json
 import time
 
 from .config import PADMode, PADVerdict
@@ -47,7 +48,7 @@ class PADResult:
     verdict: PADVerdict
     is_live: bool
     liveness_score: float      # 0.0 (definite attack) to 1.0 (definite bona fide live)
-    confidence: float          # Calibrated confidence 0.0 to 1.0
+    confidence: float          # Score-derived confidence, not calibrated population probability
     attack_detected: bool
     attack_type: Optional[str] # "PRINT_PHOTO", "SCREEN_REPLAY", "NONE"
     mode_used: str             # "MODEL" or "HEURISTIC"
@@ -80,7 +81,7 @@ class BasePADBackend(ABC):
 
 class ONNXModelPADBackend(BasePADBackend):
     """
-    Production-grade ONNX Runtime inference backend for Deep Learning PAD models.
+    Research ONNX Runtime inference backend for Deep Learning PAD models.
     Supports hardware-accelerated providers (CUDA, DirectML, OpenVINO, CPU) and SHA-256 checksums.
     """
 
@@ -93,6 +94,10 @@ class ONNXModelPADBackend(BasePADBackend):
         self._active_provider = "N/A"
         self._model_hash = "N/A"
         self._model_version = "v1.0.0-onnx"
+        self.profile = "binary_imagenet"
+        self.live_index = 0
+        self.class_count = 2
+        self.crop_scale = 1.0
         self._init_session()
 
     def _init_session(self) -> None:
@@ -127,6 +132,21 @@ class ONNXModelPADBackend(BasePADBackend):
                 while chunk := f.read(65536):
                     hasher.update(chunk)
             self._model_hash = hasher.hexdigest()
+            manifest_path = self.model_path + ".json"
+            if os.path.exists(manifest_path):
+                with open(manifest_path, encoding="utf-8") as stream:
+                    manifest = json.load(stream)
+                if manifest["sha256"] != self._model_hash:
+                    raise ValueError("Model manifest checksum mismatch")
+                if manifest["profile"] != "minifasnet_v2_2.7":
+                    raise ValueError("Unsupported model profile")
+                self.profile = manifest["profile"]
+                self.input_size = (80, 80)
+                self.live_index, self.class_count, self.crop_scale = 1, 3, 2.7
+                self._model_version = manifest["version"]
+            expected = [1, 3, self.input_size[1], self.input_size[0]]
+            if self._session.get_inputs()[0].shape != expected:
+                raise ValueError("Model input dimensions do not match preprocessing")
         except Exception:
             self._session = None
             self._active_provider = "N/A"
@@ -150,7 +170,8 @@ class ONNXModelPADBackend(BasePADBackend):
             raise RuntimeError("ONNX PAD Backend is not available.")
 
         # Standard preprocessing: BGR -> RGB -> Resize -> Normalize to [0, 1]
-        rgb = cv2.cvtColor(bgr_face, cv2.COLOR_BGR2RGB)
+        rgb = (bgr_face if self.profile == "minifasnet_v2_2.7"
+               else cv2.cvtColor(bgr_face, cv2.COLOR_BGR2RGB))
         resized = cv2.resize(rgb, self.input_size, interpolation=cv2.INTER_LINEAR)
         
         # Standard mean/std normalization
@@ -158,6 +179,9 @@ class ONNXModelPADBackend(BasePADBackend):
         mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
         std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
         normalized = (normalized - mean) / std
+        if self.profile == "minifasnet_v2_2.7":
+            # Upstream functional.to_tensor explicitly returns BGR float [0,255].
+            normalized = resized.astype(np.float32)
 
         # Transpose to NCHW format
         blob = np.transpose(normalized, (2, 0, 1))
@@ -166,6 +190,8 @@ class ONNXModelPADBackend(BasePADBackend):
         # Execute ONNX forward pass
         raw_outputs = self._session.run([self._output_name], {self._input_name: blob})[0]
         logits = raw_outputs.flatten()
+        if len(logits) != self.class_count or not np.isfinite(logits).all():
+            raise ValueError("Model output does not match its declared class contract")
 
         # Compute Softmax
         exp_logits = np.exp(logits - np.max(logits))
@@ -173,8 +199,8 @@ class ONNXModelPADBackend(BasePADBackend):
 
         # Binary output assumption: [prob_live, prob_spoof]
         if len(probs) >= 2:
-            live_score = float(probs[0])
-            spoof_score = float(probs[1])
+            live_score = float(probs[self.live_index])
+            spoof_score = 1.0 - live_score
         else:
             live_score = float(probs[0])
             spoof_score = 1.0 - live_score
@@ -363,6 +389,25 @@ class PassivePADDetector:
         face_crop = bgr_frame[y1:y2, x1:x2]
         active_backend = self._heuristic_backend
         active_mode = self.operational_mode
+        if active_mode == "MODEL" and self._onnx_backend.crop_scale > 1:
+            # Preserve the surrounding presentation medium, as required by this model.
+            scale = min((img_h - 1) / h, (img_w - 1) / w, self._onnx_backend.crop_scale)
+            crop_w, crop_h = w * scale, h * scale
+            left, top = x + w / 2 - crop_w / 2, y + h / 2 - crop_h / 2
+            right, bottom = left + crop_w, top + crop_h
+            if left < 0:
+                right -= left
+                left = 0
+            if top < 0:
+                bottom -= top
+                top = 0
+            if right > img_w - 1:
+                left -= right - img_w + 1
+                right = img_w - 1
+            if bottom > img_h - 1:
+                top -= bottom - img_h + 1
+                bottom = img_h - 1
+            face_crop = bgr_frame[int(top):int(bottom) + 1, int(left):int(right) + 1]
 
         # Enforce safe failure if ONNX_ONLY is requested but no model is loaded
         if self.mode == PADMode.ONNX_ONLY and not self._onnx_backend.is_available():
@@ -400,6 +445,15 @@ class PassivePADDetector:
                 score, conf, attack_detected, attack_type, details = self._onnx_backend.evaluate(face_crop)
                 active_backend = self._onnx_backend
             except Exception as e:
+                if self.mode == PADMode.ONNX_ONLY:
+                    return PADResult(
+                        verdict=PADVerdict.PROCESSING_ERROR, is_live=False,
+                        liveness_score=0.0, confidence=0.0, attack_detected=False,
+                        attack_type=None, mode_used="MODEL_ERROR",
+                        details={"error": "ONNX inference failed"},
+                        model_metadata=self._onnx_backend.get_metadata(),
+                        processing_time_ms=(time.time() - t_start) * 1000.0,
+                    )
                 # Fallback to heuristic on model exception
                 score, conf, attack_detected, attack_type, details = self._heuristic_backend.evaluate(face_crop)
                 active_mode = "HEURISTIC"
@@ -410,6 +464,14 @@ class PassivePADDetector:
             active_mode = "HEURISTIC"
             active_backend = self._heuristic_backend
 
+        if not np.isfinite([score, conf]).all() or not 0 <= score <= 1 or not 0 <= conf <= 1:
+            return PADResult(
+                verdict=PADVerdict.PROCESSING_ERROR, is_live=False,
+                liveness_score=0.0, confidence=0.0, attack_detected=False,
+                attack_type=None, mode_used=active_mode,
+                details={"error": "Invalid PAD scores"},
+                model_metadata=active_backend.get_metadata(),
+            )
         # 4-Way Verdict Classification
         if attack_detected or score <= self.attack_threshold:
             verdict = PADVerdict.PRESENTATION_ATTACK

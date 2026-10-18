@@ -8,8 +8,8 @@ from src.mds.mds_server import app
 
 def main():
     print("=" * 60)
-    print("Starting MOSIP Device Service (MDS) L0/L1 Server...")
-    print("API Specification : MOSIP Device Service 0.9.5 / 1.2.0")
+    print("Starting the offline face-liveness research service...")
+    print("API Specification : Custom research API v2, not certified MOSIP SBI")
     print("Device Discovery  : http://127.0.0.1:4501/info")
     print("Video Stream      : http://127.0.0.1:4501/stream")
     print("Biometric Capture : http://127.0.0.1:4501/capture")

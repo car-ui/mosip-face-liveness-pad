@@ -104,6 +104,7 @@ class LivenessPipeline:
     def set_workflow(self, workflow: WorkflowType) -> None:
         self.workflow = workflow
         self.policy = self.config.get_policy(workflow)
+        self.pad_detector.high_confidence_threshold = self.policy.passive_threshold
         self.challenge_manager = ChallengeManager(self.policy, self.config.supported_challenges)
         self.reset()
 
@@ -125,8 +126,52 @@ class LivenessPipeline:
         )
 
     def process_frame(self, frame: VideoFrame) -> PipelineStepResult:
+        """Fail closed at the engine boundary; callers never receive partial biometrics."""
+        if self.state in (PipelineState.CAPTURE_SUCCESS, PipelineState.ATTACK_REJECTED,
+                          PipelineState.MAX_RETRIES_EXCEEDED, PipelineState.DEVICE_ERROR):
+            passed = self.state == PipelineState.CAPTURE_SUCCESS
+            return PipelineStepResult(
+                state=self.state,
+                decision=LivenessDecision.PASSED if passed else LivenessDecision.FAILED,
+                status_text="Verification complete" if passed else "Verification stopped",
+                detailed_guidance="Start a new session to verify again.",
+                progress=1.0 if passed else 0.0,
+                captured_face_image=self._captured_biometric if passed else None,
+                can_retry=False,
+                current_retry=self.challenge_manager.current_retry,
+                max_retries=self.policy.max_retries,
+            )
+        try:
+            if not self.config.liveness_enabled:
+                self.state = PipelineState.DEVICE_ERROR
+                return PipelineStepResult(
+                    state=self.state, decision=LivenessDecision.ERROR,
+                    status_text="Liveness disabled by policy",
+                    detailed_guidance="Enable liveness before requesting a verified capture.",
+                    progress=0.0, can_retry=False,
+                )
+            result = self._process_frame(frame)
+            if result.state.value in self.config.guidance_messages:
+                result.detailed_guidance = self.config.guidance_messages[result.state.value]
+            return result
+        except Exception:
+            self.state = PipelineState.DEVICE_ERROR
+            self._captured_biometric = None
+            self.temporal_buffer.clear()
+            self.challenge_manager.active_challenge_state = None
+            return PipelineStepResult(
+                state=self.state, decision=LivenessDecision.ERROR,
+                status_text="Verification unavailable",
+                detailed_guidance="Restart capture. If this continues, check the device and liveness engine.",
+                progress=0.0, error_code=BiometricErrorCode.INVALID_FRAME, can_retry=False,
+            )
+
+    def _process_frame(self, frame: VideoFrame) -> PipelineStepResult:
         # 0. Frame Validation
-        if frame is None or frame.image is None or frame.image.size == 0:
+        if (frame is None or not isinstance(frame.image, np.ndarray)
+                or frame.image.ndim != 3 or frame.image.shape[2] != 3
+                or frame.image.dtype != np.uint8 or frame.image.size == 0
+                or frame.image.shape[1] != frame.width or frame.image.shape[0] != frame.height):
             self.state = PipelineState.DEVICE_ERROR
             return PipelineStepResult(
                 state=self.state,
@@ -143,6 +188,16 @@ class LivenessPipeline:
         bgr = frame.image
         h, w = bgr.shape[:2]
 
+        if self.state == PipelineState.RETRY_PENDING:
+            if time.time() - self._state_start_time > 2.0:
+                self.state = PipelineState.FACE_DETECTION
+            return PipelineStepResult(
+                state=self.state, decision=LivenessDecision.IN_PROGRESS,
+                status_text="Preparing another attempt", detailed_guidance="Stay in front of the camera.",
+                progress=0.0, current_retry=self.challenge_manager.current_retry,
+                max_retries=self.policy.max_retries,
+            )
+
         # Extract landmarks and telemetry (MediaPipe 30 FPS)
         challenge_state = self.challenge_manager.active_challenge_state
         telemetry, updated_challenge = self.active_detector.process_frame(bgr, challenge_state)
@@ -156,6 +211,24 @@ class LivenessPipeline:
 
         # Handle face detection / quality errors
         if not quality.is_acceptable:
+            # Never carry passive scores or completed actions across a missing/changed face.
+            self.temporal_buffer.clear()
+            self._passive_frames_analyzed = 0
+            self.challenge_manager.completed_challenges.clear()
+            if self.state == PipelineState.ACTIVE_CHALLENGE:
+                self.challenge_manager.increment_retry()
+                self.state = (PipelineState.RETRY_PENDING if self.challenge_manager.can_retry()
+                              else PipelineState.MAX_RETRIES_EXCEEDED)
+                self._state_start_time = time.time()
+                return PipelineStepResult(
+                    state=self.state, decision=LivenessDecision.FAILED,
+                    status_text="Face verification interrupted",
+                    detailed_guidance=quality.error_message or "Keep one face visible and try again.",
+                    progress=0.0, quality=quality,
+                    can_retry=self.challenge_manager.can_retry(),
+                    current_retry=self.challenge_manager.current_retry,
+                    max_retries=self.policy.max_retries,
+                )
             err_code = BiometricErrorCode.NO_FACE
             if quality.face_count > 1:
                 err_code = BiometricErrorCode.MULTIPLE_FACES
@@ -312,7 +385,10 @@ class LivenessPipeline:
                 # Evaluate temporal rolling score rather than single frame
                 rolling_score = temp_analysis.rolling_liveness_score
 
-                if rolling_score >= self.policy.passive_threshold and temp_analysis.temporal_stability >= 0.60:
+                if (not self.policy.require_active_challenges
+                        and rolling_score >= self.policy.passive_threshold
+                        and temp_analysis.temporal_stability >= 0.60
+                        and temp_analysis.micro_motion_detected):
                     # High confidence passive liveness passed!
                     self.state = PipelineState.CAPTURE_SUCCESS
                     self._captured_biometric = bgr.copy()
@@ -374,8 +450,12 @@ class LivenessPipeline:
                             max_retries=self.policy.max_retries
                         )
                     else:
-                        self.state = PipelineState.RETRY_PENDING
+                        self.challenge_manager.increment_retry()
+                        self.state = (PipelineState.RETRY_PENDING if self.challenge_manager.can_retry()
+                                      else PipelineState.MAX_RETRIES_EXCEEDED)
                         self._state_start_time = time.time()
+                        self.temporal_buffer.clear()
+                        self._passive_frames_analyzed = 0
 
             return PipelineStepResult(
                 state=self.state,
@@ -393,15 +473,34 @@ class LivenessPipeline:
 
         # 4. ACTIVE LIVENESS CHALLENGE EVALUATION
         if self.state == PipelineState.ACTIVE_CHALLENGE:
+            # An action must never override a PAD attack or an unavailable PAD engine.
+            pad_result = self.pad_detector.evaluate_passive_liveness(bgr, face_box)
+            if pad_result.verdict in (PADVerdict.PRESENTATION_ATTACK, PADVerdict.PROCESSING_ERROR):
+                is_attack = pad_result.verdict == PADVerdict.PRESENTATION_ATTACK
+                self.state = PipelineState.ATTACK_REJECTED if is_attack else PipelineState.DEVICE_ERROR
+                self.challenge_manager.active_challenge_state = None
+                self.challenge_manager.completed_challenges.clear()
+                return PipelineStepResult(
+                    state=self.state,
+                    decision=LivenessDecision.ATTACK_DETECTED if is_attack else LivenessDecision.ERROR,
+                    status_text="Verification incomplete",
+                    detailed_guidance="Face verification could not be completed. Start a new session.",
+                    progress=0.0, quality=quality, pad_result=pad_result, can_retry=False,
+                )
             challenge_state = self.challenge_manager.active_challenge_state
             if challenge_state is None:
                 challenge_state = self.challenge_manager.generate_next_challenge()
-            telemetry, updated_challenge = self.active_detector.process_frame(bgr, challenge_state)
+                # Newly issued challenges start observing on the next frame.
+                updated_challenge = challenge_state
+            # Existing challenge was advanced once at the start of this frame.
             self.challenge_manager.active_challenge_state = updated_challenge
 
             # Check challenge timeout or failure
             if updated_challenge and not updated_challenge.is_active and not updated_challenge.is_completed:
                 self.challenge_manager.increment_retry()
+                self.challenge_manager.completed_challenges.clear()
+                self.temporal_buffer.clear()
+                self._passive_frames_analyzed = 0
                 self.audit_logger.log_event(
                     AuditEventType.ACTIVE_CHALLENGE_FAILED,
                     session_id=self.session_id,
@@ -484,6 +583,7 @@ class LivenessPipeline:
                         detailed_guidance="All active challenges verified. Registration complete.",
                         progress=1.0,
                         quality=quality,
+                        pad_result=pad_result,
                         active_challenge=updated_challenge,
                         captured_face_image=self._captured_biometric,
                         telemetry=telemetry,

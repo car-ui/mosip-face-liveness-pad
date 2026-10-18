@@ -37,28 +37,15 @@ def test_pipeline_processes_mock_stream():
         assert 0.0 <= r.progress <= 1.0
 
 
-def test_pipeline_high_confidence_passive_pass():
-    device = MockL0Device(scenario=MockScenario.BONA_FIDE_LIVE)
-    device.connect()
-    
-    # Configure low threshold for fast direct passive pass test
-    config = LivenessConfig()
-    config.resident_policy.passive_threshold = 0.50
-    pipeline = LivenessPipeline(config=config, workflow=WorkflowType.RESIDENT_REGISTRATION)
-    pipeline.reset()
-    
-    passed = False
-    for _ in range(35):
-        success, frame = device.read_frame()
-        res = pipeline.process_frame(frame)
-        if res.state == PipelineState.CAPTURE_SUCCESS:
-            passed = True
-            assert res.decision == LivenessDecision.PASSED
-            assert res.captured_face_image is not None
-            break
-
-    device.disconnect()
-    assert passed is True
+def test_pipeline_high_confidence_passive_pass(controlled_pipeline, valid_frame):
+    # Fixed high PAD scores and moving face centers exercise policy acceptance.
+    # A recorded sample photo cannot establish bona fide liveness.
+    pipeline = controlled_pipeline
+    for _ in range(25):
+        result = pipeline.process_frame(valid_frame)
+    assert result.state == PipelineState.CAPTURE_SUCCESS
+    assert result.decision == LivenessDecision.PASSED
+    assert result.captured_face_image is not None
 
 
 def test_pipeline_passive_escalation_to_active_challenge():

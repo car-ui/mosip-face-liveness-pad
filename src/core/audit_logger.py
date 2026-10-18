@@ -1,15 +1,17 @@
 """
 Structured Biometric Audit & Diagnostic Logger
-Strictly conforms to biometric privacy standards:
+Applies best-effort buffer and sensitive-key filtering:
 - NEVER logs raw images, facial crops, or personal identifiable information (PII)
 - Logs lifecycle security events with unique event IDs, ISO timestamps, and telemetry hashes
-- Provides tamper-evident structured diagnostic trails for compliance auditing
+- Links event hashes; tamper detection requires a separately trusted checkpoint
 """
 
 import json
 import logging
 import time
 import uuid
+import hashlib
+import threading
 from enum import Enum
 from typing import Dict, Any, Optional
 
@@ -35,6 +37,8 @@ class BiometricAuditLogger:
     _instance: Optional['BiometricAuditLogger'] = None
 
     def __init__(self, log_to_console: bool = True, log_file: Optional[str] = None):
+        self._lock = threading.Lock()
+        self._last_hash = "0" * 64
         self.log_to_console = log_to_console
         self.log_file = log_file
         self._logger = logging.getLogger("MOSIP_BiometricAudit")
@@ -67,13 +71,19 @@ class BiometricAuditLogger:
         Emits a structured audit entry.
         Guarantees: Details dictionary must NEVER contain raw numpy arrays or image buffers.
         """
-        clean_details = {}
-        if details:
-            for k, v in details.items():
-                # Filter out any accidental binary arrays or image payloads
-                if hasattr(v, 'shape') or isinstance(v, bytes):
-                    continue
-                clean_details[k] = v
+        def sanitize(value, depth=0):
+            if depth > 8 or hasattr(value, "shape") or isinstance(value, (bytes, bytearray, memoryview)):
+                return None
+            if isinstance(value, dict):
+                blocked = ("image", "frame", "pixel", "landmark", "resident", "name", "token", "secret", "password", "data")
+                return {str(k): sanitize(v, depth + 1) for k, v in value.items()
+                        if not any(word in str(k).lower() for word in blocked)}
+            if isinstance(value, (list, tuple)):
+                return [sanitize(v, depth + 1) for v in value[:100]]
+            if value is None or isinstance(value, (str, int, float, bool)):
+                return value
+            return None
+        clean_details = sanitize(details or {})
 
         entry = {
             "eventId": str(uuid.uuid4()),
@@ -86,5 +96,10 @@ class BiometricAuditLogger:
         }
 
         # Format as compact single-line JSON for machine parsing / SIEM ingestion
-        self._logger.info(json.dumps(entry))
+        with self._lock:
+            entry["previousHash"] = self._last_hash
+            digest = hashlib.sha256(json.dumps(entry, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+            entry["entryHash"] = digest
+            self._last_hash = digest
+            self._logger.info(json.dumps(entry))
         return entry

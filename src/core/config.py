@@ -60,6 +60,7 @@ class WorkflowPolicy:
     min_face_size_ratio: float = 0.04
     max_face_size_ratio: float = 0.85
     escalate_attacks_to_active: bool = False
+    require_active_challenges: bool = False
 
 
 @dataclass
@@ -67,6 +68,7 @@ class LivenessConfig:
     # General Settings
     liveness_enabled: bool = True
     offline_mode: bool = True
+    guidance_messages: Dict[str, str] = field(default_factory=dict)
     
     # PAD Engine Settings
     pad_mode: PADMode = PADMode.AUTO
@@ -116,6 +118,7 @@ class LivenessConfig:
     
     operator_policy: WorkflowPolicy = field(default_factory=lambda: WorkflowPolicy(
         workflow_type=WorkflowType.OPERATOR_AUTHENTICATION,
+        require_active_challenges=True,
         passive_threshold=0.88,
         active_liveness_enabled=True,
         min_challenges=2,
@@ -126,6 +129,7 @@ class LivenessConfig:
     
     supervisor_policy: WorkflowPolicy = field(default_factory=lambda: WorkflowPolicy(
         workflow_type=WorkflowType.SUPERVISOR_AUTHENTICATION,
+        require_active_challenges=True,
         passive_threshold=0.92,
         active_liveness_enabled=True,
         min_challenges=2,
