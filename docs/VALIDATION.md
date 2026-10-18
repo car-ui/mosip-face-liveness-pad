@@ -1,12 +1,12 @@
 # Validation evidence
 
-Local checks were run on Windows on 18 October 2026 with CPython 3.11.15 and the declared runtime dependencies. The source initially contained 64 tests; the revised suite contains 119. The latest completed run passed all 119 tests from a fresh source ZIP extraction and dependency environment in 30.40 seconds. A Starlette warning notes its future TestClient preference for `httpx2`; the currently pinned `httpx` TestClient checks pass.
+Local checks were run on Windows on 18 October 2026 with CPython 3.11.15 and the declared runtime dependencies. The source initially contained 64 tests; the revised suite contains 120. The latest completed run passed all 120 tests in a fresh dependency environment in 17.54 seconds. An earlier source ZIP extraction passed all 119 tests before the final timeout regression was added. A Starlette warning notes its future TestClient preference for `httpx2`; the currently pinned `httpx` TestClient checks pass.
 
 ## Commands and scope
 
 | Check | Observed result | What it establishes |
 |---|---|---|
-| `python -m pytest -q --junitxml=tmp/test-results.xml` | 119 passed | Python regression properties, detector fixtures, API contracts, model contract, update verification. Injected-score tests are labelled explicitly. |
+| `python -m pytest -q --junitxml=tmp/test-results.xml` | 120 passed | Python regression properties, detector fixtures, API contracts, model contract, update verification. Injected-score tests are labelled explicitly. |
 | `javac --release 8 ...` followed by `java NativeCaptureGateTest` | 20 checks passed | Portable policy/transport checks, including session binding, required action counts, replayed sequence rejection, exact-payload and single-use acceptance. |
 | `scripts/export_minifasnet.py` | Six conversion comparisons passed; maximum absolute logit difference `2.6226043701171875e-06` | ONNX/PyTorch conversion parity on deterministic tensors. Not attack accuracy. |
 | Packaged ONNX tests | Model loads, BGR 0..255 input verified, class index 1 verified, altered manifest checksum rejected | Packaged inference contract and basic runtime execution. |
@@ -30,3 +30,7 @@ GitHub Actions run [39144395667](https://github.com/car-ui/mosip-face-liveness-p
 ## CPU model timing
 
 A separate warm benchmark ran 100 evaluations after ten warmups using one synthetic 80x80 crop, ONNX Runtime CPU, and two inference threads. Median evaluation time was 2.63 ms and p95 was 3.70 ms. This includes model preprocessing but excludes camera IO, face detection, full-workflow latency, Android performance, and attack accuracy. Exact measurements are in `model-runtime-benchmark.json`.
+
+## Browser verification expiry
+
+The packaged model scored the synthetic replay fixture highly, so it is not a demonstrated passive replay detector. Motion/action checks prevented acceptance. Browser testing also exposed transparent retries of HTTP 408. Verification expiry now returns HTTP 200 with `responseStatus: TIMEOUT` and empty biometrics. After the fix, one 30-second browser attempt completed, the Start verification button became available, metrics showed exactly one TIMEOUT session, and `captureBusy` was false. No automatic second capture started.

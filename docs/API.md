@@ -32,7 +32,7 @@ Workflows are `RESIDENT_REGISTRATION`, `OPERATOR_AUTHENTICATION`, and `SUPERVISO
 
 Success returns `responseStatus: SUCCESS`, `decision: PASSED`, `simulation`, `identityMatchPerformed: false`, and one `biometrics` item containing `specVersion: APPLICATION_JPEG`, Base64 `data`, `mimeType: image/jpeg`, `tokenHash`, `livenessVerified`, and the actual passive confidence. `tokenHash` is SHA-256 over the decoded JPEG bytes. It is an integrity digest, not a digital signature or a face template. Telemetry contains actual workflow, duration, completed actions, mode, and model provenance. Success in simulation remains explicitly simulated.
 
-Failure returns `biometrics: []` and a safe explanation. The caller must inspect `responseStatus` and `decision`. HTTP 200 alone never means liveness passed. HTTP 408 indicates timeout; HTTP 503 indicates an unavailable/disconnected device; HTTP 409 indicates another capture owns the device; HTTP 401/403 indicates authentication/origin rejection; HTTP 422 indicates invalid input.
+Failure returns `biometrics: []` and a safe explanation. The caller must inspect `responseStatus` and `decision`. HTTP 200 alone never means liveness passed. Verification expiry returns HTTP 200 with `responseStatus: TIMEOUT`, because the request completed and the verification failed. HTTP 408 is deliberately avoided because Chromium can transparently retry it and restart capture. HTTP 503 indicates an unavailable/disconnected device; HTTP 409 indicates another capture owns the device; HTTP 401/403 indicates authentication/origin rejection; HTTP 422 indicates invalid input.
 
 ## Configuration example
 

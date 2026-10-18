@@ -44,6 +44,20 @@ def test_terminal_attack_cannot_restart_when_face_changes(controlled_pipeline, v
         assert result.captured_face_image is None
 
 
+def test_frozen_high_model_scores_still_require_active_verification(controlled_pipeline, valid_frame, monkeypatch):
+    p=controlled_pipeline
+    original=p.active_detector.process_frame
+    def frozen(image,state=None):
+        telemetry,updated=original(image,state)
+        telemetry['face_center']=(150,100)
+        return telemetry,updated
+    monkeypatch.setattr(p.active_detector,'process_frame',frozen)
+    for _ in range(25):
+        result=p.process_frame(valid_frame)
+    assert result.state==PipelineState.ACTIVE_CHALLENGE
+    assert result.captured_face_image is None
+
+
 def test_active_inference_runs_once_per_frame(controlled_pipeline, valid_frame, monkeypatch):
     p = controlled_pipeline
     p.state = PipelineState.ACTIVE_CHALLENGE

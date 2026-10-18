@@ -97,7 +97,9 @@ def test_device_switch_to_l1_is_explicitly_simulated(client):
 def test_no_automatic_mock_challenge_completion(client):
     # A high passive score still cannot satisfy mandatory operator actions.
     r=client.post('/capture',json={'workflow':'OPERATOR_AUTHENTICATION','timeout_seconds':2})
-    assert r.status_code == 408
+    # Domain timeout must not use HTTP 408, which browsers may transparently retry.
+    assert r.status_code == 200
+    assert r.json()['responseStatus'] == 'TIMEOUT'
     assert r.json()['biometrics']==[]
     assert mds.pipeline.challenge_manager.completed_challenges==[]
 

@@ -303,7 +303,9 @@ def capture_biometric(request: CaptureRequest):
                         "biometrics": [], "simulation": simulation}
             time.sleep(0.01)
         outcome = "TIMEOUT"
-        return JSONResponse(status_code=408, content={"responseStatus": outcome,
+        # This is a completed verification outcome, not an HTTP request timeout.
+        # Chromium can transparently retry HTTP 408, which would restart capture.
+        return JSONResponse(status_code=200, content={"responseStatus": outcome,
             "reason": "Verification timed out. Follow the prompt and try again.", "biometrics": []})
     except HTTPException:
         raise

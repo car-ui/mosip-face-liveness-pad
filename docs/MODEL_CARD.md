@@ -43,6 +43,8 @@ RGB PAD is sensitive to camera sensors, image processing, illumination, print/di
 
 The inherited `face_landmarker.task` is a different model used for geometry/actions. Loading it does not establish passive PAD capability. Its provenance and distribution terms require a separate asset review.
 
+During the browser check, the synthetic screen-replay fixture received a rolling passive score of approximately 0.997 from the packaged research model. The motion/action gate prevented image acceptance, and the attempt expired without completing an action. This is a concrete limitation of the model/fixture combination. It is not evidence that passive PAD reliably detects screen replay. A moving or adaptive replay needs separate adversarial evaluation, and deployment thresholds cannot be justified by conversion parity.
+
 ## Deployment evaluation still required
 
 Freeze thresholds before testing, separate development and test subjects, record capture devices and lighting, report error rates for each presentation attack instrument group, include failure-to-acquire/nonresponse counts, and measure every supported target device. Use the [evaluation protocol](EVALUATION_PROTOCOL.md). No ISO/IEC 30107 certification is claimed.

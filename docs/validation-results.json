@@ -4,11 +4,11 @@
   "python": "3.11.15",
   "dependencyInstallation": "Fresh virtual environment from requirements.lock.txt",
   "pytest": {
-    "tests": "119",
+    "tests": "120",
     "errors": "0",
     "failures": "0",
     "skipped": "0",
-    "time": "30.364"
+    "time": "17.522"
   },
   "java": {
     "release": 8,
@@ -21,10 +21,18 @@
   },
   "physicalAttackDatasetEvaluated": false,
   "officialNativeClientE2EVerified": false,
-  "sourceExtraction": {
+  "githubCi": "https://github.com/car-ui/mosip-face-liveness-pad/actions/runs/39144395667",
+  "historicalSourceExtraction": {
     "commit": "ad9be3392396fc2d02a122b16df6a4e0eb8f4cb7",
     "trackedFilesVerified": 80,
     "archiveSha256": "b42ba00aec2b96cb8a13a4ee264d01c05e874ab78f6194b51b9c9eb27bb90559"
   },
-  "githubCi": "https://github.com/car-ui/mosip-face-liveness-pad/actions/runs/39144395667"
+  "browserTimeoutCheck": {
+    "sessions": 1,
+    "outcome": "TIMEOUT",
+    "captureBusyAfterCompletion": false,
+    "httpStatus": 200,
+    "repeatedCaptureObserved": false
+  },
+  "githubCiScope": "Recorded CI link covers the earlier 119-test code commit. Consult Actions for current HEAD."
 }
