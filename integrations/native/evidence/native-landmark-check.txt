@@ -1,0 +1,5 @@
+PASS actual Java/Python landmark inference; maxAbsError=0.0; presence=0.9999999999956091
+PASS recorded-photo crop geometry; leftEAR=0.3176376027635151; rightEAR=0.30675654105975836; turnRatio=-0.0612503934087865
+PASS blank presence, invalid values and clipped crop rejected
+PASS actual PAD/landmark frame bridge does not complete actions on repeated recorded photo; state=VERIFYING
+PASS landmark model tampering rejected; no active completion or physical accuracy claim

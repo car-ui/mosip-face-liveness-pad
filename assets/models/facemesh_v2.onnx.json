@@ -1,0 +1,46 @@
+{
+  "model": "MediaPipe FaceMesh V2, landmark submodel only",
+  "sha256": "09c96e67163c660431d37eccc24d40172e514fe4f5768ebf507941e3cb9e3bfb",
+  "bytes": 4921035,
+  "source_bundle_sha256": "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff",
+  "source_component": "face_landmarks_detector.tflite",
+  "source_component_sha256": "c7d54204ce0448474c7f3fa9af494787c0965cbdd6f20fc72867e43046bd43d5",
+  "source_url": "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+  "license": "Apache-2.0",
+  "model_card": "https://storage.googleapis.com/mediapipe-assets/Model%20Card%20MediaPipe%20Face%20Mesh%20V2.pdf",
+  "conversion": {
+    "tensorflow": "2.15.1",
+    "tf2onnx": "1.16.1",
+    "onnx": "1.17.0",
+    "opset": 17,
+    "weights_retrained": false,
+    "changes": "TFLite to ONNX serialization, constant dequantization and graph optimization",
+    "reproduction_script": "scripts/export_facemesh.py",
+    "serialization_note": "Graph serialization may differ across exports. Validate outputs and update pinned hash only for the exact exported artifact."
+  },
+  "input": {
+    "shape": [
+      1,
+      256,
+      256,
+      3
+    ],
+    "dtype": "float32",
+    "layout": "NHWC",
+    "channels": "RGB",
+    "normalization": "pixel / 255, from original TFLite metadata",
+    "roi": "Single face ROI, square 1.5x context; reject edge clipping. No automatic rotation alignment yet."
+  },
+  "outputs": {
+    "Identity": "478 x 3 pixel-relative landmark coordinates in crop",
+    "Identity_1": "face-presence logit, apply sigmoid once",
+    "Identity_2": "Unused auxiliary output; not face presence"
+  },
+  "limits": [
+    "Not a PAD or identity model",
+    "Static photo also produces valid landmarks",
+    "Action thresholds uncalibrated",
+    "Native successful operator/supervisor authentication remains blocked",
+    "No live action accuracy or physical attack measurement"
+  ]
+}

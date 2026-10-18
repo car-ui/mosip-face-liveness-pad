@@ -3,6 +3,7 @@ from pathlib import Path
 import hashlib
 import json
 import math
+import zipfile
 
 ROOT = Path(__file__).resolve().parents[1] / "integrations/native"
 
@@ -53,6 +54,19 @@ def verify():
                 raise ValueError(f"Model or sample count mismatch: {path.name}")
             if group == "adaptive_one_thread" and (metrics["availableProcessors"] != 1 or metrics["intraOpThreads"] != 1):
                 raise ValueError(f"Adaptive run did not use one CPU/thread: {path.name}")
+    models = ROOT.parents[1] / "assets/models"
+    for name in ["face_landmarker.task", "facemesh_v2.onnx"]:
+        manifest = json.loads((models / (name + ".json")).read_text(encoding="utf-8"))
+        digest(models / name, manifest["sha256"])
+        if name.endswith(".task"):
+            with zipfile.ZipFile(models / name) as bundle:
+                for member, record in manifest["components"].items():
+                    if hashlib.sha256(bundle.read(member)).hexdigest() != record["sha256"]:
+                        raise ValueError(f"Landmark bundle component changed: {member}")
+    parity = json.loads((ROOT / "facemesh-parity.json").read_text(encoding="utf-8"))
+    digest(models / "facemesh_v2.onnx", parity["onnx_sha256"])
+    if len(parity["results"]) != 24 or any(not math.isfinite(v["max_abs_error"]) or v["max_abs_error"] > .002 for v in parity["results"]):
+        raise ValueError("Landmark conversion parity record invalid")
     print(f"PASS {count} packaged evidence checksums; six Android measurement logs match reported values")
     print("Scope: evidence integrity only; no physical-device, camera or accuracy claim")
 

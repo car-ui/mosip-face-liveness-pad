@@ -66,9 +66,14 @@ jobs:
       shell: bash
       run: |
         mkdir -p output/local/native-deps
+        CLASSPATH_SEPARATOR=:
+        if [[ "$RUNNER_OS" == "Windows" ]]; then CLASSPATH_SEPARATOR=';'; fi
         curl --fail --location --retry 3 https://repo.maven.apache.org/maven2/com/microsoft/onnxruntime/onnxruntime/1.30.0/onnxruntime-1.30.0.jar -o output/local/native-deps/onnxruntime.jar
         curl --fail --location --retry 3 https://repo.maven.apache.org/maven2/org/openpnp/opencv/4.5.3-4/opencv-4.5.3-4.jar -o output/local/native-deps/opencv.jar
         python scripts/check_native_engine.py --java-home "$JAVA_HOME" --onnx-jar output/local/native-deps/onnxruntime.jar --opencv-jar output/local/native-deps/opencv.jar
+        python scripts/check_native_landmarks.py --java-home "$JAVA_HOME" --onnx-jar output/local/native-deps/onnxruntime.jar --opencv-jar output/local/native-deps/opencv.jar
+        javac --release 8 -cp "output/local/native-deps/onnxruntime.jar${CLASSPATH_SEPARATOR}output/local/native-deps/opencv.jar" -d output/local/native-actions integrations/native/common/io/mosip/facepad/*.java integrations/native/tests/NativeActiveSessionCheck.java
+        java -cp "output/local/native-actions${CLASSPATH_SEPARATOR}output/local/native-deps/onnxruntime.jar${CLASSPATH_SEPARATOR}output/local/native-deps/opencv.jar" io.mosip.facepad.NativeActiveSessionCheck
 
     - name: Preserve test evidence
       if: always()
@@ -78,3 +83,4 @@ jobs:
         path: |
           output/local/test-results.xml
           output/local/native-check/native-engine-check.log
+          output/local/native-landmarks/native-landmark-check.log

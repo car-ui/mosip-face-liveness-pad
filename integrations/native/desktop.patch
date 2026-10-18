@@ -12,17 +12,82 @@ index a039aeb1b6..8b5a5d28b5 100644
  			<groupId>io.mosip.registration</groupId>
  			<artifactId>registration-services</artifactId>
 diff --git a/registration/registration-client/src/main/java/io/mosip/registration/controller/BaseController.java b/registration/registration-client/src/main/java/io/mosip/registration/controller/BaseController.java
-index 45403104ff..08c9c7e50e 100644
+index 45403104ff..456db4a728 100644
 --- a/registration/registration-client/src/main/java/io/mosip/registration/controller/BaseController.java
 +++ b/registration/registration-client/src/main/java/io/mosip/registration/controller/BaseController.java
-@@ -1692,6 +1692,7 @@ public class BaseController {
+@@ -1682,6 +1682,11 @@ public class BaseController {
+ 	 * @throws RegBaseCheckedException
+ 	 */
+ 	protected boolean captureAndValidateFace(String userId, boolean isPacketAuth, boolean isReviewer) throws RegBaseCheckedException, IOException {
++        return captureAndValidateFace(userId, isPacketAuth, isReviewer, null);
++    }
++
++    protected boolean captureAndValidateFace(String userId, boolean isPacketAuth, boolean isReviewer,
++            io.mosip.facepad.NativeFrameChallenge active) throws RegBaseCheckedException, IOException {
+ 		MDMRequestDto mdmRequestDto = new MDMRequestDto(RegistrationConstants.FACE_FULLFACE, null, "Registration",
+ 				io.mosip.registration.context.ApplicationContext
+ 						.getStringValueFromApplicationMap(RegistrationConstants.SERVER_ACTIVE_PROFILE),
+@@ -1692,6 +1697,7 @@ public class BaseController {
  
  		List<BiometricsDto> biometrics = bioService.captureModalityForAuth(mdmRequestDto);
  
-+        io.mosip.facepad.DesktopPadCheckpoint.requireClear(biometrics, true);
++        io.mosip.facepad.DesktopPadCheckpoint.requireClear(biometrics, true, active);
  		boolean match = authenticationService.authValidator(userId, SingleType.FACE.value(), biometrics);
  		if (match && isPacketAuth) {
  			addOperatorBiometrics(biometrics, isReviewer);
+diff --git a/registration/registration-client/src/main/java/io/mosip/registration/controller/auth/AuthenticationController.java b/registration/registration-client/src/main/java/io/mosip/registration/controller/auth/AuthenticationController.java
+index 29401ee938..c2bab1f7b1 100644
+--- a/registration/registration-client/src/main/java/io/mosip/registration/controller/auth/AuthenticationController.java
++++ b/registration/registration-client/src/main/java/io/mosip/registration/controller/auth/AuthenticationController.java
+@@ -166,6 +166,7 @@ public class AuthenticationController extends BaseController implements Initiali
+ 	private Button fingerPrintScanButton;
+ 	@FXML
+ 	private ImageView faceImage;
++    @FXML private Label faceLivenessPrompt;
+ 
+ 	@Autowired
+ 	private PacketHandlerController packetHandlerController;
+@@ -216,6 +217,9 @@ public class AuthenticationController extends BaseController implements Initiali
+ 		setImage(rightHandImageView, RegistrationConstants.RIGHT_HAND_IMG);
+ 		setImage(irisImageView, RegistrationConstants.EYE_IMG);
+ 		setImage(faceImage, RegistrationConstants.PHOTO_IMG);
++        streamer.challengePromptProperty().addListener((property, before, after) -> {
++            if ("Actions complete. Capturing face...".equals(after)) validateFace();
++        });
+ 		setImage(documentCloseImgPwdBasedLogin, RegistrationConstants.CLOSE_IMG);
+ 		setImage(documentCloseImgOtp, RegistrationConstants.CLOSE_IMG);
+ 		setImage(documentCloseImgFp, RegistrationConstants.CLOSE_IMG);
+@@ -471,9 +475,11 @@ public class AuthenticationController extends BaseController implements Initiali
+ 
+ 	@FXML
+ 	private void startStream() {
++        if (!validateInput(faceUserId, null)) return;
+ 		faceImage.setImage(null);
+ 		try {
+-			streamer.startStream(bioService.getStream(RegistrationConstants.FACE_FULLFACE), faceImage, null);
++			faceLivenessPrompt.textProperty().bind(streamer.challengePromptProperty());
++            streamer.startActiveStream(bioService.getStream(RegistrationConstants.FACE_FULLFACE), faceImage);
+ 		} catch (RegBaseCheckedException regBaseCheckedException) {
+ 			LOGGER.error(LoggerConstants.LOG_REG_LOGIN, APPLICATION_NAME, APPLICATION_ID,
+ 					ExceptionUtils.getStackTrace(regBaseCheckedException));
+@@ -518,7 +524,7 @@ public class AuthenticationController extends BaseController implements Initiali
+ 					@Override
+ 					protected Boolean call() {
+ 						try {
+-							return captureAndValidateFace(userId, true, isReviewer);
++							return captureAndValidateFace(userId, true, isReviewer, streamer.getFrameChallenge());
+ 						} catch (RegBaseCheckedException | IOException exception) {
+ 							LOGGER.error("Exception while getting the scanned biometrics for user authentication: caused by "
+ 											+ ExceptionUtils.getStackTrace(exception));
+@@ -902,7 +908,7 @@ public class AuthenticationController extends BaseController implements Initiali
+ 				validateIris();
+ 				break;
+ 			case RegistrationConstants.FACE:
+-				validateFace();
++				startStream();
+ 				break;
+ 			default:
+ 		}
 diff --git a/registration/registration-client/src/main/java/io/mosip/registration/controller/device/BiometricsController.java b/registration/registration-client/src/main/java/io/mosip/registration/controller/device/BiometricsController.java
 index 6e8fae980b..2b9e96790c 100644
 --- a/registration/registration-client/src/main/java/io/mosip/registration/controller/device/BiometricsController.java
@@ -95,10 +160,10 @@ index e3e0bf37d1..84a7d93960 100644
  	}
  
 diff --git a/registration/registration-client/src/main/java/io/mosip/registration/controller/device/Streamer.java b/registration/registration-client/src/main/java/io/mosip/registration/controller/device/Streamer.java
-index 105567a999..6ec977f710 100644
+index 105567a999..794fcc35b1 100644
 --- a/registration/registration-client/src/main/java/io/mosip/registration/controller/device/Streamer.java
 +++ b/registration/registration-client/src/main/java/io/mosip/registration/controller/device/Streamer.java
-@@ -3,197 +3,107 @@ package io.mosip.registration.controller.device;
+@@ -3,197 +3,159 @@ package io.mosip.registration.controller.device;
  import java.io.ByteArrayInputStream;
  import java.io.IOException;
  import java.io.InputStream;
@@ -302,6 +367,17 @@ index 105567a999..6ec977f710 100644
 +    private volatile InputStream urlStream;
 +    private long generation;
 +    private Thread streamer_thread;
++    private io.mosip.facepad.NativeFrameChallenge frameChallenge;
++    private final javafx.beans.property.ReadOnlyStringWrapper challengePrompt = new javafx.beans.property.ReadOnlyStringWrapper("");
++    public javafx.beans.property.ReadOnlyStringProperty challengePromptProperty() { return challengePrompt.getReadOnlyProperty(); }
++    public synchronized io.mosip.facepad.NativeFrameChallenge getFrameChallenge() { return frameChallenge; }
++    private void publishPrompt(InputStream input, long token, String prompt) {
++        Platform.runLater(() -> {
++            synchronized (Streamer.this) {
++                if (current(input, token)) challengePrompt.set(prompt);
++            }
++        });
++    }
 +    public volatile byte[] imageBytes;
 +    private static volatile Image streamImage;
 +    private static volatile ImageView imageView;
@@ -309,9 +385,20 @@ index 105567a999..6ec977f710 100644
 +    public synchronized void setUrlStream(InputStream inputStream) {
 +        InputStream previous = urlStream;
 +        generation++;
++        if (frameChallenge != null) frameChallenge.cancel();
++        frameChallenge = null;
 +        urlStream = inputStream;
 +        imageBytes = null;
 +        streamImage = null;
++        final long resetToken = generation;
++        try {
++            Platform.runLater(() -> {
++                synchronized (Streamer.this) {
++                    if (generation == resetToken && urlStream == null)
++                        challengePrompt.set("Camera stopped. Start it again to verify liveness.");
++                }
++            });
++        } catch (IllegalStateException noToolkit) { /* Parser-only checks have no JavaFX runtime. */ }
 +        if (previous != null && previous != inputStream) close(previous);
 +    }
 +
@@ -338,17 +425,44 @@ index 105567a999..6ec977f710 100644
 +        return urlStream == input && generation == token;
 +    }
 +
-+    public synchronized void startStream(InputStream inputStream, ImageView preview, ImageView scanImage) {
++    public void startStream(InputStream input, ImageView preview, ImageView scanImage) {
++        startStream(input, preview, scanImage, false);
++    }
++    public void startActiveStream(InputStream input, ImageView preview) {
++        startStream(input, preview, null, true);
++    }
++    private synchronized void startStream(InputStream inputStream, ImageView preview, ImageView scanImage, boolean activeRequired) {
 +        setUrlStream(inputStream);
 +        if (inputStream == null) return;
 +        final long token = generation;
 +        final AtomicBoolean updatePending = new AtomicBoolean();
 +        streamer_thread = new Thread(() -> {
 +            try {
++                io.mosip.facepad.NativeFrameChallenge active = null;
++                if (activeRequired) {
++                    publishPrompt(inputStream, token, "Loading liveness models");
++                    active = io.mosip.facepad.DesktopPadCheckpoint.newFrameChallenge();
++                    synchronized (Streamer.this) {
++                        if (!current(inputStream, token)) { active.cancel(); return; }
++                        frameChallenge = active;
++                    }
++                }
++                String previousPrompt = null;
 +                while (current(inputStream, token) && !Thread.currentThread().isInterrupted()) {
 +                    byte[] frame = retrieveNextImage(inputStream);
 +                    Image image = new Image(new ByteArrayInputStream(frame));
 +                    if (image.isError()) throw new IOException("Camera JPEG could not be decoded");
++                    if (active != null) {
++                        io.mosip.facepad.NativeActiveSession.State state = active.observe(frame);
++                        String prompt = active.prompt();
++                        if (state == io.mosip.facepad.NativeActiveSession.State.COMPLETE)
++                            prompt = "Actions complete. Capturing face...";
++                        if (state == io.mosip.facepad.NativeActiveSession.State.REJECTED)
++                            prompt = "Liveness could not be verified. Restart camera.";
++                        if (state == io.mosip.facepad.NativeActiveSession.State.CONSUMED)
++                            prompt = "Liveness checked. Validating identity.";
++                        if (!prompt.equals(previousPrompt)) { publishPrompt(inputStream, token, prompt); previousPrompt = prompt; }
++                    }
 +                    synchronized (Streamer.this) {
 +                        if (!current(inputStream, token)) break;
 +                        imageBytes = frame;
@@ -365,8 +479,11 @@ index 105567a999..6ec977f710 100644
 +                        });
 +                    }
 +                }
-+            } catch (IOException | RuntimeException e) {
-+                if (current(inputStream, token)) LOGGER.error("Camera stream stopped", e);
++            } catch (Exception | LinkageError e) {
++                if (current(inputStream, token)) {
++                    LOGGER.error("Camera stream stopped", e);
++                    publishPrompt(inputStream, token, "Liveness unavailable. Restart camera.");
++                }
 +            } finally {
 +                synchronized (Streamer.this) {
 +                    // An older reader must never close or clear a replacement session.
@@ -390,3 +507,16 @@ index 105567a999..6ec977f710 100644
 +        streamer_thread = null;
 +    }
  }
+diff --git a/registration/registration-client/src/main/resources/fxml/OperatorAuthentication.fxml b/registration/registration-client/src/main/resources/fxml/OperatorAuthentication.fxml
+index eafc0011b9..59bc116ca9 100644
+--- a/registration/registration-client/src/main/resources/fxml/OperatorAuthentication.fxml
++++ b/registration/registration-client/src/main/resources/fxml/OperatorAuthentication.fxml
+@@ -852,7 +852,7 @@
+ 															<children>
+ 																<GridPane fx:id="photoInstructionPane" GridPane.columnIndex="1" GridPane.rowIndex="1">
+ 																	<children>
+-																		<Label prefHeight="${photoInstructionPane.height}" prefWidth="${photoInstructionPane.width}" styleClass="operatorAuthenticationStyleTextTypeOne" text="%faceinstruction" GridPane.rowIndex="1" />
++																		<Label fx:id="faceLivenessPrompt" prefHeight="${photoInstructionPane.height}" prefWidth="${photoInstructionPane.width}" styleClass="operatorAuthenticationStyleTextTypeOne" text="%faceinstruction" wrapText="true" GridPane.rowIndex="1" />
+ 																	</children>
+ 																	<columnConstraints>
+ 																		<ColumnConstraints hgrow="SOMETIMES" minWidth="10.0" prefWidth="100.0" />

@@ -1,0 +1,6 @@
+PASS actual Streamer preview on JavaFX thread and exact JPEG cache with defensive copy
+PASS camera replacement survives delayed EOF from the previous reader
+PASS stop closes camera and clears cached image/bytes
+PASS actual active preview loads both models, guides through bound JavaFX label, and cancels proof on stop
+PASS actual OperatorAuthentication FXML loads with prompt injection; service initialization replaced for layout check
+Evidence scope: actual upstream Streamer and JavaFX ImageView; synthetic JPEG, no physical camera or full client UI

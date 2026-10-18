@@ -1,5 +1,5 @@
 {
-  "date": "2026-10-18",
+  "date": "2026-10-19",
   "desktop_upstream_commit": "935306e2fd38bff2803697468e595026b1d18cec",
   "android_upstream_commit": "8f4643a694f3b5e66e0491f077a8630ab5667658",
   "desktop_reactor_compile": "PASS",
@@ -46,12 +46,45 @@
         "PASS model tampering rejection"
       ],
       "scope": "Real Java/Python ONNX parity after CPU-count-aware thread selection"
+    },
+    "desktop-active-binding-check.txt": {
+      "sha256": "9c0101be3e78e0416794d35c11c84b1218ea263c51c39a05a6bcdb2b0a23624f",
+      "results": [
+        "PASS actual upstream Streamer: consecutive frames, bounded EOF rejection and disconnect cleanup",
+        "PASS registration checkpoint rejects decoded blank ISO: NO_FACE",
+        "PASS upstream GenericBiometricsController rejects blank ISO before returning candidates for storage",
+        "PASS upstream BaseController operator/supervisor rejection: captures=2, identityMatcherCalls=0",
+        "PASS recorded NASA portrait rejected for operator/supervisor: ACTIVE_CHALLENGE_REQUIRED; identityMatcherCalls=0; passiveClear=false",
+        "PASS actual BaseController exact-frame binding: injected completed geometry reaches matcher double for both roles; different final JPEG rejects before matcher",
+        "Evidence scope: synthetic ISO + actual upstream controller/model, no live UI or physical attack."
+      ]
+    },
+    "desktop-active-preview-check.txt": {
+      "sha256": "c8619ac9810f5d37e9f1169d3c47be0e4385ef55b893e38a752d50df00896f42",
+      "results": [
+        "PASS actual Streamer preview on JavaFX thread and exact JPEG cache with defensive copy",
+        "PASS camera replacement survives delayed EOF from the previous reader",
+        "PASS stop closes camera and clears cached image/bytes",
+        "PASS actual active preview loads both models, guides through bound JavaFX label, and cancels proof on stop",
+        "PASS actual OperatorAuthentication FXML loads with prompt injection; service initialization replaced for layout check",
+        "Evidence scope: actual upstream Streamer and JavaFX ImageView; synthetic JPEG, no physical camera or full client UI"
+      ]
+    },
+    "native-landmark-check.txt": {
+      "sha256": "f6b3b39bf89a9dbc52563999c9fe16c909a1185c866a08a6e8f6535ef35fbfa1",
+      "results": [
+        "PASS actual Java/Python landmark inference; maxAbsError=0.0; presence=0.9999999999956091",
+        "PASS recorded-photo crop geometry; leftEAR=0.3176376027635151; rightEAR=0.30675654105975836; turnRatio=-0.0612503934087865",
+        "PASS blank presence, invalid values and clipped crop rejected",
+        "PASS actual PAD/landmark frame bridge does not complete actions on repeated recorded photo; state=VERIFYING",
+        "PASS landmark model tampering rejected; no active completion or physical accuracy claim"
+      ]
     }
   },
   "android_build": "PASS_APP_AND_TEST_APKS",
-  "native_ui_rejection": "NOT_TESTED",
+  "native_ui_rejection": "CONTROLLED_JAVAFX_PREVIEW_AND_FXML_LOADING_ONLY;FULL_CLIENT_UI_NOT_TESTED",
   "physical_attacks": "DEFERRED_BY_USER",
-  "active_challenge_integration": "NOT_CONNECTED_FAIL_CLOSED",
+  "active_challenge_integration": "DESKTOP_OPERATOR_SUPERVISOR_PREVIEW_CONNECTED_EXACT_JPEG_BINDING;ANDROID_CAMERA_OWNER_PENDING",
   "identity_matcher": "TEST_DOUBLE_NOT_CALLED_AFTER_REJECTION",
   "desktop_paths": [
     "GenericBiometricsController.rCapture: resident/exception photo",
@@ -242,5 +275,87 @@
       "physical_device_tested": false
     }
   ],
-  "desktop_adaptive_reactor_compile": "PASS"
+  "desktop_adaptive_reactor_compile": "PASS",
+  "android_landmarks_instrumentation": {
+    "status": "PASS",
+    "tests": 6,
+    "time_seconds": 36.023,
+    "api": 34,
+    "abi": "x86_64",
+    "camera": "DISABLED",
+    "result_log": "evidence/android-landmarks-final-instrumentation.txt",
+    "result_sha256": "5cce0a3ee0aa9c0f7c18bfc5037548302dcb08c8d4324f6f6a94ffedfb7b7276",
+    "scope": "Actual PAD and landmark Android JNI, ISO decoding, acceptance API; recorded photo and test doubles, no camera",
+    "latest_pad_tensor_timing": {
+      "scope": "ONNX scoreTensor only; synthetic input; no camera, face detection or full capture",
+      "modelSha256": "5281b4a621b1a2a7570d88bc3a37ac5273ab3082b61d1e284b9847660909cbef",
+      "api": 34,
+      "abis": "[x86_64]",
+      "deviceModel": "Google ATD built for x86_64",
+      "availableProcessors": 1,
+      "intraOpThreads": 1,
+      "warmups": 10,
+      "iterations": 100,
+      "p50Ms": 17.901752,
+      "p95Ms": 46.954588,
+      "minMs": 8.744894,
+      "maxMs": 56.603575,
+      "processTotalPssKb": 198222,
+      "processJavaHeapUsedBytes": 42897192,
+      "memoryScope": "Whole instrumentation target process after benchmark, not incremental model memory"
+    },
+    "timing_limit": "Full-suite run under uncontrolled host load; not a new stable phone-performance claim"
+  },
+  "historical_landmarks_run": {
+    "tests": 6,
+    "time_seconds": 80.685,
+    "result_log": "evidence/android-landmarks-instrumentation.txt",
+    "result_sha256": "be8175b5b286264fd4228bf953feee63e49b5c394509fb4f9828dfcfa831f74b",
+    "scope": "Earlier shared-source snapshot, before active session cancellation/freshness updates",
+    "p95_inference_ms": 87.952407,
+    "host_load_controlled": false
+  },
+  "landmarks_apks": [
+    {
+      "file": "registration-client-pad-arm64-v8a-landmarks-debug.apk",
+      "bytes": 223712618,
+      "sha256": "1e729b1741e15a885144a21b19bac158aa32383d144e1b768b6625449e91953d",
+      "abi": "arm64-v8a",
+      "zip_integrity": "PASS",
+      "runtime_and_model_notices": "PASS",
+      "both_model_hashes": "PASS",
+      "physical_device_tested": false,
+      "signature_verification": "PASS_APKSIGNER_35"
+    },
+    {
+      "file": "registration-client-pad-x86_64-landmarks-debug.apk",
+      "bytes": 261548645,
+      "sha256": "94d0cd5622a3500312552ba8831a9ba81f8d78a7d1539d5381916dd1c0197f15",
+      "abi": "x86_64",
+      "zip_integrity": "PASS",
+      "runtime_and_model_notices": "PASS",
+      "both_model_hashes": "PASS",
+      "physical_device_tested": false,
+      "signature_verification": "PASS_APKSIGNER_35"
+    },
+    {
+      "file": "registration-client-pad-landmarks-androidTest.apk",
+      "bytes": 2751371,
+      "sha256": "031cdf21c4b2a144fd56e81897928d4f89b97a8678674b6cbe6103165d91ac93",
+      "type": "instrumentation",
+      "signature_verification": "PASS_APKSIGNER_35"
+    }
+  ],
+  "native_landmark_model": {
+    "sha256": "09c96e67163c660431d37eccc24d40172e514fe4f5768ebf507941e3cb9e3bfb",
+    "tflite_onnx_comparisons": 24,
+    "max_abs_error": 0.0009765625,
+    "java_python_parity": "PASS",
+    "recorded_photo_does_not_complete_frame_challenge": "PASS",
+    "android_recorded_photo_inference": "PASS",
+    "live_action_accuracy": "NOT_TESTED"
+  },
+  "prepare_clean_active_desktop_and_android": "PASS",
+  "desktop_active_reactor_compile": "PASS",
+  "active_candidate_format": "JPEG_ONLY_EXACT_BYTE_MATCH;JPEG2000_ACTIVE_PROOF_REJECTED"
 }

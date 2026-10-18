@@ -16,6 +16,14 @@ import androidx.test.platform.app.InstrumentationRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mosip.facepad.AndroidPadCheckpoint;
 import io.mosip.facepad.NativePadEngine;
+import io.mosip.facepad.NativeLandmarkEngine;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import org.opencv.android.OpenCVLoader;
+import org.opencv.android.Utils;
+import org.opencv.core.Mat;
+import org.opencv.core.Rect;
+import org.opencv.imgproc.Imgproc;
 import io.mosip.registration.clientmanager.constant.Modality;
 import io.mosip.registration.clientmanager.constant.RegistrationConstants;
 import io.mosip.registration.clientmanager.dto.registration.BiometricsDto;
@@ -72,6 +80,37 @@ public class NativePadAcceptanceTest {
         for (int i = 0; i < input.length; i++) input[i] = i % 256;
         // Reference from Python ORT and the exact packaged model hash. Synthetic tensor only.
         assertEquals(8.380277904507238e-6, engine.scoreTensor(input), 1e-7);
+    }
+
+    @Test public void actualAndroidLandmarksOnRecordedFixture() throws Exception {
+        assertTrue(OpenCVLoader.initLocal());
+        Context target = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        byte[] model;
+        try (InputStream input = target.getAssets().open("facepad/facemesh_v2.onnx");
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[8192]; int count;
+            while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+            model = output.toByteArray();
+        }
+        Bitmap photo;
+        try (InputStream input = InstrumentationRegistry.getInstrumentation().getContext().getAssets().open("astronaut.png")) {
+            photo = BitmapFactory.decodeStream(input);
+        }
+        assertNotNull(photo);
+        Mat rgba = new Mat(), bgr = new Mat();
+        try (NativeLandmarkEngine engine = new NativeLandmarkEngine(model)) {
+            Utils.bitmapToMat(photo, rgba);
+            Imgproc.cvtColor(rgba, bgr, Imgproc.COLOR_RGBA2BGR);
+            NativeLandmarkEngine.Observation result = engine.observe(bgr, new Rect(172,64,102,102));
+            assertEquals(478 * 3, result.landmarks.length);
+            assertTrue(result.presence > .9);
+            // Desktop ORT references. Tolerance covers decoder/resize version differences.
+            assertEquals(.3176376028, result.leftEar, .02);
+            assertEquals(.3067565411, result.rightEar, .02);
+            assertEquals(-.0612503934, result.turnRatio, .02);
+            try { engine.infer(new float[256 * 256 * 3]); fail("Blank supplied face evidence"); }
+            catch (IOException expected) { assertTrue(expected.getMessage().contains("presence")); }
+        } finally { photo.recycle(); rgba.release(); bgr.release(); }
     }
 
     @Test public void actualAndroidInferenceTimingAndMemory() throws Exception {

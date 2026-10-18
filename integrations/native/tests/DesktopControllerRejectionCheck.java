@@ -9,7 +9,11 @@ import io.mosip.registration.service.bio.BioService;
 import io.mosip.registration.service.security.AuthenticationService;
 import io.mosip.biometrics.util.ConvertRequestDto;
 import io.mosip.biometrics.util.face.FaceEncoder;
+import io.mosip.biometrics.util.face.FaceBDIR;
+import io.mosip.biometrics.util.face.ImageDataType;
 import io.mosip.facepad.DesktopPadCheckpoint;
+import io.mosip.facepad.NativeFrameChallenge;
+import io.mosip.facepad.NativeActiveSessionCheck;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.*;
@@ -115,6 +119,14 @@ public final class DesktopControllerRejectionCheck extends BaseController {
                 throw new IOException("Cannot encode portrait fixture as JPEG");
             convert.setInputBytes(portraitJpeg.toByteArray());
             biometric.setAttributeISO(FaceEncoder.convertFaceImageToISO(convert));
+            // This pinned FaceEncoder convenience method always marks bytes as
+            // lossless JPEG2000, even when input is JPEG. Correct the test record's
+            // declared format to match its bytes before checking exact binding.
+            FaceBDIR record = new FaceBDIR(new DataInputStream(new ByteArrayInputStream(biometric.getAttributeISO())));
+            record.getRepresentation().getRepresentationHeader().getImageInformation().setImageDataType(ImageDataType.JPEG);
+            ByteArrayOutputStream corrected = new ByteArrayOutputStream();
+            record.writeObject(new DataOutputStream(corrected));
+            biometric.setAttributeISO(corrected.toByteArray());
             boolean passiveClear = false;
             try { DesktopPadCheckpoint.requireClear(candidates, false); passiveClear = true; }
             catch (IOException expected) {
@@ -128,6 +140,27 @@ public final class DesktopControllerRejectionCheck extends BaseController {
             }
             if (captures.get() != 4 || matches.get() != 0) throw new AssertionError("Matcher called without active evidence");
             System.out.println("PASS recorded NASA portrait rejected for operator/supervisor: ACTIVE_CHALLENGE_REQUIRED; identityMatcherCalls=0; passiveClear=" + passiveClear);
+            // Inject only session geometry for this controller-path test. Production
+            // sessions receive actual PAD/landmark observations from the native stream.
+            Field evidence = NativeFrameChallenge.class.getDeclaredField("session");
+            evidence.setAccessible(true);
+            for (boolean reviewer : new boolean[]{false,true}) {
+                NativeFrameChallenge proof = DesktopPadCheckpoint.newFrameChallenge();
+                evidence.set(proof, NativeActiveSessionCheck.completedForControllerTest(portraitJpeg.toByteArray()));
+                if (!controller.captureAndValidateFace("SYNTHETIC-TEST-ONLY", false, reviewer, proof))
+                    throw new AssertionError("Exact active frame did not reach matcher double");
+            }
+            if (matches.get() != 2) throw new AssertionError("Expected two calls to matcher double");
+            NativeFrameChallenge mismatch = DesktopPadCheckpoint.newFrameChallenge();
+            evidence.set(mismatch, NativeActiveSessionCheck.completedForControllerTest(new byte[]{(byte)255,(byte)216,0,0,(byte)255,(byte)217}));
+            try {
+                controller.captureAndValidateFace("SYNTHETIC-TEST-ONLY", false, false, mismatch);
+                throw new AssertionError("Different final image reached matcher");
+            } catch (IOException expected) {
+                if (!expected.getMessage().contains("ACTIVE_CHALLENGE_REQUIRED")) throw expected;
+            }
+            if (matches.get() != 2) throw new AssertionError("Mismatched proof reached matcher");
+            System.out.println("PASS actual BaseController exact-frame binding: injected completed geometry reaches matcher double for both roles; different final JPEG rejects before matcher");
         }
         System.out.println("Evidence scope: synthetic ISO + actual upstream controller/model, no live UI or physical attack.");
     }

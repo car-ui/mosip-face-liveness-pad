@@ -37,6 +37,7 @@ def run(java_home: Path, checkout: Path, classpath_file: Path, output: Path, pre
         return '"' + str(value).replace("\\", "/").replace('"', '\\"') + '"'
     compile_args = ["--release", "8", "-cp", quoted(classpath), "-d", quoted(output)]
     compile_args += [quoted(ROOT / "integrations/native/tests" / (name + ".java")) for name in names]
+    compile_args.append(quoted(ROOT / "integrations/native/tests/NativeActiveSessionCheck.java"))
     args_file = output / "javac.args"
     args_file.write_text("\n".join(compile_args) + "\n", encoding="utf-8")
     subprocess.run([str(javac), "-J-Xmx192m", "@" + str(args_file)], check=True, timeout=120)

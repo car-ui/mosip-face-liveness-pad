@@ -30,6 +30,9 @@ def prepare(platform: str, checkout: Path):
     resources.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(ROOT / "assets/models/minifasnet_v2.onnx", resources / "minifasnet_v2.onnx")
     shutil.copyfile(ROOT / "assets/models/minifasnet_v2.onnx.json", resources / "minifasnet_v2.onnx.json")
+    shutil.copyfile(ROOT / "assets/models/facemesh_v2.onnx", resources / "facemesh_v2.onnx")
+    shutil.copyfile(ROOT / "assets/models/facemesh_v2.onnx.json", resources / "facemesh_v2.onnx.json")
+    shutil.copyfile(ROOT / "third_party/MediaPipe-LICENSE.txt", resources / "LANDMARK-MODEL-LICENSE.txt")
     shutil.copyfile(ROOT / "third_party/Silent-Face-Anti-Spoofing-LICENSE.txt", resources / "MODEL-LICENSE.txt")
     shutil.copyfile(ROOT / "third_party/ONNX-Runtime-LICENSE.txt", resources / "ONNX-Runtime-LICENSE.txt")
     shutil.copyfile(ROOT / "third_party/OpenCV-LICENSE.txt", resources / "OpenCV-LICENSE.txt")
@@ -39,6 +42,7 @@ def prepare(platform: str, checkout: Path):
         shutil.copytree(base / "android-test", tests / "java", dirs_exist_ok=True)
         (tests / "assets").mkdir(parents=True, exist_ok=True)
         shutil.copyfile(base / "tests/fixtures/blank-face.iso", tests / "assets/blank-face.iso")
+        shutil.copyfile(ROOT / "tests/sample_images/astronaut.png", tests / "assets/astronaut.png")
     print(f"Prepared {platform} {PINS[platform]} in {checkout}")
 
 

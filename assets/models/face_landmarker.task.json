@@ -1,0 +1,32 @@
+{
+  "asset": "face_landmarker.task",
+  "source": "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+  "sha256": "64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff",
+  "components": {
+    "face_detector.tflite": {
+      "bytes": 229746,
+      "sha256": "b4578f35940bf5a1a655214a1cce5cab13eba73c1297cd78e1a04c2380b0152f"
+    },
+    "face_landmarks_detector.tflite": {
+      "bytes": 2553590,
+      "sha256": "c7d54204ce0448474c7f3fa9af494787c0965cbdd6f20fc72867e43046bd43d5"
+    },
+    "geometry_pipeline_metadata_landmarks.binarypb": {
+      "bytes": 19376,
+      "sha256": "bdbcda96dfcb7da883da124aaa2c55dee49770d934f0fcc71747f8c21bdc75b4"
+    },
+    "face_blendshapes.tflite": {
+      "bytes": 955312,
+      "sha256": "4f36dded049db18d76048567439b2a7f58f1daabc00d78bfe8f3ad396a2d2082"
+    }
+  },
+  "model_license": "Apache-2.0",
+  "license_file": "third_party/MediaPipe-LICENSE.txt",
+  "official_bundle_guide": "https://developers.google.com/edge/mediapipe/solutions/vision/face_landmarker",
+  "model_cards": {
+    "face_detector.tflite": "https://storage.googleapis.com/mediapipe-assets/MediaPipe%20BlazeFace%20Model%20Card%20(Short%20Range).pdf",
+    "face_landmarks_detector.tflite": "https://storage.googleapis.com/mediapipe-assets/Model%20Card%20MediaPipe%20Face%20Mesh%20V2.pdf",
+    "face_blendshapes.tflite": "https://storage.googleapis.com/mediapipe-assets/Model%20Card%20Blendshape%20V2.pdf"
+  },
+  "limits": "Landmarks and blendshapes do not identify a person and do not establish presentation attack detection accuracy."
+}
