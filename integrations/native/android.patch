@@ -24,7 +24,7 @@ index 8e17558..f793095 100644
  
      implementation "javax.inject:javax.inject:${rootProject.ext.javaxInjectVersion}"
 diff --git a/android/app/src/main/java/io/mosip/registration_client/api_services/BiometricsDetailsApi.java b/android/app/src/main/java/io/mosip/registration_client/api_services/BiometricsDetailsApi.java
-index 640ac66..d774f54 100644
+index 640ac66..86de3bc 100644
 --- a/android/app/src/main/java/io/mosip/registration_client/api_services/BiometricsDetailsApi.java
 +++ b/android/app/src/main/java/io/mosip/registration_client/api_services/BiometricsDetailsApi.java
 @@ -1075,6 +1075,9 @@ public class BiometricsDetailsApi implements BiometricsPigeon.BiometricsApi {
@@ -32,7 +32,7 @@ index 640ac66..d774f54 100644
              List<BiometricsDto> biometricsDtoList = biometricsService.handleRCaptureResponse(currentModality, respData,
                      getExceptionAttributes(), transactionId, isOperatorOnboarding);
 +            if (currentModality == Modality.FACE || currentModality == Modality.EXCEPTION_PHOTO) {
-+                io.mosip.facepad.AndroidPadCheckpoint.requireClear(activity, biometricsDtoList, isOperatorOnboarding);
++                io.mosip.facepad.AndroidPadCheckpoint.requireClear(activity, biometricsDtoList, isOperatorOnboarding, transactionId);
 +            }
              // if attempts is zero, there is no need to maintain the counter
              if (fieldId.equals(OPERATOR_BIOMETRICS)) {
@@ -48,3 +48,15 @@ index 640ac66..d774f54 100644
          } catch (BiometricsServiceException e) {
              auditManagerService.audit(AuditEvent.R_CAPTURE_PARSE_FAILED, Components.REGISTRATION, e.getMessage());
              Log.e(TAG, "R-Capture failed: " + e.getErrorCode(), e);
+diff --git a/android/clientmanager/src/main/java/io/mosip/registration/clientmanager/dto/sbi/CaptureDto.java b/android/clientmanager/src/main/java/io/mosip/registration/clientmanager/dto/sbi/CaptureDto.java
+index e8b36ff..99e1d4a 100644
+--- a/android/clientmanager/src/main/java/io/mosip/registration/clientmanager/dto/sbi/CaptureDto.java
++++ b/android/clientmanager/src/main/java/io/mosip/registration/clientmanager/dto/sbi/CaptureDto.java
+@@ -5,6 +5,7 @@ import lombok.Data;
+ @Data
+ public class CaptureDto {
+ 
++    private java.util.Map<String,Object> facePad;
+     private String digitalId;
+     private String bioType;
+     private String deviceCode;

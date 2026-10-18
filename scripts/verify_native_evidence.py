@@ -25,7 +25,12 @@ def verify():
             digest(path, record["sha256"])
     for record in validation.values():
         if isinstance(record, dict) and "result_log" in record:
-            digest(ROOT / record["result_log"], record["result_sha256"])
+            path = ROOT / record["result_log"]
+            digest(path, record["result_sha256"])
+            if "tests" in record:
+                result = path.read_text(encoding="utf-8")
+                if f'OK ({record["tests"]} tests)' not in result or "FAILURES!!!" in result:
+                    raise ValueError(f"Instrumentation result differs from reported count: {path.name}")
     report = json.loads((ROOT / "android-benchmark.json").read_text(encoding="utf-8"))
     adaptive = next(p for p in validation["adaptive_apks"] if p.get("abi") == "x86_64")
     if report["adaptive_app_sha256"] != adaptive["sha256"]:

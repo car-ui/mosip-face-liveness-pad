@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PINS = {
     "android": "8f4643a694f3b5e66e0491f077a8630ab5667658",
     "desktop": "935306e2fd38bff2803697468e595026b1d18cec",
+    "camera-sbi": "d1ec22a542294b798f5b9c5bb97428deabb2064b",
 }
 
 
@@ -23,10 +24,11 @@ def prepare(platform: str, checkout: Path):
     patch = base / f"{platform}.patch"
     subprocess.run(["git", "apply", "--check", str(patch)], cwd=checkout, check=True)
     subprocess.run(["git", "apply", str(patch)], cwd=checkout, check=True)
-    module = checkout / ("android/app/src/main" if platform == "android" else "registration/registration-client/src/main")
+    module = checkout / {"android": "android/app/src/main", "desktop": "registration/registration-client/src/main",
+                         "camera-sbi": "app/src/main"}[platform]
     shutil.copytree(base / "common", module / "java", dirs_exist_ok=True)
     shutil.copytree(base / platform, module / "java", dirs_exist_ok=True)
-    resources = module / ("assets/facepad" if platform == "android" else "resources/facepad")
+    resources = module / ("resources/facepad" if platform == "desktop" else "assets/facepad")
     resources.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(ROOT / "assets/models/minifasnet_v2.onnx", resources / "minifasnet_v2.onnx")
     shutil.copyfile(ROOT / "assets/models/minifasnet_v2.onnx.json", resources / "minifasnet_v2.onnx.json")
@@ -37,12 +39,16 @@ def prepare(platform: str, checkout: Path):
     shutil.copyfile(ROOT / "third_party/ONNX-Runtime-LICENSE.txt", resources / "ONNX-Runtime-LICENSE.txt")
     shutil.copyfile(ROOT / "third_party/OpenCV-LICENSE.txt", resources / "OpenCV-LICENSE.txt")
     shutil.copyfile(base / "assets/haarcascade_frontalface_default.xml", resources / "haarcascade_frontalface_default.xml")
-    if platform == "android":
+    if platform == "camera-sbi":
+        shutil.copyfile(ROOT / "third_party/android-camera-mds-MPL-2.0.txt", resources / "CAMERA-SBI-LICENSE.txt")
+    if platform in ("android", "camera-sbi"):
         tests = module.parent / "androidTest"
-        shutil.copytree(base / "android-test", tests / "java", dirs_exist_ok=True)
+        shutil.copytree(base / ("android-test" if platform == "android" else "camera-sbi-test"), tests / "java", dirs_exist_ok=True)
         (tests / "assets").mkdir(parents=True, exist_ok=True)
         shutil.copyfile(base / "tests/fixtures/blank-face.iso", tests / "assets/blank-face.iso")
         shutil.copyfile(ROOT / "tests/sample_images/astronaut.png", tests / "assets/astronaut.png")
+        if platform == "android":
+            shutil.copyfile(base / "tests/fixtures/portrait-face.iso", tests / "assets/portrait-face.iso")
     print(f"Prepared {platform} {PINS[platform]} in {checkout}")
 
 

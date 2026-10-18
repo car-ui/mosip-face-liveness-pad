@@ -70,3 +70,14 @@ The SBI parser and client repositories are test doubles. Android JNI libraries, 
 The first instrumentation attempt had one test-fixture failure because the mocked Activity did not supply its asset manager and cache directory. The fixture now supplies those real target-application resources. A fresh-process run passed all four tests. The model and capture acceptance code were not bypassed to obtain that result.
 
 The current CPU-count-aware build passes five instrumentation tests in 17.635 seconds, plus two further benchmark-only fresh-process runs. It uses one intra-op thread on the one-CPU emulator. Both native clients rebuild successfully with that shared engine change. The current ARM64 debug package is 220,254,144 bytes. The x86_64 app and instrumentation APK were installed and tested together; ARM64 remains untested on hardware. See `docs/ANDROID_BENCHMARK.md` for every timing/PSS observation and the limits of the measurements.
+
+
+## Signed active evidence
+
+The newer client build passes 12 tests, including the actual SBI response parser with an RSA fixture crypto provider and the actual onboarding API. Run both classes with:
+
+```text
+adb shell am instrument -w -r -e class io.mosip.registration_client.api_services.NativePadAcceptanceTest,io.mosip.facepad.AndroidActiveEvidenceTest io.mosip.registration_client.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+The producer patch targets the deprecated root app of `mosip/android-camera-mds` at `d1ec22a542294b798f5b9c5bb97428deabb2064b`. Use `prepare_native_clients.py camera-sbi` and follow `docs/CAMERA_SBI_INTEGRATION.md`. Production use of the extension requires an existing provisioned SBI certificate trusted by the client. No device key or trust bypass is installed by this patch.

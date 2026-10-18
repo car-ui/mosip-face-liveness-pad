@@ -357,5 +357,70 @@
   },
   "prepare_clean_active_desktop_and_android": "PASS",
   "desktop_active_reactor_compile": "PASS",
-  "active_candidate_format": "JPEG_ONLY_EXACT_BYTE_MATCH;JPEG2000_ACTIVE_PROOF_REJECTED"
+  "active_candidate_format": "JPEG_ONLY_EXACT_BYTE_MATCH;JPEG2000_ACTIVE_PROOF_REJECTED",
+  "camera_sbi": {
+    "upstream_commit": "d1ec22a542294b798f5b9c5bb97428deabb2064b",
+    "build": "PASS",
+    "tests": 6,
+    "elapsed_seconds": 61.311,
+    "result_log": "evidence/camera-sbi-instrumentation.txt",
+    "result_sha256": "445f993f570c879029478d3c19586b01696d1fcf05a6f3e8ec26ebc069c43998",
+    "apks": [
+      {
+        "file": "camera-sbi-pad-active-notices-debug.apk",
+        "bytes": 235786359,
+        "sha256": "8f609a922ea76e0a1be4de3c1c844a80a6ed3d1ea848d6555776ed11f4fe60c3"
+      },
+      {
+        "file": "camera-sbi-pad-active-androidTest.apk",
+        "bytes": 1882414,
+        "sha256": "c821077514d429b6730c2f211448d2929e9c8f12aee45cb6f37df21b4731be75"
+      }
+    ],
+    "scope": "API34 x86_64 camera-disabled emulator. Real native models, static fixture, EXIF and ISO checks, metadata format, no-camera activity failure. No human action success, real camera or production PKI.",
+    "package_verification": "PASS signatures, ZIP integrity, exact model hashes and all runtime/model/upstream notices"
+  },
+  "signed_active_android": {
+    "build": "PASS",
+    "tests": 12,
+    "elapsed_seconds": 63.239,
+    "result_log": "evidence/android-signed-active-instrumentation.txt",
+    "result_sha256": "7caae36485e19d4da3277ecbe4023df7a4a0783f72664d7d0007b29f12115f30",
+    "apks": [
+      {
+        "file": "registration-client-pad-x86_64-signed-active-debug.apk",
+        "bytes": 261548641,
+        "sha256": "47b5b9cfd0ff6112d82da93f02374e2ae8fca8755d5e5ca7cb6a39c84290abea"
+      },
+      {
+        "file": "registration-client-pad-arm64-v8a-signed-active-debug.apk",
+        "bytes": 223712614,
+        "sha256": "75ed1e0a139764148963a165f3ec31f6de47023d790180a7c9103e68c543f571"
+      },
+      {
+        "file": "registration-client-pad-signed-active-androidTest.apk",
+        "bytes": 2845140,
+        "sha256": "47e2511ee2cea0658c9fd6ebc3763775675ad9ea5c08fdbc6dad960b0c986035"
+      }
+    ],
+    "metrics": {
+      "scope": "ONNX scoreTensor only; synthetic input; no camera, face detection or full capture",
+      "modelSha256": "5281b4a621b1a2a7570d88bc3a37ac5273ab3082b61d1e284b9847660909cbef",
+      "api": 34,
+      "abis": "[x86_64]",
+      "deviceModel": "Google ATD built for x86_64",
+      "availableProcessors": 1,
+      "intraOpThreads": 1,
+      "warmups": 10,
+      "iterations": 100,
+      "p50Ms": 29.406384,
+      "p95Ms": 89.091049,
+      "minMs": 12.020636,
+      "maxMs": 95.066515,
+      "processTotalPssKb": 186092,
+      "processJavaHeapUsedBytes": 31243384,
+      "memoryScope": "Whole instrumentation target process after benchmark, not incremental model memory"
+    },
+    "scope": "Real Android JNI/model, actual SBI response parser and actual BiometricsDetailsApi onboarding storage path. Ephemeral RSA fixture crypto provider; production certificate-chain trust and repositories are test doubles. Completed action metadata is simulated for the static NASA portrait. No real camera, physical attacks or full UI/packet workflow."
+  }
 }

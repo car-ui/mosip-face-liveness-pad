@@ -39,6 +39,11 @@ public final class AndroidPadCheckpoint {
     }
 
     public static void requireClear(Context context, List<BiometricsDto> biometrics, boolean activeRequired) throws IOException {
+        requireClear(context,biometrics,activeRequired,null);
+    }
+
+    public static void requireClear(Context context, List<BiometricsDto> biometrics, boolean activeRequired,
+                                    String transactionId) throws IOException {
         if (biometrics == null || biometrics.size() != 1) throw new IOException("PAD: expected one face capture");
         Bitmap bitmap = null;
         Mat rgba = null, bgr = null;
@@ -47,15 +52,23 @@ public final class AndroidPadCheckpoint {
             rgba = new Mat(); bgr = new Mat();
             // SBI signature and transaction validation run upstream before this method.
             byte[] iso = java.util.Base64.getUrlDecoder().decode(biometrics.get(0).getBioValue());
+            if(iso.length>8*1024*1024)throw new IOException("PAD: ISO capture too large");
             byte[] encoded = new FaceBDIR(new DataInputStream(new ByteArrayInputStream(iso)))
                     .getRepresentation().getRepresentationData().getImageData().getImage();
+            BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;
+            BitmapFactory.decodeByteArray(encoded,0,encoded.length,bounds);
+            if(bounds.outWidth>4096 || bounds.outHeight>4096)throw new IOException("PAD: image dimensions too large");
             bitmap = BitmapFactory.decodeByteArray(encoded, 0, encoded.length);
             if (bitmap == null) bitmap = new JP2Decoder(encoded).decode();
             if (bitmap == null) throw new IOException("PAD: image decoding failed");
             Utils.bitmapToMat(bitmap, rgba);
             Imgproc.cvtColor(rgba, bgr, Imgproc.COLOR_RGBA2BGR);
             NativePadEngine.Decision decision = evaluator.evaluateBgr(bgr, activeRequired);
-            if (!decision.accepted) throw new IOException("PAD rejected face capture: " + decision.reason);
+            if (!decision.accepted) {
+                if(!"ACTIVE_CHALLENGE_REQUIRED".equals(decision.reason))
+                    throw new IOException("PAD rejected face capture: " + decision.reason);
+                AndroidActiveEvidence.verifyAndConsume(context,biometrics.get(0),iso,transactionId);
+            }
         } catch (IOException e) { throw e; }
         catch (Exception | LinkageError e) { throw new IOException("PAD unavailable; face capture rejected", e); }
         finally { if (bitmap != null) bitmap.recycle(); if (rgba != null) rgba.release(); if (bgr != null) bgr.release(); }

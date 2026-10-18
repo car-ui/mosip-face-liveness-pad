@@ -1,0 +1,147 @@
+diff --git a/app/build.gradle b/app/build.gradle
+index 293be5a..e712bd9 100644
+--- a/app/build.gradle
++++ b/app/build.gradle
+@@ -3,8 +3,9 @@ plugins {
+ }
+ 
+ android {
+-    compileSdkVersion 30
+-    buildToolsVersion "30.0.3"
++    namespace "nprime.reg.sbi.face"
++    compileSdkVersion 34
++    buildToolsVersion "35.0.0"
+ 
+     defaultConfig {
+         applicationId "nprime.reg.sbi.face"
+@@ -30,6 +31,8 @@ android {
+ 
+ dependencies {
+ 
++    implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.23.2'
++    implementation 'org.opencv:opencv:4.12.0'
+     implementation 'androidx.appcompat:appcompat:1.3.0'
+     implementation 'com.google.android.material:material:1.4.0'
+     implementation 'androidx.constraintlayout:constraintlayout:2.0.4'
+@@ -50,7 +53,8 @@ dependencies {
+     implementation files('libs/commons-codec-1.4.jar')
+     implementation files('libs/MdsDao.jar')
+     implementation 'androidx.legacy:legacy-support-v4:1.0.0'
+-    testImplementation 'junit:junit:4.+'
+-    androidTestImplementation 'androidx.test.ext:junit:1.1.3'
+-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
++    testImplementation 'junit:junit:4.13.2'
++    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
++    androidTestImplementation 'androidx.test:runner:1.6.2'
++    androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
+ }
+\ No newline at end of file
+diff --git a/app/src/main/AndroidManifest.xml b/app/src/main/AndroidManifest.xml
+index 3d12da0..3a41c0f 100644
+--- a/app/src/main/AndroidManifest.xml
++++ b/app/src/main/AndroidManifest.xml
+@@ -1,6 +1,5 @@
+ <?xml version="1.0" encoding="utf-8"?>
+-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+-    package="nprime.reg.sbi.face">
++<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+ 
+     <uses-permission android:name="android.permission.INTERNET" />
+     <uses-permission android:name="android.permission.CAMERA" />
+@@ -13,6 +12,7 @@
+         android:supportsRtl="true"
+         android:theme="@style/NPrimeTheme">
+         <activity android:name="nprime.reg.sbi.googlevision.CameraActivity"/>
++        <activity android:name="nprime.reg.sbi.googlevision.NativePadCameraActivity" android:exported="false"/>
+         <activity android:name="nprime.reg.sbi.mds.DeviceMain" />
+         <activity android:name="nprime.reg.sbi.faceCaptureApi.FaceCaptureActivity" />
+         <activity android:name=".MainActivity">
+diff --git a/app/src/main/java/nprime/reg/sbi/face/MainActivity.java b/app/src/main/java/nprime/reg/sbi/face/MainActivity.java
+index 226edf0..2d2bed2 100644
+--- a/app/src/main/java/nprime/reg/sbi/face/MainActivity.java
++++ b/app/src/main/java/nprime/reg/sbi/face/MainActivity.java
+@@ -386,11 +386,15 @@ public class MainActivity extends AppCompatActivity {
+ 			qualityThreshold = captureReqDetailDto.requestedScore;
+ 		}*/
+ 
++        if (captureReqDto.mosipBioRequest != null && !captureReqDto.mosipBioRequest.isEmpty()) {
++            qualityThreshold = Math.max(0, Math.min(100, captureReqDto.mosipBioRequest.get(0).requestedScore));
++        }
+         captureTimeout = captureReqDto.timeout;
+ 
+         Logger.d(DeviceConstants.LOG_TAG, "Inside Method, invokeCaptureCompressEncryptSign. Timeout : " + captureTimeout + " Requested Quality Score : " + qualityThreshold);
+-        Intent intent = new Intent(this, CameraActivity.class);
++        Intent intent = new Intent(this, nprime.reg.sbi.googlevision.NativePadCameraActivity.class);
+         intent.putExtra("CaptureTimeout", captureTimeout);
++        intent.putExtra("FacePadTransactionId", captureReqDto.transactionId);
+         intent.putExtra("QualityThreshold", qualityThreshold);
+         startActivityForResult(intent, captureRequestType);
+         //fcResult = invokeFaceCapture(captureTimeout, qualityThreshold);
+@@ -431,6 +435,7 @@ public class MainActivity extends AppCompatActivity {
+                             FaceCaptureResult captureResult = new FaceCaptureResult();
+                             //captureResult.setCapturedImage(bmpPhoto);
+                             captureResult.setIsoFaceRecord(data.getByteArrayExtra("IsoFaceRecord"));
++                            captureResult.setFacePadEvidence(data.getStringExtra("FacePadEvidence"));
+                             captureResult.setStatus(data.getIntExtra("Status", FaceCaptureResult.CAPTURE_CANCELLED));
+                             captureResult.setQualityScore(data.getIntExtra("Quality", 0));
+ 
+@@ -452,6 +457,7 @@ public class MainActivity extends AppCompatActivity {
+             }else{
+                 FaceCaptureResult captureResult = new FaceCaptureResult();
+                 captureResult.setIsoFaceRecord(data.getByteArrayExtra("IsoFaceRecord"));
++                            captureResult.setFacePadEvidence(data.getStringExtra("FacePadEvidence"));
+                 captureResult.setStatus(data.getIntExtra("Status", FaceCaptureResult.CAPTURE_CANCELLED));
+                 captureResult.setQualityScore(data.getIntExtra("Quality", 0));
+ 
+@@ -472,6 +478,7 @@ public class MainActivity extends AppCompatActivity {
+                             FaceCaptureResult captureResult = new FaceCaptureResult();
+                             //captureResult.setCapturedImage(bmpPhoto);
+                             captureResult.setIsoFaceRecord(data.getByteArrayExtra("IsoFaceRecord"));
++                            captureResult.setFacePadEvidence(data.getStringExtra("FacePadEvidence"));
+                             captureResult.setStatus(data.getIntExtra("Status", FaceCaptureResult.CAPTURE_CANCELLED));
+                             captureResult.setQualityScore(data.getIntExtra("Quality", 0));
+ 
+diff --git a/app/src/main/java/nprime/reg/sbi/faceCaptureApi/FaceCaptureResult.java b/app/src/main/java/nprime/reg/sbi/faceCaptureApi/FaceCaptureResult.java
+index 17c8ef5..a430f7f 100644
+--- a/app/src/main/java/nprime/reg/sbi/faceCaptureApi/FaceCaptureResult.java
++++ b/app/src/main/java/nprime/reg/sbi/faceCaptureApi/FaceCaptureResult.java
+@@ -4,6 +4,10 @@ import android.graphics.Bitmap;
+ 
+ public class FaceCaptureResult
+ {
++    private String facePadEvidence;
++    public String getFacePadEvidence() { return facePadEvidence; }
++    public void setFacePadEvidence(String value) { facePadEvidence=value; }
++
+ 	public static final int	CAPTURE_SUCCESS = 0;
+ 	public static final int CAPTURE_STARTED = 1;
+ 	public static final int	CAPTURE_COMPLETED = 2;
+diff --git a/app/src/main/java/nprime/reg/sbi/scanner/ResponseGenerator/ResponseGenHelper.java b/app/src/main/java/nprime/reg/sbi/scanner/ResponseGenerator/ResponseGenHelper.java
+index 2e0c954..6e1aa4b 100644
+--- a/app/src/main/java/nprime/reg/sbi/scanner/ResponseGenerator/ResponseGenHelper.java
++++ b/app/src/main/java/nprime/reg/sbi/scanner/ResponseGenerator/ResponseGenHelper.java
+@@ -733,7 +733,10 @@ public class ResponseGenHelper
+ 			String certStr =  java.util.Base64.getEncoder().encodeToString(certificate.getEncoded());
+ 
+ 			String enCodedHeader =  java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(mdCommonDeviceAPI.getHeaderfromCert(certStr));//.replace("=", "");
+-			String enCodedPayload = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(oB.writeValueAsBytes(data));//.replace("=", "");
++			Map<String,Object> signedPayload=oB.convertValue(data,Map.class);
++            if(fcResult.getFacePadEvidence()!=null)
++                signedPayload.put("facePad",oB.readValue(fcResult.getFacePadEvidence(),Map.class));
++            String enCodedPayload = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(oB.writeValueAsBytes(signedPayload));
+ 			byte [] inSignString = (enCodedHeader + "." + enCodedPayload).getBytes();
+ 
+ 			byte[] signature = "".getBytes();
+diff --git a/build.gradle b/build.gradle
+index 600c7b6..6ab5345 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -5,7 +5,7 @@ buildscript {
+         mavenCentral()
+     }
+     dependencies {
+-        classpath "com.android.tools.build:gradle:4.2.1"
++        classpath "com.android.tools.build:gradle:8.3.2"
+ 
+         // NOTE: Do not place your application dependencies here; they belong
+         // in the individual module build.gradle files

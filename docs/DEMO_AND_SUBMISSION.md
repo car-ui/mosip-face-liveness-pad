@@ -28,7 +28,7 @@ The submission guide also lists optional video, mockups, architecture diagrams, 
 
 - Complete the unresolved mandatory requirements in `REQUIREMENTS_MATRIX.md`, particularly official Desktop/Android capture gates and physical L1 integration.
 - Run and record a consented, representative attack evaluation with fixed thresholds and separate test participants.
-- Resolve the provenance/distribution terms of inherited sample images and the landmark asset. Replace any fixture whose rights cannot be established.
+- Retain the NASA fixture attribution, official landmark/model provenance, runtime notices and upstream client licenses. Review the reference SBI's inherited bundled JAR terms before distributing its APK.
 - Verify a clean extraction/install, model checksums, Python tests, Java checks, and CI results for the submitted commit.
 - Record a 2-5 minute demo if submitting video. Play the full export, inspect its start/end, and check that captions and any links work.
 - Add the actual team name/members and institution details to the final private submission material.
