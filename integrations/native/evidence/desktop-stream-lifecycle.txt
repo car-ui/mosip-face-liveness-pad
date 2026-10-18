@@ -1,0 +1,4 @@
+PASS actual Streamer preview on JavaFX thread and exact JPEG cache with defensive copy
+PASS camera replacement survives delayed EOF from the previous reader
+PASS stop closes camera and clears cached image/bytes
+Evidence scope: actual upstream Streamer and JavaFX ImageView; synthetic JPEG, no physical camera or full client UI
