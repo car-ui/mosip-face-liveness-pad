@@ -24,17 +24,45 @@ index 45403104ff..08c9c7e50e 100644
  		if (match && isPacketAuth) {
  			addOperatorBiometrics(biometrics, isReviewer);
 diff --git a/registration/registration-client/src/main/java/io/mosip/registration/controller/device/BiometricsController.java b/registration/registration-client/src/main/java/io/mosip/registration/controller/device/BiometricsController.java
-index 6e8fae980b..a3eb350bdb 100644
+index 6e8fae980b..67c3aefbdd 100644
 --- a/registration/registration-client/src/main/java/io/mosip/registration/controller/device/BiometricsController.java
 +++ b/registration/registration-client/src/main/java/io/mosip/registration/controller/device/BiometricsController.java
-@@ -1096,6 +1096,10 @@ public class BiometricsController extends BaseController /* implements Initializ
- 						return;
- 					}
+@@ -1285,7 +1285,11 @@ public class BiometricsController extends BaseController /* implements Initializ
+ 		LOGGER.debug(LOG_REG_BIOMETRIC_CONTROLLER, APPLICATION_NAME, APPLICATION_ID,
+ 				"exceptionBioAttributes passed to mock/real MDM >>> " + exceptionBioAttributes);
  
-+                    if (isFace(currentModality) || isExceptionPhoto(currentModality)) {
-+                        io.mosip.facepad.DesktopPadCheckpoint.requireClear(mdsCapturedBiometricsList,
-+                                getRegistrationDTOFromSession() == null);
-+                    }
- 					LOGGER.debug("Started local de-dup validation");// validate local de-dup check
- 					if(identifyInLocalGallery(mdsCapturedBiometricsList,
- 							Biometric.getSingleTypeByModality(isFace(currentModality) || isExceptionPhoto(currentModality) ?
+-		return bioService.captureModality(mdmRequestDto);
++        List<BiometricsDto> candidates = bioService.captureModality(mdmRequestDto);
++        if (isFace(modality) || isExceptionPhoto(modality)) {
++            io.mosip.facepad.DesktopPadCheckpoint.requireClear(candidates, true);
++        }
++        return candidates;
+ 
+ 	}
+ 
+diff --git a/registration/registration-client/src/main/java/io/mosip/registration/controller/device/GenericBiometricsController.java b/registration/registration-client/src/main/java/io/mosip/registration/controller/device/GenericBiometricsController.java
+index e3e0bf37d1..cac7dc6996 100644
+--- a/registration/registration-client/src/main/java/io/mosip/registration/controller/device/GenericBiometricsController.java
++++ b/registration/registration-client/src/main/java/io/mosip/registration/controller/device/GenericBiometricsController.java
+@@ -752,7 +752,7 @@ public class GenericBiometricsController extends BaseController {
+ 		return isValid;
+ 	}
+ 
+-	private List<BiometricsDto> rCapture(String fieldId, Modality modality) throws RegBaseCheckedException {
++	private List<BiometricsDto> rCapture(String fieldId, Modality modality) throws RegBaseCheckedException, IOException {
+ 		LOGGER.info("Finding exception bio attributes");
+ 		List<String> exceptionBioAttributes = new LinkedList<>();
+ 		int count = 1;
+@@ -777,7 +777,11 @@ public class GenericBiometricsController extends BaseController {
+ 				io.mosip.registration.context.ApplicationContext.getStringValueFromApplicationMap(
+ 						RegistrationConstants.SERVER_ACTIVE_PROFILE),
+ 				Integer.valueOf(getCaptureTimeOut()), count, (int) bioService.getMDMQualityThreshold(modality));
+-		return bioService.captureModality(mdmRequestDto);
++        List<BiometricsDto> candidates = bioService.captureModality(mdmRequestDto);
++        if (isFace(modality) || isExceptionPhoto(modality)) {
++            io.mosip.facepad.DesktopPadCheckpoint.requireClear(candidates, false);
++        }
++        return candidates;
+ 
+ 	}
+ 

@@ -51,9 +51,25 @@ jobs:
         javac --release 8 -d output/local/java src/java_integration/*.java tests/java/NativeCaptureGateTest.java
         java -cp output/local/java NativeCaptureGateTest
 
+    - name: Set up desktop native runtime
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '11'
+
+    - name: Check actual Java ONNX inference and rejection
+      shell: bash
+      run: |
+        mkdir -p output/local/native-deps
+        curl --fail --location --retry 3 https://repo.maven.apache.org/maven2/com/microsoft/onnxruntime/onnxruntime/1.30.0/onnxruntime-1.30.0.jar -o output/local/native-deps/onnxruntime.jar
+        curl --fail --location --retry 3 https://repo.maven.apache.org/maven2/org/openpnp/opencv/4.5.3-4/opencv-4.5.3-4.jar -o output/local/native-deps/opencv.jar
+        python scripts/check_native_engine.py --java-home "$JAVA_HOME" --onnx-jar output/local/native-deps/onnxruntime.jar --opencv-jar output/local/native-deps/opencv.jar
+
     - name: Preserve test evidence
       if: always()
       uses: actions/upload-artifact@v4
       with:
         name: test-results-${{ matrix.os }}
-        path: output/local/test-results.xml
+        path: |
+          output/local/test-results.xml
+          output/local/native-check/native-engine-check.log

@@ -18,10 +18,12 @@
       ]
     },
     "desktop-controller-check.log": {
-      "sha256": "200f0a61f7139252d0a6e80f2550f2081c31f3a87ced3530137652b75fb90bfe",
+      "sha256": "20117318c6389b3582ee9b67449e638d690ef142354030dd81e99eeeb4135933",
       "results": [
         "PASS registration checkpoint rejects decoded blank ISO: NO_FACE",
+        "PASS upstream GenericBiometricsController rejects blank ISO before returning candidates for storage",
         "PASS upstream BaseController operator/supervisor rejection: captures=2, identityMatcherCalls=0",
+        "PASS high-passive-score portrait still rejected for operator/supervisor: ACTIVE_CHALLENGE_REQUIRED; identityMatcherCalls=0",
         "Evidence scope: synthetic ISO + actual upstream controller/model, no live UI or physical attack."
       ]
     }
@@ -30,5 +32,10 @@
   "native_ui_rejection": "NOT_TESTED",
   "physical_attacks": "DEFERRED_BY_USER",
   "active_challenge_integration": "NOT_CONNECTED_FAIL_CLOSED",
-  "identity_matcher": "TEST_DOUBLE_NOT_CALLED_AFTER_REJECTION"
+  "identity_matcher": "TEST_DOUBLE_NOT_CALLED_AFTER_REJECTION",
+  "desktop_paths": [
+    "GenericBiometricsController.rCapture: resident/exception photo",
+    "BiometricsController.rCapture: operator onboarding",
+    "BaseController.captureAndValidateFace: operator/supervisor"
+  ]
 }

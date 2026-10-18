@@ -2,7 +2,7 @@
 
 An offline research prototype for MOSIP Decode 2026, Problem 04. It processes camera frames, checks face quality and passive PAD, and asks for randomly selected facial actions when policy requires them. An attack, engine error, or failed challenge prevents the prototype from returning a captured image.
 
-The repository includes a local browser console, an OpenCV desktop demo, a mock device, workflow policies, an ONNX adapter, offline signed model updates, automated tests, and a portable Java capture gate. **This is not a completed integration into the official MOSIP Desktop or Android Registration Client.** Physical L1 hardware, native client acceptance paths, ISO conformance, and real presentation attack accuracy still need validation. See the [requirement-by-requirement evidence matrix](docs/REQUIREMENTS_MATRIX.md) before presenting coverage claims.
+The repository includes a local browser console, an OpenCV desktop demo, a mock device, workflow policies, an ONNX adapter, offline signed model updates, automated tests, and native client patches. The patched official desktop client compiles, and synthetic ISO captures are rejected inside its resident and authentication controllers. **Native integration remains incomplete.** Active evidence, live client UI flows, Android device execution, physical L1 hardware, ISO conformance, and real presentation attack accuracy still need validation. See the [requirement-by-requirement evidence matrix](docs/REQUIREMENTS_MATRIX.md) before presenting coverage claims.
 
 ## Run locally
 
@@ -63,6 +63,17 @@ For a private, independently collected test set:
 ```
 
 The [evaluation protocol](docs/EVALUATION_PROTOCOL.md) defines the manifest, denominators, attack groups, nonresponses, and limits. The older `test_photo_spoof_simulation.py` remains a developer-fixture experiment. Its figures must not be presented as human live-versus-spoof accuracy.
+
+## Build the native checkpoints
+
+The [native integration directory](integrations/native/README.md) contains small patches for exact official Android and desktop source commits, a shared Java ONNX engine, and platform-specific ISO decoding adapters. Apply them to a clean upstream checkout:
+
+```powershell
+python scripts/prepare_native_clients.py desktop path/to/registration-client
+python scripts/prepare_native_clients.py android path/to/android-registration-client
+```
+
+The desktop check runs before resident capture storage and operator/supervisor identity matching. Android checks before resident or operator-onboarding storage. Required active evidence is not connected to these adapters yet, so native operator/supervisor captures reject even when passive scores are high. The [native evidence report](integrations/native/validation.json) distinguishes actual upstream controller execution from live UI and physical attack testing.
 
 ## API and local security
 
