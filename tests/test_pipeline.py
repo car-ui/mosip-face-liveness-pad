@@ -122,38 +122,25 @@ def test_pipeline_definite_attack_rejected_even_when_active_enabled(controlled_a
     assert attack_rejected is True
 
 
-def test_pipeline_active_challenge_success_with_scripted_action():
-    """Verifies that an active challenge completes and reaches CAPTURE_SUCCESS upon valid action."""
-    device = MockL0Device(scenario=MockScenario.STATIC_PHOTO_ATTACK)
-    device.connect()
-
-    config = LivenessConfig()
-    config.resident_policy.passive_threshold = 0.95  # Forces active escalation
-    config.resident_policy.min_challenges = 1
-
-    pipeline = LivenessPipeline(config=config, workflow=WorkflowType.RESIDENT_REGISTRATION)
+def test_pipeline_accepts_explicitly_completed_challenge_double(controlled_pipeline, valid_frame):
+    """Exercise the completion transition, separately from real action inference."""
+    pipeline = controlled_pipeline
+    pipeline.policy.passive_threshold = 1.0
+    pipeline.policy.min_challenges = 1
     pipeline.reset()
-
-    # Step until active challenge starts
     for _ in range(30):
-        success, frame = device.read_frame()
-        res = pipeline.process_frame(frame)
-        if res.state == PipelineState.ACTIVE_CHALLENGE:
+        result = pipeline.process_frame(valid_frame)
+        if result.state == PipelineState.ACTIVE_CHALLENGE:
             break
-
     assert pipeline.state == PipelineState.ACTIVE_CHALLENGE
     challenge = pipeline.challenge_manager.active_challenge_state
     assert challenge is not None
-
-    # Manually mark the challenge completed to test pipeline transition
+    # This is a completion double, not a scripted or observed physical action.
     challenge.is_completed = True
-    success, frame = device.read_frame()
-    res = pipeline.process_frame(frame)
-
-    assert res.state == PipelineState.CAPTURE_SUCCESS
-    assert res.decision == LivenessDecision.PASSED
-    assert res.captured_face_image is not None
-    device.disconnect()
+    result = pipeline.process_frame(valid_frame)
+    assert result.state == PipelineState.CAPTURE_SUCCESS
+    assert result.decision == LivenessDecision.PASSED
+    assert result.captured_face_image is not None
 
 
 def test_pipeline_retry_exhaustion():

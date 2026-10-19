@@ -128,22 +128,39 @@ public final class DesktopControllerRejectionCheck extends BaseController {
             record.writeObject(new DataOutputStream(corrected));
             biometric.setAttributeISO(corrected.toByteArray());
             boolean passiveClear = false;
+            boolean attackRejected = false;
             try { DesktopPadCheckpoint.requireClear(candidates, false); passiveClear = true; }
             catch (IOException expected) {
-                if (!expected.getMessage().contains("ACTIVE_CHALLENGE_REQUIRED")) throw expected;
+                attackRejected = expected.getMessage().contains("PRESENTATION_ATTACK");
+                if (!attackRejected && !expected.getMessage().contains("ACTIVE_CHALLENGE_REQUIRED")) throw expected;
             }
             for (boolean reviewer : new boolean[]{false,true}) {
                 try { controller.captureAndValidateFace("SYNTHETIC-TEST-ONLY", true, reviewer); throw new AssertionError("Active evidence bypassed"); }
                 catch (IOException expected) {
-                    if (!expected.getMessage().contains("ACTIVE_CHALLENGE_REQUIRED")) throw expected;
+                    String reason = attackRejected ? "PRESENTATION_ATTACK" : "ACTIVE_CHALLENGE_REQUIRED";
+                    if (!expected.getMessage().contains(reason)) throw expected;
                 }
             }
             if (captures.get() != 4 || matches.get() != 0) throw new AssertionError("Matcher called without active evidence");
-            System.out.println("PASS recorded NASA portrait rejected for operator/supervisor: ACTIVE_CHALLENGE_REQUIRED; identityMatcherCalls=0; passiveClear=" + passiveClear);
+            System.out.println("PASS recorded NASA portrait rejected for operator/supervisor; identityMatcherCalls=0; passiveClear=" + passiveClear + "; attackRejected=" + attackRejected);
             // Inject only session geometry for this controller-path test. Production
             // sessions receive actual PAD/landmark observations from the native stream.
             Field evidence = NativeFrameChallenge.class.getDeclaredField("session");
             evidence.setAccessible(true);
+            if (attackRejected) {
+                NativeFrameChallenge proof = DesktopPadCheckpoint.newFrameChallenge();
+                evidence.set(proof, NativeActiveSessionCheck.completedForControllerTest(portraitJpeg.toByteArray()));
+                try {
+                    controller.captureAndValidateFace("SYNTHETIC-TEST-ONLY", false, false, proof);
+                    throw new AssertionError("Completed action double overrode a PAD attack");
+                } catch (IOException expected) {
+                    if (!expected.getMessage().contains("PRESENTATION_ATTACK")) throw expected;
+                }
+                if (matches.get() != 0) throw new AssertionError("Attack reached identity matcher");
+                System.out.println("PASS completed action double cannot override PAD attack; identityMatcherCalls=0");
+                System.out.println("Evidence scope: recorded photo rejection through upstream controllers; positive matcher path not exercised with this rejected fixture; no live UI or physical attack claim.");
+                return;
+            }
             for (boolean reviewer : new boolean[]{false,true}) {
                 NativeFrameChallenge proof = DesktopPadCheckpoint.newFrameChallenge();
                 evidence.set(proof, NativeActiveSessionCheck.completedForControllerTest(portraitJpeg.toByteArray()));

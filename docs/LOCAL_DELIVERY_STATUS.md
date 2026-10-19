@@ -80,3 +80,15 @@ Windows directory junctions to D:/CodexWork/native-face-pad-20261018/workspace-m
 and workspace-git. Paths in the checkout still work. The unused broken .venv was
 preserved on D: as preserved-broken-workspace-venv. The supported launcher uses
 the separate working D: Python environment. Repository connectivity was checked.
+
+
+Latest validation after resource recovery: all 165 Python tests passed in 16.51
+seconds. The completion-transition test now uses explicit controlled inputs,
+instead of relying on a real detector and timed gate inside a fixed frame loop.
+The native action test also passed after recompiling the final source. Desktop
+controller checks subsequently passed on the new detector. Blank ISO captures
+were rejected before storage, operator/supervisor rejection made zero matcher
+calls, and a completed action double could not override the recorded portrait's
+PAD attack verdict. This fixture no longer exercises positive matcher acceptance.
+See native-yunet-controller-check.json. Earlier resource failures remain in logs;
+Android rebuilds, physical attack accuracy and live client UI remain unverified.

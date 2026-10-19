@@ -44,3 +44,15 @@ Do not repeat resource-heavy builds until headroom is available. Do not claim
 old APKs contain this milestone. Model files and Git storage are now junctions
 to workspace-models and workspace-git under the D: artifact root. The old broken
 .venv is preserved there as preserved-broken-workspace-venv. No remote push.
+
+
+Latest validation after resource recovery: all 165 Python tests passed in 16.51
+seconds. The completion-transition test now uses explicit controlled inputs,
+instead of relying on a real detector and timed gate inside a fixed frame loop.
+The native action test also passed after recompiling the final source. Desktop
+controller checks subsequently passed on the new detector. Blank ISO captures
+were rejected before storage, operator/supervisor rejection made zero matcher
+calls, and a completed action double could not override the recorded portrait's
+PAD attack verdict. This fixture no longer exercises positive matcher acceptance.
+See native-yunet-controller-check.json. Earlier resource failures remain in logs;
+Android rebuilds, physical attack accuracy and live client UI remain unverified.
