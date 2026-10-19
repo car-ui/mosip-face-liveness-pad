@@ -17,6 +17,8 @@ from ..devices.mock_l0_device import MockL0Device
 from ..core.pipeline import LivenessPipeline, PipelineState, PipelineStepResult
 from ..core.config import WorkflowType, LivenessConfig, PADMode, ChallengeType, LivenessDecision
 from ..core.enrollment import ResidentEnrollmentManager, EnrollmentStage
+from ..core.presentation import ACTION_INSTRUCTIONS, stage_progress, stable_prompt
+from ..core.policy_store import PolicyStore
 
 
 class DesktopRegistrationClient:
@@ -30,6 +32,8 @@ class DesktopRegistrationClient:
         available = Path(model).is_file()
         self.config = LivenessConfig(onnx_model_path=model if available else None,
             pad_mode=PADMode(os.environ.get("MOSIP_PAD_MODE", "ONNX" if available or "MOSIP_PAD_MODEL" in os.environ else "HEURISTIC")))
+        if os.environ.get("MOSIP_PAD_POLICY_FILE"):
+            self.config = PolicyStore(os.environ["MOSIP_PAD_POLICY_FILE"]).load(self.config)
         self.workflow = initial_workflow
         self.pipeline = LivenessPipeline(self.config, self.workflow)
         self.enrollment_manager = ResidentEnrollmentManager(default_resident_id=resident_id)
@@ -53,19 +57,16 @@ class DesktopRegistrationClient:
         challenge = result.active_challenge
         if result.state != PipelineState.ACTIVE_CHALLENGE or challenge is None:
             self._prompt_key = None
+            if result.state == PipelineState.PASSIVE_LIVENESS:
+                if result.restart_count:
+                    return "Rechecking liveness", "Previous actions cleared. New instructions will follow."
+                return "Checking liveness", "Face the camera with a relaxed expression."
             if result.state == PipelineState.ATTACK_REJECTED and result.pad_result is not None:
                 return "Could not verify liveness", (
                     f"Model score {result.pad_result.liveness_score:.3f}; "
                     f"cutoff {self.config.pad_attack_rejection_threshold:.3f}. Press R for a new trial.")
-            return result.status_text, result.detailed_guidance
-        titles = {
-            ChallengeType.BLINK: "Blink once, then open your eyes",
-            ChallengeType.SMILE: "Smile naturally",
-            ChallengeType.TURN_LEFT: "Turn slightly to YOUR LEFT, then face camera",
-            ChallengeType.TURN_RIGHT: "Turn slightly to YOUR RIGHT, then face camera",
-            ChallengeType.LOOK_UP: "Look slightly up, then face camera",
-            ChallengeType.LOOK_DOWN: "Look slightly down, then face camera",
-        }
+            return stable_prompt(result), result.detailed_guidance
+        titles = ACTION_INSTRUCTIONS
         key = (self.pipeline.session_id, challenge.challenge, challenge.start_time)
         now = time.monotonic()
         if key != self._prompt_key or now - self._prompt_changed_at >= 1.0:
@@ -79,6 +80,10 @@ class DesktopRegistrationClient:
         if preparing:
             return "Get ready: " + title, "Face camera first. Action starts in a moment."
         return title, f"{self._prompt_detail}  {remaining}s"
+
+    def _stage_progress(self, result):
+        """Only verified actions advance this bar; pose and model scores do not."""
+        return stage_progress(result)
 
     def toggle_device(self):
         """Switches dynamically between Physical Webcam and Mock L0 Simulator."""
@@ -379,18 +384,20 @@ class DesktopRegistrationClient:
         # Capsule Progress Bar inside Action Card
         bar_x = c_x1 + 56
         bar_y = c_y1 + 78
-        bar_w = 550
+        bar_w = 475
         bar_h = 10
         # Track
         self._draw_rounded_rect(canvas, (bar_x, bar_y), (bar_x + bar_w, bar_y + bar_h),
                                 (35, 42, 55), radius=5, alpha=1.0)
         # Fill
-        fill_w = int(bar_w * max(0.04, min(1.0, result.progress)))
-        self._draw_rounded_rect(canvas, (bar_x, bar_y), (bar_x + fill_w, bar_y + bar_h),
-                                theme_accent, radius=5, alpha=1.0)
-        # Percentage label
-        pct_text = f"{int(result.progress * 100)}%"
-        cv2.putText(canvas, pct_text, (bar_x + bar_w + 12, bar_y + 9),
+        stage_progress, stage_label = self._stage_progress(result)
+        fill_w = int(bar_w * stage_progress)
+        if fill_w > 0:
+            self._draw_rounded_rect(canvas, (bar_x, bar_y), (bar_x + fill_w, bar_y + bar_h),
+                                    theme_accent, radius=5, alpha=1.0)
+        # Completed-action count, not a confidence percentage.
+        progress_label = "Complete" if stage_label == "Done" else f"Actions {stage_label}"
+        cv2.putText(canvas, progress_label, (bar_x + bar_w + 12, bar_y + 9),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.38, (180, 190, 210), 1, cv2.LINE_AA)
 
         # FPS calculation
@@ -552,7 +559,8 @@ class DesktopRegistrationClient:
                         decision=LivenessDecision.IN_PROGRESS,
                         status_text="Camera settling",
                         detailed_guidance="Face the camera. Verification starts in a moment.",
-                        progress=0.0, max_retries=self.pipeline.policy.max_retries)
+                        progress=0.0, max_retries=self.pipeline.policy.max_retries,
+                        required_actions=self.pipeline.policy.min_challenges)
                 else:
                     result = self.pipeline.process_frame(frame)
                 

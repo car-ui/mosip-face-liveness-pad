@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "updates": [
+    {
+      "liveness_enabled": true,
+      "guidance_messages": {},
+      "workflow": "RESIDENT_REGISTRATION",
+      "passive_threshold": 0.82,
+      "min_challenges": 1,
+      "challenge_timeout": 12.0,
+      "max_retries": 3,
+      "pad_mode": "ONNX",
+      "active_liveness_enabled": true,
+      "require_active_challenges": false,
+      "supported_challenges": [
+        "BLINK",
+        "SMILE",
+        "TURN_LEFT",
+        "TURN_RIGHT"
+      ]
+    },
+    {
+      "liveness_enabled": true,
+      "guidance_messages": {},
+      "workflow": "OPERATOR_AUTHENTICATION",
+      "passive_threshold": 0.88,
+      "min_challenges": 2,
+      "challenge_timeout": 12.0,
+      "max_retries": 2,
+      "pad_mode": "ONNX",
+      "active_liveness_enabled": true,
+      "require_active_challenges": true,
+      "supported_challenges": [
+        "BLINK",
+        "SMILE",
+        "TURN_LEFT",
+        "TURN_RIGHT"
+      ]
+    },
+    {
+      "liveness_enabled": true,
+      "guidance_messages": {},
+      "workflow": "SUPERVISOR_AUTHENTICATION",
+      "passive_threshold": 0.92,
+      "min_challenges": 2,
+      "challenge_timeout": 12.0,
+      "max_retries": 2,
+      "pad_mode": "ONNX",
+      "active_liveness_enabled": true,
+      "require_active_challenges": true,
+      "supported_challenges": [
+        "BLINK",
+        "SMILE",
+        "TURN_LEFT",
+        "TURN_RIGHT"
+      ]
+    }
+  ]
+}

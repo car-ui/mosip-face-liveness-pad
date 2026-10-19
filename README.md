@@ -33,7 +33,7 @@ On Linux or macOS, use `.venv/bin/python` instead. Linux desktop OpenCV may also
 
 Open [the local verification console](http://127.0.0.1:4501). The default source is a simulator. Select a scenario and choose **Start verification**. Select **Physical webcam** explicitly for camera use. A disconnected camera produces an error rather than switching silently to simulated success.
 
-The console provides positioning guidance, progress, active prompts, retry messages, device diagnostics, and policy settings. Diagnostic controls apply to the selected workflow. Settings are held in memory and reset when the service restarts.
+The console provides positioning guidance, progress, active prompts, retry messages, device diagnostics, and policy settings. Diagnostic controls apply to the selected workflow. Settings are in memory by default. Set `MOSIP_PAD_POLICY_FILE` to enable validated offline persistence; see [the policy guide](docs/OFFLINE_POLICY.md).
 
 For the separate OpenCV desktop demo:
 

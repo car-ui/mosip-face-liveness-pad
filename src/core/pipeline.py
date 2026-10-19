@@ -66,6 +66,9 @@ class PipelineStepResult:
     can_retry: bool = True
     current_retry: int = 0
     max_retries: int = 3
+    completed_actions: int = 0
+    required_actions: int = 0
+    restart_count: int = 0
 
 
 class LivenessPipeline:
@@ -106,6 +109,8 @@ class LivenessPipeline:
         self._multiple_faces_since = None
         self.pad_gate = SessionPADGate()
         self._pad_score_trace = deque(maxlen=60)
+        self._restart_count = 0
+        self._recovery_until = 0.0
 
     def set_workflow(self, workflow: WorkflowType) -> None:
         self.workflow = workflow
@@ -128,6 +133,8 @@ class LivenessPipeline:
         self._multiple_faces_since = None
         self.pad_gate.reset()
         self._pad_score_trace.clear()
+        self._restart_count = 0
+        self._recovery_until = 0.0
         
         self.audit_logger.log_event(
             AuditEventType.CAPTURE_STARTED,
@@ -172,6 +179,9 @@ class LivenessPipeline:
                     progress=0.0, can_retry=False,
                 )
             result = self._process_frame(frame)
+            result.completed_actions = len(self.challenge_manager.completed_challenges)
+            result.required_actions = self.policy.min_challenges
+            result.restart_count = self._restart_count
             if result.state.value in self.config.guidance_messages:
                 result.detailed_guidance = self.config.guidance_messages[result.state.value]
             if result.state in (PipelineState.ATTACK_REJECTED, PipelineState.MAX_RETRIES_EXCEEDED,
@@ -190,6 +200,16 @@ class LivenessPipeline:
                 detailed_guidance="Restart capture. If this continues, check the device and liveness engine.",
                 progress=0.0, error_code=BiometricErrorCode.INVALID_FRAME, can_retry=False,
             )
+
+    def _record_restart(self, reason):
+        if time.monotonic() < self._recovery_until:
+            return
+        self._restart_count += 1
+        self._recovery_until = time.monotonic() + 2.0
+        self.audit_logger.log_event(
+            AuditEventType.VERIFICATION_RESTARTED, session_id=self.session_id,
+            workflow=self.workflow.value,
+            details={"reason": reason, "restart_count": self._restart_count})
 
     def _process_frame(self, frame: VideoFrame) -> PipelineStepResult:
         # 0. Frame Validation
@@ -252,6 +272,7 @@ class LivenessPipeline:
                     self.challenge_manager.active_challenge_state = None
                     now = time.monotonic()
                     if self._multiple_faces_since is None:
+                        self._record_restart("Face count uncertain; previous actions invalidated")
                         self._multiple_faces_since = now
                     if now - self._multiple_faces_since < 0.75:
                         return PipelineStepResult(
@@ -261,6 +282,7 @@ class LivenessPipeline:
                             progress=0.0, quality=quality,
                             current_retry=self.challenge_manager.current_retry,
                             max_retries=self.policy.max_retries)
+                self._record_restart(quality.error_message or "Quality interrupted")
                 self.audit_logger.log_event(
                     AuditEventType.ACTIVE_CHALLENGE_FAILED,
                     session_id=self.session_id, workflow=self.workflow.value,
@@ -344,6 +366,8 @@ class LivenessPipeline:
         self._pad_score_trace.append(pad_result.liveness_score)
         evidence = self.pad_gate.observe(pad_result.verdict, time.monotonic())
         if evidence.state != EvidenceState.CLEAR:
+            if self.state == PipelineState.ACTIVE_CHALLENGE and evidence.state == EvidenceState.COLLECTING:
+                self._record_restart("PAD observation changed; previous actions invalidated")
             self.temporal_buffer.clear()
             self._passive_frames_analyzed = 0
             self.challenge_manager.completed_challenges.clear()
@@ -366,6 +390,14 @@ class LivenessPipeline:
                     max_retries=self.policy.max_retries)
             # A confirmed rejection follows the existing terminal path below.
             self.state = PipelineState.PASSIVE_LIVENESS
+        elif time.monotonic() < self._recovery_until:
+            return PipelineStepResult(
+                state=self.state, decision=LivenessDecision.IN_PROGRESS,
+                status_text="Rechecking liveness",
+                detailed_guidance="Previous actions cleared. New instructions will follow.",
+                progress=0.0, quality=quality, pad_result=pad_result,
+                current_retry=self.challenge_manager.current_retry,
+                max_retries=self.policy.max_retries)
         if self.state == PipelineState.PASSIVE_LIVENESS:
 
             # Update temporal sliding buffer
@@ -400,9 +432,9 @@ class LivenessPipeline:
                     details={
                         "attack_type": pad_result.attack_type,
                         "liveness_score": pad_result.liveness_score,
-                        "confirmation_frames": evidence.attack_frames,
+                        "observation_count": evidence.attack_frames,
                         "confirmation_min_seconds": self.pad_gate.attack_seconds,
-                        "recent_frame_scores": list(self._pad_score_trace),
+                        "recent_scores": list(self._pad_score_trace),
                         "mode": pad_result.mode_used,
                         "model_provenance": meta_dict
                     }

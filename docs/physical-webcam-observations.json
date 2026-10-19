@@ -1,0 +1,43 @@
+{
+  "scope": "User-observed L0 physical webcam prototype trials. One participant, uncontrolled conditions; not a PAD accuracy estimate, identity authentication, or official MOSIP-client test.",
+  "sourceCommit": "2ac8c92c4fb040d9bcdc46473fdeef0f1d9594f3",
+  "date": "2026-10-19",
+  "sourceLogSha256": "c05ab5eb7d0471e4ce3a3fd539ac024ed6c31f1be9be44491fcddf7c6a3a4d38",
+  "hashLinkedEvents": 16,
+  "imagesIncluded": false,
+  "trials": [
+    {
+      "trial": 1,
+      "outcome": "PAD_ATTACK_DETECTED",
+      "completedActions": [],
+      "activeSequencesStarted": 2,
+      "elapsedSeconds": 21.821
+    },
+    {
+      "trial": 2,
+      "outcome": "CAPTURE_SUCCESS",
+      "completedActions": [
+        "TURN_LEFT",
+        "BLINK"
+      ],
+      "activeSequencesStarted": 3,
+      "elapsedSeconds": 28.862
+    },
+    {
+      "trial": 3,
+      "outcome": "CAPTURE_SUCCESS",
+      "completedActions": [
+        "TURN_RIGHT",
+        "TURN_LEFT"
+      ],
+      "activeSequencesStarted": 1,
+      "elapsedSeconds": 18.698
+    }
+  ],
+  "limitations": [
+    "One rejection followed by two accepted trials; repeated user resets occurred.",
+    "Some sessions restarted active sequences before reaching a terminal outcome.",
+    "The score history keys were filtered by the audit sanitizer in this version, so no complete score trace can be reconstructed.",
+    "No physical print or screen-replay attack was tested."
+  ]
+}

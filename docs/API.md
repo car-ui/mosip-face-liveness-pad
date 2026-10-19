@@ -15,7 +15,7 @@ Browser mutations also require an allowed origin when the `Origin` header is pre
 | `GET /` | Same-origin evaluator console | HTML, ephemeral token, no-store |
 | `GET /info` | Device and model capabilities | Device ID, status, security level, simulation flag, engine mode, `NOT_CERTIFIED` |
 | `GET /stream` | MJPEG positioning preview | Multipart JPEG; never advances pipeline decisions |
-| `GET /status` | Current guidance and progress | State, prompt, progress, retry counters; no images |
+| `GET /status` | Current guidance and progress | State, stable prompt, completed-action progress, restart and retry counters; no images |
 | `GET /configuration` | Current nonsecret policy settings | Global settings and all workflow profiles |
 | `GET /metrics` | Anonymous counters for this process | Session counts, outcomes, mean capture/challenge duration, retry/failure rate |
 | `POST /capture` | Start exclusive verification session | Success with application JPEG, or empty biometrics on failure |
@@ -28,7 +28,7 @@ Browser mutations also require an allowed origin when the `Origin` header is pre
 {"workflow":"OPERATOR_AUTHENTICATION","timeout_seconds":30}
 ```
 
-Workflows are `RESIDENT_REGISTRATION`, `OPERATOR_AUTHENTICATION`, and `SUPERVISOR_AUTHENTICATION`. `timeout_seconds` is an integer from 2 to 60. An optional `resident_id` is returned to the requesting client and is not an authentication identity or a log field.
+Workflows are `RESIDENT_REGISTRATION`, `OPERATOR_AUTHENTICATION`, and `SUPERVISOR_AUTHENTICATION`. `timeout_seconds` defaults to 45 seconds and accepts integers from 2 to 60. An optional `resident_id` is returned to the requesting client and is not an authentication identity or a log field.
 
 Success returns `responseStatus: SUCCESS`, `decision: PASSED`, `simulation`, `identityMatchPerformed: false`, and one `biometrics` item containing `specVersion: APPLICATION_JPEG`, Base64 `data`, `mimeType: image/jpeg`, `tokenHash`, `livenessVerified`, and the actual passive confidence. `tokenHash` is SHA-256 over the decoded JPEG bytes. It is an integrity digest, not a digital signature or a face template. Telemetry contains actual workflow, duration, completed actions, mode, and model provenance. Success in simulation remains explicitly simulated.
 
@@ -51,7 +51,7 @@ Failure returns `biometrics: []` and a safe explanation. The caller must inspect
 }
 ```
 
-`pad_mode` accepts `AUTO`, `HEURISTIC`, or `ONNX`. Strict ONNX mode rejects a missing or failing model. Global `liveness_enabled: false` prevents verified capture rather than labeling an unchecked image as verified. Required active challenges cannot coexist with active verification disabled. Guidance keys must be pipeline state names and values are limited to 300 characters. Unknown fields, devices, scenarios, and modes are rejected, not silently replaced with a live simulator. Configuration is in memory and resets on service restart.
+`pad_mode` accepts `AUTO`, `HEURISTIC`, or `ONNX`. Strict ONNX mode rejects a missing or failing model. Global `liveness_enabled: false` prevents verified capture rather than labeling an unchecked image as verified. Required active challenges cannot coexist with active verification disabled. Guidance keys must be pipeline state names and values are limited to 300 characters. Unknown fields, devices, scenarios, and modes are rejected, not silently replaced with a live simulator. Configuration is in memory by default. With `MOSIP_PAD_POLICY_FILE`, accepted configuration changes are saved atomically and loaded on restart. Failed saves retain the running policy. See [offline policies](OFFLINE_POLICY.md).
 
 ## Device selection example
 

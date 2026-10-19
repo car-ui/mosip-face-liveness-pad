@@ -1,6 +1,5 @@
 """Loopback research API. This service is not a certified MOSIP SBI implementation."""
 import base64
-import copy
 import hashlib
 import os
 import secrets
@@ -17,7 +16,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.trustedhost import TrustedHostMiddleware
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..devices.base import DeviceType, MockScenario, VendorL1Adapter
 from ..devices.webcam_device import WebcamCaptureDevice
@@ -25,16 +24,22 @@ from ..devices.mock_l0_device import MockL0Device
 from ..core.pipeline import LivenessPipeline, PipelineState
 from ..core.config import LivenessConfig, WorkflowType, PADMode, ChallengeType
 from ..core.metrics import OperationalMetrics
+from ..core.presentation import stage_progress, stable_prompt
+from ..core.policy_store import PolicyUpdate, PolicyStore, apply_update
 
 API_TOKEN = os.environ.get("MOSIP_MDS_API_TOKEN") or secrets.token_urlsafe(32)
 device = MockL0Device()
 _packaged_model = Path(__file__).resolve().parents[2] / "assets/models/minifasnet_v2.onnx"
 _model_path = os.environ.get("MOSIP_PAD_MODEL", str(_packaged_model))
 _model_present = Path(_model_path).is_file()
-pipeline = LivenessPipeline(LivenessConfig(
+_runtime_config = LivenessConfig(
     onnx_model_path=_model_path if _model_present else None,
     pad_mode=PADMode(os.environ.get("MOSIP_PAD_MODE", "ONNX" if _model_present or "MOSIP_PAD_MODEL" in os.environ else "HEURISTIC")),
-))
+)
+_policy_store = PolicyStore(os.environ["MOSIP_PAD_POLICY_FILE"]) if os.environ.get("MOSIP_PAD_POLICY_FILE") else None
+if _policy_store:
+    _runtime_config = _policy_store.load(_runtime_config)
+pipeline = LivenessPipeline(_runtime_config)
 metrics = OperationalMetrics()
 _device_lock = threading.RLock()
 _capture_lock = threading.Lock()
@@ -87,28 +92,10 @@ class StrictRequest(BaseModel):
 class CaptureRequest(StrictRequest):
     workflow: str = "RESIDENT_REGISTRATION"
     resident_id: Optional[str] = Field(default=None, max_length=64)
-    timeout_seconds: int = Field(default=15, ge=2, le=60)
+    timeout_seconds: int = Field(default=45, ge=2, le=60)
 
 
-class ConfigureRequest(StrictRequest):
-    liveness_enabled: Optional[bool] = None
-    guidance_messages: Optional[dict[str, str]] = Field(default=None, max_length=16)
-    workflow: WorkflowType = WorkflowType.RESIDENT_REGISTRATION
-    passive_threshold: Optional[float] = Field(default=None, ge=0.46, le=0.99)
-    min_challenges: Optional[int] = Field(default=None, ge=1, le=5)
-    challenge_timeout: Optional[float] = Field(default=None, ge=2, le=30)
-    max_retries: Optional[int] = Field(default=None, ge=0, le=5)
-    pad_mode: Optional[PADMode] = None
-    active_liveness_enabled: Optional[bool] = None
-    require_active_challenges: Optional[bool] = None
-    supported_challenges: Optional[list[ChallengeType]] = Field(default=None, min_length=1, max_length=6)
-
-    @field_validator("guidance_messages")
-    @classmethod
-    def valid_guidance(cls, value):
-        if value is not None and any(k not in {s.value for s in PipelineState} or len(v) > 300 for k, v in value.items()):
-            raise ValueError("Use pipeline state names and guidance of at most 300 characters")
-        return value
+ConfigureRequest = PolicyUpdate
 
 
 class DeviceSwitchRequest(StrictRequest):
@@ -190,26 +177,16 @@ def configure_subsystem(req: ConfigureRequest):
         raise HTTPException(409, "Finish capture before changing policy.")
     try:
         with _device_lock:
-            config = copy.deepcopy(pipeline.config)
-            if req.liveness_enabled is not None:
-                config.liveness_enabled = req.liveness_enabled
-            if req.guidance_messages is not None:
-                config.guidance_messages = req.guidance_messages
+            try:
+                config = apply_update(pipeline.config, req)
+            except ValueError as error:
+                raise HTTPException(422, str(error)) from error
+            if _policy_store:
+                try:
+                    _policy_store.save(config)
+                except OSError as error:
+                    raise HTTPException(503, "Policy could not be saved; previous settings were retained.") from error
             policy = config.get_policy(req.workflow)
-            changes = req.model_dump(exclude_none=True)
-            for name in ("passive_threshold", "min_challenges", "max_retries",
-                         "active_liveness_enabled", "require_active_challenges"):
-                if name in changes:
-                    setattr(policy, name, changes[name])
-            if req.challenge_timeout is not None:
-                policy.challenge_timeout_seconds = req.challenge_timeout
-            policy.max_challenges = max(policy.max_challenges, policy.min_challenges)
-            if policy.require_active_challenges and not policy.active_liveness_enabled:
-                raise HTTPException(422, "Required active challenges cannot be disabled.")
-            if req.supported_challenges is not None:
-                config.supported_challenges = list(dict.fromkeys(req.supported_challenges))
-            if req.pad_mode is not None:
-                config.pad_mode = req.pad_mode
             pipeline.config = config
             pipeline.pad_detector.mode = config.pad_mode
             pipeline.set_workflow(req.workflow)
@@ -271,9 +248,14 @@ def capture_biometric(request: CaptureRequest):
                 if encoded:
                     _latest_jpeg = buf.tobytes()
                 challenge = pipeline.challenge_manager.active_challenge_state
-                _status = {"state": result.state.value, "guidance": result.detailed_guidance,
-                    "prompt": challenge.feedback_message if challenge else result.status_text,
-                    "progress": result.progress, "retry": retries, "maxRetries": pipeline.policy.max_retries,
+                _status = {"state": result.state.value,
+                    "guidance": challenge.feedback_message if challenge else result.detailed_guidance,
+                    "prompt": stable_prompt(result),
+                    "progress": stage_progress(result)[0],
+                    "completedActions": result.completed_actions,
+                    "requiredActions": result.required_actions,
+                    "restartCount": result.restart_count,
+                    "retry": retries, "maxRetries": pipeline.policy.max_retries,
                     "simulation": simulation}
                 if result.state == PipelineState.ACTIVE_CHALLENGE and challenge_start is None:
                     challenge_start = time.monotonic()

@@ -28,6 +28,27 @@ def test_device_reports_simulation_and_no_certification(client):
     assert data['livenessCapability']['hardwareLiveness'] is False
 
 
+def test_configuration_save_failure_does_not_change_running_policy(client, monkeypatch):
+    from types import SimpleNamespace
+    previous = mds.pipeline.config.resident_policy.passive_threshold
+    def fail(config):
+        raise OSError("simulated full disk")
+    monkeypatch.setattr(mds, "_policy_store", SimpleNamespace(save=fail))
+    response = client.post('/configure', json={'passive_threshold': .94})
+    assert response.status_code == 503
+    assert mds.pipeline.config.resident_policy.passive_threshold == previous
+
+
+def test_api_policy_survives_reload_when_persistence_is_enabled(client, monkeypatch, tmp_path):
+    from src.core.policy_store import PolicyStore
+    from src.core.config import LivenessConfig
+    store = PolicyStore(tmp_path / "policy.json")
+    monkeypatch.setattr(mds, "_policy_store", store)
+    assert client.post('/configure', json={'workflow': 'OPERATOR_AUTHENTICATION',
+                                          'passive_threshold': .93}).status_code == 200
+    assert store.load(LivenessConfig()).operator_policy.passive_threshold == .93
+
+
 def test_mds_capture_payload_hash_and_ephemeral_cleanup(client):
     r = client.post('/capture', json={'resident_id':'TEST-001', 'timeout_seconds':5})
     assert r.status_code == 200

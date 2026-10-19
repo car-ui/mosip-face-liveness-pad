@@ -30,3 +30,5 @@ using the fixed model and complete session policy. Do not lower thresholds,
 switch models based on higher live scores, or call score-double tests physical
 accuracy. The user does not want another request to retry while the software is
 being changed. Native Java/Android policy changes require separate work and tests.
+
+Latest local work adds action-count progress, explicit restart recovery, numeric score audit fields and validated offline policy persistence. The user now excludes GitHub publication and the demo. Do not push new commits or change visibility. See LOCAL_DELIVERY_STATUS.md and the retained physical webcam observations. The remote baseline remains 2ac8c92.
