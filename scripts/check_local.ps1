@@ -49,9 +49,12 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'The selected Python runtime did not start.' }
     $junit = Join-Path $checkOutput 'pytest.xml'
     $pytestLog = Join-Path $checkOutput 'pytest.log'
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
     & $Python -X faulthandler -m pytest -q -p no:cacheprovider "--junitxml=$junit" 2>&1 |
         Tee-Object -FilePath $pytestLog
     $exitStatus = $LASTEXITCODE
+    $ErrorActionPreference = $prevEap
     $report.pytestExitCode = $exitStatus
     if ($exitStatus -ne 0) { throw 'Python regression checks did not pass. See pytest.log.' }
     [xml]$results = Get-Content -LiteralPath $junit -Raw

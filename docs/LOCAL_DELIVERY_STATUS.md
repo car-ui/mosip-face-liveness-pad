@@ -171,3 +171,14 @@ This checkpoint establishes the successful completion and verification of the fu
    - Checks are conducted with injected test doubles, synthetic images, and unit/integration harnesses.
    - Offline tests do not attest to live camera physical attack accuracy or production certificate authority chains.
 
+7. **Release Packaging, Clean Package Extraction & Launcher Retargeting**:
+   - Packaged committed release tree using `scripts/package_release.py`:
+     - Archive: `D:/CodexWork/native-face-pad-20261018/artifacts/face-liveness-source-70f02e7.zip`
+     - SHA-256: `14aa996b47d94c4e7e6baf1c9ea903b7942a4f1d09215326139920e4c1a474f4`
+     - 201 files verified against `RELEASE_MANIFEST.json`.
+   - Extracted to fresh directory `D:/CodexWork/native-face-pad-20261018/source-check-70f02e7` and verified all 201 file hashes against `RELEASE_MANIFEST.json`.
+   - Scoped PowerShell native CLI error action handling in `scripts/check_local.ps1` to prevent non-fatal stderr warnings (e.g. OpenCV libpng sRGB profile warnings) from aborting the pipeline.
+   - Executed full 199-test suite against the freshly extracted source package: all 199 tests passed in 24.87s (`D:/CodexWork/native-face-pad-20261018/extracted-check-suite-verified/20261019T160055551Z-287a7ea0/result.json`).
+   - Retargeted launcher `D:/CodexWork/native-face-pad-20261018/artifacts/START-LAPTOP-PHYSICAL-TRIAL.cmd` to `source-check-70f02e7`, added `PYTHONPYCACHEPREFIX=D:\CodexWork\native-face-pad-20261018\pycache`, preserved strict ONNX mode, and validated via `--check` flag (exit code 0, without opening physical camera).
+
+
