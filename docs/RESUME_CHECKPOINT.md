@@ -110,3 +110,54 @@ The successful desktop build log is desktop-final-jdk11-reactor-build.log under
 the same D: artifact root. The laptop launcher still targets the older f5a678d
 source extraction; it has not been retargeted to the publication checkpoint.
 The original supplied PDFs and private camera evidence remain excluded from Git.
+
+## Delivery completion checkpoint, 19 October 2026 (Evening)
+
+This checkpoint establishes the successful completion and verification of the full Python test suite, native desktop validation, reference camera-SBI APK rebuild, and Android registration client APK rebuild under explicit resource constraints.
+
+1. **Full Python Suite Execution (199 Tests Passing)**:
+   - Command: `scripts/check_local.ps1` with explicit `-SourceDirectory` targeting the repository checkout, Python runtime `D:/CodexWork/face-pad-clean-20261018/Scripts/python.exe`, and output directory `D:/CodexWork/native-face-pad-20261018/full-suite-run`.
+   - Result: All 199 tests passed (186 core + 13 native preparation) in 33.82s (0 failures, 0 errors, 0 skipped).
+   - Pytest collection diagnosis: The previous `SystemError` during pytest collection at commit `f10cbb2` was caused by AST parsing traceback formatting during an interrupted collection in a shared cache. Executing with isolated pycache on D: (`PYTHONPYCACHEPREFIX=D:/CodexWork/native-face-pad-20261018/full-suite-run/pycache`) and `-p no:cacheprovider` ran cleanly and reproducibly.
+   - Retained report: `D:/CodexWork/native-face-pad-20261018/full-suite-run/20261019T142245795Z-357159ff/result.json`.
+
+2. **Native Desktop Verification & Lifecycle Check**:
+   - Resolved POM reverse patch-check discrepancy: normalized `integrations/native/desktop.patch` and `android.patch` line endings to LF on disk.
+   - `scripts/verify_native_preparation.py` verified all three checkouts:
+     - Desktop: 21 prepared files; 0 mismatches; patch present=True.
+     - Android: 27 prepared files; 0 mismatches; patch present=True.
+     - Camera-SBI: 30 prepared files; 0 mismatches; patch present=True.
+   - Refined `integrations/native/tests/DesktopStreamLifecycleCheck.java`: updated guidance assertion to accept initial bounded PAD session prompt (`"Checking liveness"` or `"Look straight"`) for the synthetic blank frame fixture.
+   - Executed `scripts/check_native_desktop.py` with Java 11 (`C:/CodexTools/temurin-11.0.32/jdk-11.0.32.1+1`), `--preview`, and classpath file `D:/CodexWork/native-face-pad-20261018/desktop-classpath.txt`.
+   - Both `DesktopControllerRejectionCheck` and `DesktopStreamLifecycleCheck` passed cleanly.
+   - Retained report: `D:/CodexWork/native-face-pad-20261018/desktop-publication-check/report.json`.
+
+3. **Reference Camera SBI Rebuild & Verification**:
+   - Rebuilt reference camera SBI debug APK and test APK using isolated Java 21 (`D:/CodexWork/native-face-pad-20261018/jbr-native-check/bin/java.exe`) and single-JVM bounded settings in 30 seconds.
+   - Verified APK ZIP integrity, model hashes (`minifasnet_v2.onnx`, `facemesh_v2.onnx`, `face_detection_yunet_2023mar.onnx`), runtime notices, ABI (`x86_64`), and v2 APK signature with `apksigner`.
+   - Distinct artifacts archived to `D:/CodexWork/native-face-pad-20261018/artifacts/camera-sbi-rebuilt-20261019`:
+     - `camera-sbi-debug.apk`: 94,316,807 bytes, SHA-256 `676ecf0a089b7835730b54c1cd616fc9c75ac3f32662dd6d6835b8ef2844f145`.
+     - `camera-sbi-androidTest.apk`: 1,879,121 bytes, SHA-256 `c3a541dbae8bc2e019db931dda996aed8bceb57dbe6d47cbfbda3760a83e96e6`.
+     - Verification report: `verification.json`.
+
+4. **Android Registration Client Rebuild & Verification**:
+   - Addressed Jetifier heap exhaustion on large modern binaries by adding `opencv`, `onnxruntime`, and Flutter engine debug JARs (`x86_64_debug.*`, `arm64_v8a_debug.*`, `x86_debug.*`, `armeabi_v7a_debug.*`, `flutter_embedding_debug.*`, `io.flutter.*`) to `-Pandroid.jetifier.ignorelist`.
+   - Resolved D8 dex merging out-of-memory error during `:app:mergeExtDexDebug` by removing aggressive GC heap shrinking parameters (`-XX:MinHeapFreeRatio=5 -XX:MaxHeapFreeRatio=15`) and setting bounded heap to 1536 MB (`-Xmx1536m`), matching the project's `gradle.properties` configuration.
+   - Full build (`:app:assembleDebug` and `:app:assembleDebugAndroidTest`) succeeded in 8m 54s (448 actionable tasks: 108 executed, 340 up-to-date).
+   - Verified ZIP integrity, exact model hashes, runtime notices, ABI splits (`x86_64` and `arm64-v8a`), and v2 APK signatures with `apksigner`.
+   - Distinct artifacts archived to `D:/CodexWork/native-face-pad-20261018/artifacts/registration-client-rebuilt-20261019`:
+     - `app-x86_64-debug.apk`: 261,021,276 bytes, SHA-256 `bdc5e259a4a3f997393a1de04e8774dec1f9e4a5a031024439aa4a630ef4c2be`.
+     - `app-arm64-v8a-debug.apk`: 223,185,249 bytes, SHA-256 `55c8a1ab4cbef8810bf1ad9384e09dd650d2074046c9575589cbf0bad547d649`.
+     - `app-debug-androidTest.apk`: 2,802,864 bytes, SHA-256 `408cbffb802be92002ce452bf13acbdb19d5acfd852745d047664baf95a19bc8`.
+     - Verification report: `verification.json`.
+
+5. **Test Inventory and Device Boundaries**:
+   - Verified test count in source:
+     - Registration client test sources: 14 tests (6 in `AndroidActiveEvidenceTest`, 8 in `NativePadAcceptanceTest`).
+     - Camera-SBI test sources: 8 tests (6 in `CameraOwnerPadTest`, 2 in `PhysicalPadHarnessTest`).
+   - No test emulator was running during build or verification (`adb devices` was empty). Per explicit safety instructions, no emulator was launched and no physical phone operations were performed.
+
+6. **Evidence Boundaries**:
+   - Checks are conducted with injected test doubles, synthetic images, and unit/integration harnesses.
+   - Offline tests do not attest to live camera physical attack accuracy or production certificate authority chains.
+

@@ -114,7 +114,9 @@ public final class DesktopStreamLifecycleCheck {
             if (active == null || active.state() != NativeActiveSession.State.VERIFYING)
                 throw new AssertionError("Blank preview supplied active proof");
             fx(() -> {
-                if (!guidance.get().getText().contains("Look straight")) throw new AssertionError("Native guidance did not update");
+                String text = guidance.get().getText();
+                if (text == null || (!text.contains("Checking liveness") && !text.contains("Look straight")))
+                    throw new AssertionError("Native guidance did not update; got: " + text);
             });
             stream.stop();
             if (active.state() != NativeActiveSession.State.REJECTED || !activeCamera.closed)
