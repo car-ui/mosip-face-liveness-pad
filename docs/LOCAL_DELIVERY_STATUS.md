@@ -59,3 +59,24 @@ The source package, regression checks and research evidence are local reviewable
 deliverables. The full mandatory hackathon scope is not declared complete.
 Publication, repository visibility changes, a public release, demo recording and
 external submission are excluded from this pass.
+
+## Subsequent native milestone
+
+Portable YuNet detection and bounded session PAD observations are now connected
+in native source. The PAD decision and action landmark crop share the same face
+box. All platform resource preparation includes the detector and its MIT notice.
+See NATIVE_DETECTOR_PLAN.md for executed checks and remaining build limitations.
+Native configuration framework adoption, APK rebuilds and physical native tests
+remain open. Retained APKs must not be described as containing this new source.
+
+The later validation attempt hit host resource exhaustion. Its result was 159
+passes and six failures, followed by an OpenCV import failure from an exhausted
+Windows paging file. The earlier 165-pass result remains historical evidence,
+not a claim that this later run passed. Desktop controller validation was also
+blocked by memory allocation. New source is saved locally with these limits.
+
+To preserve disk headroom, the project model directory and Git storage now use
+Windows directory junctions to D:/CodexWork/native-face-pad-20261018/workspace-models
+and workspace-git. Paths in the checkout still work. The unused broken .venv was
+preserved on D: as preserved-broken-workspace-venv. The supported launcher uses
+the separate working D: Python environment. Repository connectivity was checked.

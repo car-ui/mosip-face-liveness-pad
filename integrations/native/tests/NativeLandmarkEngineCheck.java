@@ -39,7 +39,7 @@ public final class NativeLandmarkEngineCheck {
             catch (IOException expectedError) { }
             System.out.println("PASS blank presence, invalid values and clipped crop rejected");
             Path cascade = root.resolve("integrations/native/assets/haarcascade_frontalface_default.xml");
-            try (NativePadEngine pad = new NativePadEngine(Files.readAllBytes(root.resolve("assets/models/minifasnet_v2.onnx")), cascade)) {
+            try (NativePadEngine pad = new NativePadEngine(Files.readAllBytes(root.resolve("assets/models/minifasnet_v2.onnx")), Files.readAllBytes(root.resolve("assets/models/face_detection_yunet_2023mar.onnx")))) {
                 NativeFrameChallenge active = new NativeFrameChallenge(pad, engine, cascade, 10000);
                 MatOfByte jpeg = new MatOfByte();
                 try {

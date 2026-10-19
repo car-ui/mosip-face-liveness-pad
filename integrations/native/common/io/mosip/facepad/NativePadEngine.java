@@ -6,19 +6,19 @@ import ai.onnxruntime.OrtSession;
 import java.io.IOException;
 import java.nio.FloatBuffer;
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.security.MessageDigest;
 import java.util.Collections;
 import org.opencv.core.*;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
-import org.opencv.objdetect.CascadeClassifier;
 
 /** Offline passive checkpoint. A single image cannot supply active challenge evidence. */
 public final class NativePadEngine implements AutoCloseable {
     public static final String MODEL_SHA256 = "5281b4a621b1a2a7570d88bc3a37ac5273ab3082b61d1e284b9847660909cbef";
     private final OrtEnvironment environment = OrtEnvironment.getEnvironment();
     private final OrtSession session;
-    private final CascadeClassifier detector;
+    private final NativeYuNet detector;
     private final String inputName;
     private final int inferenceThreads;
 
@@ -26,21 +26,31 @@ public final class NativePadEngine implements AutoCloseable {
         public final boolean accepted;
         public final String reason;
         public final double score;
+        final Rect faceBox;
         public Decision(boolean accepted, String reason, double score) {
-            this.accepted = accepted; this.reason = reason; this.score = score;
+            this(accepted,reason,score,null);
+        }
+        Decision(boolean accepted, String reason, double score, Rect faceBox) {
+            this.accepted = accepted; this.reason = reason; this.score = score; this.faceBox = faceBox;
         }
     }
 
     public NativePadEngine(byte[] model, Path cascadePath) throws Exception {
+        this(model,Files.readAllBytes(cascadePath.resolveSibling("face_detection_yunet_2023mar.onnx")));
+    }
+
+    public NativePadEngine(byte[] model, byte[] detectorModel) throws Exception {
         if (!MODEL_SHA256.equals(sha256(model))) throw new IOException("PAD model checksum mismatch");
-        detector = new CascadeClassifier(cascadePath.toString());
-        if (detector.empty()) throw new IOException("PAD face detector unavailable");
+        NativeYuNet loadedDetector = new NativeYuNet(detectorModel);
         inferenceThreads = Math.max(1, Math.min(2, Runtime.getRuntime().availableProcessors()));
         try (OrtSession.SessionOptions options = new OrtSession.SessionOptions()) {
             options.setIntraOpNumThreads(inferenceThreads);
             options.setInterOpNumThreads(1);
             session = environment.createSession(model, options);
+        } catch (Exception | LinkageError failure) {
+            loadedDetector.close(); throw failure;
         }
+        detector = loadedDetector;
         inputName = session.getInputNames().iterator().next();
     }
 
@@ -68,22 +78,15 @@ public final class NativePadEngine implements AutoCloseable {
         if (image == null || image.empty() || image.channels() != 3 || image.cols() < 80 || image.rows() < 80
                 || image.cols() > 4096 || image.rows() > 4096)
             return new Decision(false, "INVALID_IMAGE", 0);
-        Mat small = new Mat(), gray = new Mat();
-        MatOfRect faces = new MatOfRect();
-        try {
-            Imgproc.resize(image, small, new Size(), .5, .5, Imgproc.INTER_LINEAR);
-            Imgproc.cvtColor(small, gray, Imgproc.COLOR_BGR2GRAY);
-            detector.detectMultiScale(gray, faces, 1.15, 4, 0, new Size(30, 30), new Size());
-            Rect[] found = faces.toArray();
-            if (found.length != 1) return new Decision(false, found.length == 0 ? "NO_FACE" : "MULTIPLE_FACES", 0);
-            Rect face = new Rect(found[0].x * 2, found[0].y * 2, found[0].width * 2, found[0].height * 2);
-            double score = scoreFace(image, face);
-            if (!Double.isFinite(score)) return new Decision(false, "MODEL_ERROR", 0);
-            if (score <= .45) return new Decision(false, "PRESENTATION_ATTACK", score);
-            if (score < .85 || activeRequired)
-                return new Decision(false, "ACTIVE_CHALLENGE_REQUIRED", score);
-            return new Decision(true, "PASSIVE_CLEAR", score);
-        } finally { small.release(); gray.release(); faces.release(); }
+        java.util.List<NativeYuNet.Face> found = detector.detect(image);
+        if (found.size() != 1) return new Decision(false, found.isEmpty() ? "NO_FACE" : "MULTIPLE_FACES", 0);
+        Rect face = found.get(0).box;
+        double score = scoreFace(image, face);
+        if (!Double.isFinite(score)) return new Decision(false, "MODEL_ERROR", 0);
+        if (score <= .45) return new Decision(false, "PRESENTATION_ATTACK", score,face);
+        if (score < .85 || activeRequired)
+            return new Decision(false, "ACTIVE_CHALLENGE_REQUIRED", score,face);
+        return new Decision(true, "PASSIVE_CLEAR", score,face);
     }
 
     /** Exact MiniFASNet 2.7x context crop, raw BGR floats, NCHW 1x3x80x80. */
@@ -126,5 +129,5 @@ public final class NativePadEngine implements AutoCloseable {
         }
     }
 
-    @Override public void close() throws Exception { session.close(); }
+    @Override public void close() throws Exception { try { session.close(); } finally { detector.close(); } }
 }

@@ -13,21 +13,18 @@ public final class CameraOwnedPadGate implements AutoCloseable {
 
     public CameraOwnedPadGate(Context context, long timeoutMillis) throws Exception {
         if (!OpenCVLoader.initLocal()) throw new IOException("OpenCV unavailable");
-        File cascade = File.createTempFile("camera-pad-", ".xml", context.getCacheDir());
         NativePadEngine loadedPad = null;
         NativeLandmarkEngine loadedLandmarks = null;
         try {
-            try (InputStream input = context.getAssets().open("facepad/haarcascade_frontalface_default.xml");
-                 OutputStream output = new FileOutputStream(cascade)) { transfer(input, output); }
-            loadedPad = new NativePadEngine(asset(context,"minifasnet_v2.onnx"),cascade.toPath());
+            loadedPad = new NativePadEngine(asset(context,"minifasnet_v2.onnx"),asset(context,"face_detection_yunet_2023mar.onnx"));
             loadedLandmarks = new NativeLandmarkEngine(asset(context,"facemesh_v2.onnx"));
-            active = new NativeFrameChallenge(loadedPad,loadedLandmarks,cascade.toPath(),timeoutMillis);
+            active = new NativeFrameChallenge(loadedPad,loadedLandmarks,timeoutMillis);
             pad = loadedPad; landmarks = loadedLandmarks;
         } catch (Exception | LinkageError failure) {
             if (loadedLandmarks != null) loadedLandmarks.close();
             if (loadedPad != null) loadedPad.close();
             throw failure;
-        } finally { cascade.delete(); }
+        }
     }
 
     private static byte[] asset(Context context,String name) throws IOException {

@@ -2,7 +2,8 @@
 
 The current branch is `new/hackathon-quality`. Resolve its exact commit with
 `git rev-parse HEAD`; the predecessor was `30686fb13db650fb4a58dbfcc90dc2a8a3c8e38d`.
-Push to both `main` and `new/hackathon-quality`, with `[skip ci]` in commit messages.
+Keep new commits local, with `[skip ci]` in commit messages. The user's latest
+scope excludes GitHub publication and the demo. Do not push or change visibility.
 Do not run GitHub Actions because the user's allowance is exhausted.
 
 Read `RELIABILITY_PLAN.md` before making more inference changes. The user asked
@@ -32,3 +33,14 @@ accuracy. The user does not want another request to retry while the software is
 being changed. Native Java/Android policy changes require separate work and tests.
 
 Latest local work adds action-count progress, explicit restart recovery, numeric score audit fields and validated offline policy persistence. The user now excludes GitHub publication and the demo. Do not push new commits or change visibility. See LOCAL_DELIVERY_STATUS.md and the retained physical webcam observations. The remote baseline remains 2ac8c92.
+
+
+Native continuation: read NATIVE_DETECTOR_PLAN.md. Portable YuNet and shared-face
+frame wiring passed real model parity checks. Bounded native PAD evidence and
+recovery passed the Java action checks. Native sources/resources were synced to
+three prepared D: checkouts. Full new APK/controller validation is not complete.
+Host C: exhaustion and Windows paging-file exhaustion blocked later checks.
+Do not repeat resource-heavy builds until headroom is available. Do not claim
+old APKs contain this milestone. Model files and Git storage are now junctions
+to workspace-models and workspace-git under the D: artifact root. The old broken
+.venv is preserved there as preserved-broken-workspace-venv. No remote push.

@@ -20,7 +20,7 @@ public final class NativeActiveSessionCheck {
         }
         void neutral(int n) throws Exception { for (int i=0;i<n;i++) frame(.3,0); }
         void complete() throws Exception {
-            neutral(3);
+            neutral(7);
             for(int i=0;i<3;i++) frame(.1,0);
             neutral(2);
             neutral(3);
@@ -61,13 +61,28 @@ public final class NativeActiveSessionCheck {
         Fixture closed=new Fixture();for(int i=0;i<20;i++)closed.frame(.1,0);
         require(closed.session.prompt().startsWith("Look straight"),"Closed-eye start armed challenge");
         Fixture loss=new Fixture();loss.neutral(3);loss.frame(.1,0);loss.session.invalidateFrame();loss.neutral(2);
-        require(loss.session.prompt().startsWith("Look straight"),"Face loss retained challenge progression");
+        require(loss.session.prompt().startsWith("Checking liveness"),"Face loss retained challenge progression");
         Fixture duplicate=new Fixture();duplicate.neutral(1);
         duplicate.session.observe(duplicate.sequence,geometry(.3,0),CLEAR,JPEG);
         require(duplicate.session.state()==NativeActiveSession.State.REJECTED,"Duplicate frame accepted");
-        Fixture attack=new Fixture();attack.neutral(3);
+        Fixture attack=new Fixture();attack.neutral(7);
         attack.session.observe(++attack.sequence,geometry(.1,0),new NativePadEngine.Decision(false,"PRESENTATION_ATTACK",.01),JPEG);
+        require(attack.session.state()==NativeActiveSession.State.VERIFYING,"One suspect frame terminated session");
+        require(attack.session.prompt().startsWith("Checking liveness"),"Suspect frame retained action progress");
+        for(int i=0;i<5;i++) {
+            attack.clock.addAndGet(100_000_000L);
+            attack.session.observe(++attack.sequence,geometry(.1,0),new NativePadEngine.Decision(false,"PRESENTATION_ATTACK",.01),JPEG);
+        }
         require(attack.session.state()==NativeActiveSession.State.REJECTED,"Action overrode attack");
+        Fixture recovery=new Fixture();recovery.neutral(7);
+        recovery.session.observe(++recovery.sequence,geometry(.3,0),new NativePadEngine.Decision(false,"PRESENTATION_ATTACK",.1),JPEG);
+        recovery.neutral(4);
+        require(recovery.session.prompt().startsWith("Checking liveness"),"Insufficient fresh evidence cleared suspicion");
+        recovery.complete();
+        require(recovery.session.consume(JPEG),"Fresh clear evidence and new actions did not recover");
+        Fixture modelError=new Fixture();modelError.neutral(7);
+        modelError.session.observe(++modelError.sequence,geometry(.3,0),new NativePadEngine.Decision(false,"MODEL_ERROR",0),JPEG);
+        require(modelError.session.state()==NativeActiveSession.State.REJECTED,"Model error recovered as liveness");
         Fixture expired=new Fixture();expired.complete();expired.clock.set(11_000_000_000L);
         require(!expired.session.consume(JPEG),"Expired completion accepted");
         Fixture stale=new Fixture();stale.complete();stale.clock.addAndGet(3_000_000_000L);
@@ -75,7 +90,7 @@ public final class NativeActiveSessionCheck {
         Fixture cancelled=new Fixture();cancelled.complete();cancelled.session.cancel();
         require(!cancelled.session.consume(JPEG),"Cancelled stream proof accepted");
         Fixture gap=new Fixture();gap.neutral(3);gap.clock.addAndGet(2_000_000_000L);gap.frame(.1,0);
-        require(gap.session.prompt().startsWith("Look straight"),"Stream gap preserved action phase");
+        require(gap.session.prompt().startsWith("Checking liveness"),"Stream gap preserved action phase");
         System.out.println("PASS native action control flow: neutral baseline, blink/turn/return, static rejection, face loss, sequence, PAD failure, expiry and one-use exact-frame binding");
         System.out.println("Evidence scope: injected landmark geometry; no live action, physical attack or real identity-matching claim");
     }

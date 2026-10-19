@@ -21,14 +21,14 @@ public final class AndroidPadCheckpoint {
     private static synchronized NativePadEngine engine(Context context) throws Exception {
         if (engine == null) {
             if (!OpenCVLoader.initLocal()) throw new IOException("OpenCV unavailable");
-            File cascade = new File(context.getCacheDir(), "facepad-cascade.xml");
-            try (InputStream input = context.getAssets().open("facepad/haarcascade_frontalface_default.xml");
-                 OutputStream output = new FileOutputStream(cascade)) { copy(input, output); }
             try (InputStream input = context.getAssets().open("facepad/minifasnet_v2.onnx");
-                 ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+                 InputStream faceInput = context.getAssets().open("facepad/face_detection_yunet_2023mar.onnx");
+                 ByteArrayOutputStream output = new ByteArrayOutputStream();
+                 ByteArrayOutputStream faceOutput = new ByteArrayOutputStream()) {
                 copy(input, output);
-                engine = new NativePadEngine(output.toByteArray(), cascade.toPath());
-            } finally { cascade.delete(); }
+                copy(faceInput,faceOutput);
+                engine = new NativePadEngine(output.toByteArray(), faceOutput.toByteArray());
+            }
         }
         return engine;
     }

@@ -4,7 +4,7 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.function.LongSupplier;
 
-/** Session-bound action progression for trusted frame adapters. No client accepts it yet. */
+/** Session-bound action progression for trusted frame adapters and exact-image consumers. */
 public final class NativeActiveSession {
     public enum State { VERIFYING, COMPLETE, REJECTED, CONSUMED }
     private enum Action { BLINK, TURN_IMAGE_LEFT, TURN_IMAGE_RIGHT }
@@ -16,6 +16,9 @@ public final class NativeActiveSession {
     private long lastSequence = -1, lastTime = -1, heldSince;
     private long completedAt;
     private byte[] candidateDigest;
+    private int padStreak;
+    private boolean padClear;
+    private long padStarted = -1, padHeldSince, padLast = -1;
 
     public NativeActiveSession(long timeoutMillis) {
         this(timeoutMillis, System::nanoTime, new SecureRandom());
@@ -37,6 +40,7 @@ public final class NativeActiveSession {
     public synchronized String prompt() {
         expire();
         if (state != State.VERIFYING) return state.name();
+        if (!padClear) return "Checking liveness. Keep your face in view";
         if (phase == 0 || phase == 2) return "Look straight at the camera with both eyes open";
         if (actions[action] == Action.BLINK) return "Close both eyes, then open them";
         return actions[action] == Action.TURN_IMAGE_LEFT ? "Move your nose toward the left side of the preview" :
@@ -46,6 +50,11 @@ public final class NativeActiveSession {
     /** Missing/multiple faces invalidate all actions. Call this for failed frame geometry. */
     public synchronized void invalidateFrame() {
         if (state != State.VERIFYING) return;
+        padStreak = 0; padClear = false; padStarted = padLast = -1;
+        clearActions();
+    }
+
+    private void clearActions() {
         action = phase = stable = 0;
         heldSince = 0;
     }
@@ -60,9 +69,8 @@ public final class NativeActiveSession {
         lastSequence = sequence;
         if (lastTime >= 0 && now - lastTime > 1_000_000_000L) invalidateFrame();
         lastTime = now;
-        if (pad == null || !Double.isFinite(pad.score) || pad.score <= .45
-                || !("PASSIVE_CLEAR".equals(pad.reason) || "ACTIVE_CHALLENGE_REQUIRED".equals(pad.reason))) return reject();
-        if (face == null || face.presence < .9 || !Double.isFinite(face.leftEar) || !Double.isFinite(face.rightEar)
+        if (!observePad(pad, now)) return state;
+        if (face == null || !Double.isFinite(face.presence) || face.presence < .9 || !Double.isFinite(face.leftEar) || !Double.isFinite(face.rightEar)
                 || !Double.isFinite(face.turnRatio)) { invalidateFrame(); return state; }
         boolean open = face.leftEar >= .23 && face.rightEar >= .23;
         boolean neutral = open && Math.abs(face.turnRatio) < .12;
@@ -84,6 +92,34 @@ public final class NativeActiveSession {
             }
         }
         return state;
+    }
+
+    /** Suspect evidence blocks immediately; repeated observations confirm a rejection. */
+    private boolean observePad(NativePadEngine.Decision pad, long now) {
+        if (pad == null || !Double.isFinite(pad.score) || pad.score < 0 || pad.score > 1) {
+            reject(); return false;
+        }
+        boolean attack = "PRESENTATION_ATTACK".equals(pad.reason) && pad.score <= .45;
+        boolean clear = ("PASSIVE_CLEAR".equals(pad.reason) || "ACTIVE_CHALLENGE_REQUIRED".equals(pad.reason))
+                && pad.score > .45;
+        if (!attack && !clear) { reject(); return false; }
+        if (padLast >= 0 && now - padLast > 750_000_000L) invalidateFrame();
+        padLast = now;
+        if (padStarted < 0) padStarted = now;
+        if (clear && padClear) return true;
+        if (attack) { padClear = false; clearActions(); }
+        int direction = attack ? -1 : 1;
+        if (Integer.signum(padStreak) != direction) {
+            padStreak = direction; padHeldSince = now;
+        } else padStreak += direction;
+        if (attack && padStreak <= -5 && now - padHeldSince >= 500_000_000L) {
+            reject(); return false;
+        }
+        if (clear && padStreak >= 5 && now - padHeldSince >= 250_000_000L) {
+            padClear = true; padStarted = -1; return true;
+        }
+        if (now - padStarted >= 10_000_000_000L) reject();
+        return false;
     }
 
     private boolean hold(boolean condition, long now, int frames, long nanos) {

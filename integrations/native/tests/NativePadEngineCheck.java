@@ -12,8 +12,8 @@ public final class NativePadEngineCheck {
         nu.pattern.OpenCV.loadLocally();
         Path root = Paths.get(args[0]);
         byte[] model = Files.readAllBytes(root.resolve("assets/models/minifasnet_v2.onnx"));
-        Path cascade = root.resolve("integrations/native/assets/haarcascade_frontalface_default.xml");
-        try (NativePadEngine engine = new NativePadEngine(model, cascade)) {
+        byte[] detector = Files.readAllBytes(root.resolve("assets/models/face_detection_yunet_2023mar.onnx"));
+        try (NativePadEngine engine = new NativePadEngine(model, detector)) {
             byte[] input = Files.readAllBytes(Paths.get(args[1]));
             FloatBuffer buffer = ByteBuffer.wrap(input).order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer();
             float[] tensor = new float[buffer.remaining()]; buffer.get(tensor);
@@ -33,7 +33,7 @@ public final class NativePadEngineCheck {
         }
         model[model.length - 1] ^= 1;
         boolean tampered = false;
-        try (NativePadEngine ignored = new NativePadEngine(model, cascade)) { }
+        try (NativePadEngine ignored = new NativePadEngine(model, detector)) { }
         catch (Exception e) { tampered = true; }
         require(tampered, "Tampered model loaded");
         System.out.println("PASS model tampering rejection");

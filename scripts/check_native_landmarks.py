@@ -25,6 +25,7 @@ def run(java_home: Path, onnx_jar: Path, opencv_jar: Path, output: Path):
     classpath = os.pathsep.join(str(p.resolve()) for p in [output, onnx_jar, opencv_jar])
     sources = sorted((ROOT / "integrations/native/common/io/mosip/facepad").glob("*.java"))
     sources.append(ROOT / "integrations/native/tests/NativeLandmarkEngineCheck.java")
+    sources.append(ROOT / "integrations/native/tests/NativeActiveSessionCheck.java")
     subprocess.run([str(java_home / "bin" / ("javac" + suffix)), "-J-Xmx192m", "--release", "8", "-cp", classpath,
                     "-d", str(output), *map(str,sources)], check=True)
     result = subprocess.run([str(java_home / "bin" / ("java" + suffix)), "-Xmx128m", "-XX:+UseSerialGC",
@@ -34,6 +35,12 @@ def run(java_home: Path, onnx_jar: Path, opencv_jar: Path, output: Path):
     print(result.stdout)
     if result.returncode:
         raise SystemExit(f"Landmark check failed; inspect {output / 'native-landmark-check.log'}")
+    actions = subprocess.run([str(java_home / "bin" / ("java" + suffix)), "-Xmx128m", "-cp", classpath,
+                              "io.mosip.facepad.NativeActiveSessionCheck"], text=True, capture_output=True, timeout=30)
+    (output / "native-action-check.log").write_text(actions.stdout + actions.stderr, encoding="utf-8")
+    print(actions.stdout)
+    if actions.returncode:
+        raise SystemExit(f"Action check failed; inspect {output / 'native-action-check.log'}")
 
 
 if __name__ == "__main__":

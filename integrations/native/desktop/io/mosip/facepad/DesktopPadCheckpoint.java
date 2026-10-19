@@ -16,13 +16,10 @@ public final class DesktopPadCheckpoint {
     private static synchronized NativePadEngine engine() throws Exception {
         if (engine == null) {
             nu.pattern.OpenCV.loadLocally();
-            Path cascade = Files.createTempFile("facepad-cascade-", ".xml");
-            try (InputStream stream = resource("haarcascade_frontalface_default.xml")) {
-                Files.copy(stream, cascade, StandardCopyOption.REPLACE_EXISTING);
+            try (InputStream stream = resource("minifasnet_v2.onnx");
+                 InputStream faceModel = resource("face_detection_yunet_2023mar.onnx")) {
+                engine = new NativePadEngine(read(stream), read(faceModel));
             }
-            try (InputStream stream = resource("minifasnet_v2.onnx")) {
-                engine = new NativePadEngine(read(stream), cascade);
-            } finally { Files.deleteIfExists(cascade); }
         }
         return engine;
     }
@@ -51,11 +48,7 @@ public final class DesktopPadCheckpoint {
                 landmarks = new NativeLandmarkEngine(read(stream));
             }
         }
-        Path cascade = Files.createTempFile("facepad-active-cascade-", ".xml");
-        try (InputStream stream = resource("haarcascade_frontalface_default.xml")) {
-            Files.copy(stream, cascade, StandardCopyOption.REPLACE_EXISTING);
-            return new NativeFrameChallenge(passive, landmarks, cascade, 30000);
-        } finally { Files.deleteIfExists(cascade); }
+        return new NativeFrameChallenge(passive, landmarks, 30000);
     }
 
     public static void requireClear(List<BiometricsDto> biometrics, boolean activeRequired,

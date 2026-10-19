@@ -35,12 +35,14 @@ def run(java_home: Path, checkout: Path, classpath_file: Path, output: Path, pre
     # An argument file avoids the Windows command-line length limit.
     def quoted(value):
         return '"' + str(value).replace("\\", "/").replace('"', '\\"') + '"'
-    compile_args = ["--release", "8", "-cp", quoted(classpath), "-d", quoted(output)]
+    # Check sources have no generated annotations; ignore processors from app dependencies.
+    compile_args = ["--release", "8", "-proc:none", "-cp", quoted(classpath), "-d", quoted(output)]
     compile_args += [quoted(ROOT / "integrations/native/tests" / (name + ".java")) for name in names]
     compile_args.append(quoted(ROOT / "integrations/native/tests/NativeActiveSessionCheck.java"))
     args_file = output / "javac.args"
     args_file.write_text("\n".join(compile_args) + "\n", encoding="utf-8")
-    subprocess.run([str(javac), "-J-Xmx192m", "@" + str(args_file)], check=True, timeout=120)
+    subprocess.run([str(javac), "-J-Xmx192m", "-J-XX:+UseSerialGC", "-J-XX:ReservedCodeCacheSize=32m",
+                    "-J-XX:CompressedClassSpaceSize=32m", "@" + str(args_file)], check=True, timeout=120)
     reports = []
     for name in names:
         java_args = ["-Xmx128m", "-XX:+UseSerialGC", quoted("-Djava.io.tmpdir=" + str(output)),

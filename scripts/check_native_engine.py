@@ -31,6 +31,7 @@ def run(java_home: Path, onnx_jar: Path, opencv_jar: Path, output: Path):
     classpath = os.pathsep.join(str(p.resolve()) for p in [output, onnx_jar, opencv_jar])
     subprocess.run([str(javac), "-J-Xmx192m", "--release", "8", "-cp", classpath,
                     "-d", str(output), str(ROOT / "integrations/native/common/io/mosip/facepad/NativePadEngine.java"),
+                    str(ROOT / "integrations/native/common/io/mosip/facepad/NativeYuNet.java"),
                     str(ROOT / "integrations/native/tests/NativePadEngineCheck.java")], check=True)
     result = subprocess.run([str(java), "-Xmx128m", "-XX:+UseSerialGC", "-Djava.io.tmpdir=" + str(output),
                              "-cp", classpath, "NativePadEngineCheck", str(ROOT), str(tensor), str(expected)],
