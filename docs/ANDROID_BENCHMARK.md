@@ -1,5 +1,9 @@
 # Android inference measurements
 
+These retained runs predate the portable YuNet/native policy changes. Their
+whole-process memory and timing do not validate the current detector or a full
+camera workflow. New source/build checks are recorded separately.
+
 The native inference engine now selects one ONNX intra-op thread on a one-CPU system, with a maximum of two on larger systems. Inter-op threads are limited to one. The previous implementation always requested two intra-op threads.
 
 The revised Android package passed all five instrumentation tests on a Google ATD API 34 x86_64 emulator with one virtual CPU and about 2 GB guest RAM. Tests include actual ONNX inference, ISO face decoding, and rejection before resident and operator-onboarding storage. The camera was disabled; the SBI parser and repositories are test doubles.

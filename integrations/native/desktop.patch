@@ -12,7 +12,7 @@ index a039aeb1b6..8b5a5d28b5 100644
  			<groupId>io.mosip.registration</groupId>
  			<artifactId>registration-services</artifactId>
 diff --git a/registration/registration-client/src/main/java/io/mosip/registration/controller/BaseController.java b/registration/registration-client/src/main/java/io/mosip/registration/controller/BaseController.java
-index 45403104ff..456db4a728 100644
+index 45403104ff..51242f4f5c 100644
 --- a/registration/registration-client/src/main/java/io/mosip/registration/controller/BaseController.java
 +++ b/registration/registration-client/src/main/java/io/mosip/registration/controller/BaseController.java
 @@ -1682,6 +1682,11 @@ public class BaseController {
@@ -31,12 +31,12 @@ index 45403104ff..456db4a728 100644
  
  		List<BiometricsDto> biometrics = bioService.captureModalityForAuth(mdmRequestDto);
  
-+        io.mosip.facepad.DesktopPadCheckpoint.requireClear(biometrics, true, active);
++        io.mosip.facepad.DesktopPadCheckpoint.requireClear(biometrics, isReviewer ? io.mosip.facepad.NativePadPolicy.Workflow.SUPERVISOR : io.mosip.facepad.NativePadPolicy.Workflow.OPERATOR, active);
  		boolean match = authenticationService.authValidator(userId, SingleType.FACE.value(), biometrics);
  		if (match && isPacketAuth) {
  			addOperatorBiometrics(biometrics, isReviewer);
 diff --git a/registration/registration-client/src/main/java/io/mosip/registration/controller/auth/AuthenticationController.java b/registration/registration-client/src/main/java/io/mosip/registration/controller/auth/AuthenticationController.java
-index 29401ee938..c2bab1f7b1 100644
+index 29401ee938..9a223a6345 100644
 --- a/registration/registration-client/src/main/java/io/mosip/registration/controller/auth/AuthenticationController.java
 +++ b/registration/registration-client/src/main/java/io/mosip/registration/controller/auth/AuthenticationController.java
 @@ -166,6 +166,7 @@ public class AuthenticationController extends BaseController implements Initiali
@@ -66,7 +66,7 @@ index 29401ee938..c2bab1f7b1 100644
  		try {
 -			streamer.startStream(bioService.getStream(RegistrationConstants.FACE_FULLFACE), faceImage, null);
 +			faceLivenessPrompt.textProperty().bind(streamer.challengePromptProperty());
-+            streamer.startActiveStream(bioService.getStream(RegistrationConstants.FACE_FULLFACE), faceImage);
++            streamer.startActiveStream(bioService.getStream(RegistrationConstants.FACE_FULLFACE), faceImage, isReviewer ? io.mosip.facepad.NativePadPolicy.Workflow.SUPERVISOR : io.mosip.facepad.NativePadPolicy.Workflow.OPERATOR);
  		} catch (RegBaseCheckedException regBaseCheckedException) {
  			LOGGER.error(LoggerConstants.LOG_REG_LOGIN, APPLICATION_NAME, APPLICATION_ID,
  					ExceptionUtils.getStackTrace(regBaseCheckedException));
@@ -160,10 +160,10 @@ index e3e0bf37d1..84a7d93960 100644
  	}
  
 diff --git a/registration/registration-client/src/main/java/io/mosip/registration/controller/device/Streamer.java b/registration/registration-client/src/main/java/io/mosip/registration/controller/device/Streamer.java
-index 105567a999..794fcc35b1 100644
+index 105567a999..06daa8b71c 100644
 --- a/registration/registration-client/src/main/java/io/mosip/registration/controller/device/Streamer.java
 +++ b/registration/registration-client/src/main/java/io/mosip/registration/controller/device/Streamer.java
-@@ -3,197 +3,159 @@ package io.mosip.registration.controller.device;
+@@ -3,197 +3,162 @@ package io.mosip.registration.controller.device;
  import java.io.ByteArrayInputStream;
  import java.io.IOException;
  import java.io.InputStream;
@@ -426,12 +426,15 @@ index 105567a999..794fcc35b1 100644
 +    }
 +
 +    public void startStream(InputStream input, ImageView preview, ImageView scanImage) {
-+        startStream(input, preview, scanImage, false);
++        startStream(input, preview, scanImage, false, io.mosip.facepad.NativePadPolicy.Workflow.RESIDENT);
 +    }
 +    public void startActiveStream(InputStream input, ImageView preview) {
-+        startStream(input, preview, null, true);
++        startActiveStream(input, preview, io.mosip.facepad.NativePadPolicy.Workflow.OPERATOR);
 +    }
-+    private synchronized void startStream(InputStream inputStream, ImageView preview, ImageView scanImage, boolean activeRequired) {
++    public void startActiveStream(InputStream input, ImageView preview, io.mosip.facepad.NativePadPolicy.Workflow workflow) {
++        startStream(input, preview, null, true, workflow);
++    }
++    private synchronized void startStream(InputStream inputStream, ImageView preview, ImageView scanImage, boolean activeRequired, io.mosip.facepad.NativePadPolicy.Workflow workflow) {
 +        setUrlStream(inputStream);
 +        if (inputStream == null) return;
 +        final long token = generation;
@@ -441,7 +444,7 @@ index 105567a999..794fcc35b1 100644
 +                io.mosip.facepad.NativeFrameChallenge active = null;
 +                if (activeRequired) {
 +                    publishPrompt(inputStream, token, "Loading liveness models");
-+                    active = io.mosip.facepad.DesktopPadCheckpoint.newFrameChallenge();
++                    active = io.mosip.facepad.DesktopPadCheckpoint.newFrameChallenge(workflow);
 +                    synchronized (Streamer.this) {
 +                        if (!current(inputStream, token)) { active.cancel(); return; }
 +                        frameChallenge = active;

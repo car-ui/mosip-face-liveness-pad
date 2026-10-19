@@ -24,20 +24,22 @@ index 8e17558..f793095 100644
  
      implementation "javax.inject:javax.inject:${rootProject.ext.javaxInjectVersion}"
 diff --git a/android/app/src/main/java/io/mosip/registration_client/api_services/BiometricsDetailsApi.java b/android/app/src/main/java/io/mosip/registration_client/api_services/BiometricsDetailsApi.java
-index 640ac66..86de3bc 100644
+index 640ac66..68b6502 100644
 --- a/android/app/src/main/java/io/mosip/registration_client/api_services/BiometricsDetailsApi.java
 +++ b/android/app/src/main/java/io/mosip/registration_client/api_services/BiometricsDetailsApi.java
-@@ -1075,6 +1075,9 @@ public class BiometricsDetailsApi implements BiometricsPigeon.BiometricsApi {
+@@ -1075,6 +1075,11 @@ public class BiometricsDetailsApi implements BiometricsPigeon.BiometricsApi {
                      : registrationService.getRegistrationDto().getCaptureTransactionId();
              List<BiometricsDto> biometricsDtoList = biometricsService.handleRCaptureResponse(currentModality, respData,
                      getExceptionAttributes(), transactionId, isOperatorOnboarding);
 +            if (currentModality == Modality.FACE || currentModality == Modality.EXCEPTION_PHOTO) {
-+                io.mosip.facepad.AndroidPadCheckpoint.requireClear(activity, biometricsDtoList, isOperatorOnboarding, transactionId);
++                io.mosip.facepad.NativePadPolicy policy = io.mosip.facepad.NativePadPolicy.read(globalParamRepository::getCachedStringGlobalParam,
++                        isOperatorOnboarding ? io.mosip.facepad.NativePadPolicy.Workflow.OPERATOR : io.mosip.facepad.NativePadPolicy.Workflow.RESIDENT);
++                io.mosip.facepad.AndroidPadCheckpoint.requireClear(activity, biometricsDtoList, policy, transactionId);
 +            }
              // if attempts is zero, there is no need to maintain the counter
              if (fieldId.equals(OPERATOR_BIOMETRICS)) {
                  removeDuplicatesFromOperatorBiometricList(currentModality);
-@@ -1127,6 +1130,10 @@ public class BiometricsDetailsApi implements BiometricsPigeon.BiometricsApi {
+@@ -1127,6 +1132,10 @@ public class BiometricsDetailsApi implements BiometricsPigeon.BiometricsApi {
                  biometricResult.success("Ok");
              }
  

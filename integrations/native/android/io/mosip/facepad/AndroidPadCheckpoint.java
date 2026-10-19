@@ -44,7 +44,13 @@ public final class AndroidPadCheckpoint {
 
     public static void requireClear(Context context, List<BiometricsDto> biometrics, boolean activeRequired,
                                     String transactionId) throws IOException {
+        requireClear(context,biometrics,NativePadPolicy.defaults(activeRequired ? NativePadPolicy.Workflow.OPERATOR : NativePadPolicy.Workflow.RESIDENT),transactionId);
+    }
+
+    public static void requireClear(Context context, List<BiometricsDto> biometrics, NativePadPolicy policy,
+                                    String transactionId) throws IOException {
         if (biometrics == null || biometrics.size() != 1) throw new IOException("PAD: expected one face capture");
+        if (policy == null || !policy.enabled) throw new IOException("PAD: liveness disabled; capture is unverified");
         Bitmap bitmap = null;
         Mat rgba = null, bgr = null;
         try {
@@ -55,6 +61,7 @@ public final class AndroidPadCheckpoint {
             if(iso.length>8*1024*1024)throw new IOException("PAD: ISO capture too large");
             byte[] encoded = new FaceBDIR(new DataInputStream(new ByteArrayInputStream(iso)))
                     .getRepresentation().getRepresentationData().getImageData().getImage();
+            BoundedImage.requireImage(encoded);
             BitmapFactory.Options bounds=new BitmapFactory.Options();bounds.inJustDecodeBounds=true;
             BitmapFactory.decodeByteArray(encoded,0,encoded.length,bounds);
             if(bounds.outWidth>4096 || bounds.outHeight>4096)throw new IOException("PAD: image dimensions too large");
@@ -63,7 +70,7 @@ public final class AndroidPadCheckpoint {
             if (bitmap == null) throw new IOException("PAD: image decoding failed");
             Utils.bitmapToMat(bitmap, rgba);
             Imgproc.cvtColor(rgba, bgr, Imgproc.COLOR_RGBA2BGR);
-            NativePadEngine.Decision decision = evaluator.evaluateBgr(bgr, activeRequired);
+            NativePadEngine.Decision decision = evaluator.evaluateBgr(bgr, policy);
             if (!decision.accepted) {
                 if(!"ACTIVE_CHALLENGE_REQUIRED".equals(decision.reason))
                     throw new IOException("PAD rejected face capture: " + decision.reason);

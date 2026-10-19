@@ -64,17 +64,29 @@ public final class NativePadEngine implements AutoCloseable {
     }
 
     public synchronized Decision evaluateEncoded(byte[] encoded, boolean activeRequired) throws Exception {
+        return evaluateEncoded(encoded,NativePadPolicy.defaults(activeRequired ? NativePadPolicy.Workflow.OPERATOR : NativePadPolicy.Workflow.RESIDENT));
+    }
+
+    public synchronized Decision evaluateEncoded(byte[] encoded, NativePadPolicy policy) throws Exception {
+        if (policy == null || !policy.enabled) return new Decision(false,"LIVENESS_DISABLED",0);
         if (encoded == null || encoded.length == 0 || encoded.length > 8 * 1024 * 1024)
             return new Decision(false, "INVALID_IMAGE", 0);
+        try { BoundedImage.requireImage(encoded); }
+        catch (IOException invalid) { return new Decision(false, "INVALID_IMAGE", 0); }
         MatOfByte bytes = new MatOfByte(encoded);
         Mat image = null;
         try {
             image = Imgcodecs.imdecode(bytes, Imgcodecs.IMREAD_COLOR);
-            return evaluateBgr(image, activeRequired);
+            return evaluateBgr(image, policy);
         } finally { bytes.release(); if (image != null) image.release(); }
     }
 
     public synchronized Decision evaluateBgr(Mat image, boolean activeRequired) throws Exception {
+        return evaluateBgr(image,NativePadPolicy.defaults(activeRequired ? NativePadPolicy.Workflow.OPERATOR : NativePadPolicy.Workflow.RESIDENT));
+    }
+
+    public synchronized Decision evaluateBgr(Mat image, NativePadPolicy policy) throws Exception {
+        if (policy == null || !policy.enabled) return new Decision(false,"LIVENESS_DISABLED",0);
         if (image == null || image.empty() || image.channels() != 3 || image.cols() < 80 || image.rows() < 80
                 || image.cols() > 4096 || image.rows() > 4096)
             return new Decision(false, "INVALID_IMAGE", 0);
@@ -84,8 +96,10 @@ public final class NativePadEngine implements AutoCloseable {
         double score = scoreFace(image, face);
         if (!Double.isFinite(score)) return new Decision(false, "MODEL_ERROR", 0);
         if (score <= .45) return new Decision(false, "PRESENTATION_ATTACK", score,face);
-        if (score < .85 || activeRequired)
+        if (score < policy.passiveThreshold || policy.activeRequired) {
+            if (!policy.activeEnabled) return new Decision(false,"ACTIVE_DISABLED",score,face);
             return new Decision(false, "ACTIVE_CHALLENGE_REQUIRED", score,face);
+        }
         return new Decision(true, "PASSIVE_CLEAR", score,face);
     }
 

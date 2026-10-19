@@ -1,22 +1,20 @@
-"""
-Secure Offline Model Update Subsystem
-Fulfills the MOSIP Decode Bonus Deliverable:
-- Integrity Verification (SHA-256 Digest)
-- Cryptographic Signature Verification (HMAC-SHA256 / Public Key)
-- Anti-Downgrade Version Validation (Strict Semantic Version Progression)
-- Atomic Installation (POSIX / Windows compliant atomic swap)
-- Automatic Rollback on Verification Failure
+"""Offline signed-model installation with a persisted version ceiling.
+
+Ed25519 verification and explicit HMAC test signing cover package metadata and
+the payload digest. Staged model and version files are flushed before atomic
+replacement. Key provisioning, multi-process deployment and power-loss recovery
+still require deployment-specific integration.
 """
 
 import os
 import shutil
 import hashlib
 import hmac
-import time
 import json
 import re
 from pathlib import Path
 import threading
+import tempfile
 from dataclasses import dataclass
 from typing import Optional, Tuple, Dict, Any
 
@@ -37,14 +35,11 @@ DEFAULT_DEV_TEST_KEY = b"DEV_INSECURE_TEST_KEY_FOR_LOCAL_EVALUATION_ONLY"
 
 
 class SecureModelUpdateManager:
-    """
-    Manages secure, offline deployment of biometric model weight updates.
-    Ensures that corrupted, unverified, or downgraded models cannot be installed.
-    Production Architecture Note:
-    In production MOSIP deployments, model payloads are signed by the MOSIP Root Authority
-    using asymmetric PKI (e.g. RSA-4096 / ECDSA P-384) or hardware KMS/HSM modules.
-    For offline testing, symmetric HMAC-SHA256 with key injection via environment variable
-    MOSIP_MODEL_SIGNING_KEY or explicit parameter is supported.
+    """Verify offline packages before replacing a local model.
+
+    Production verification requires a provisioned public key. HMAC mode is
+    available with an explicit key; the bundled development key needs opt-in.
+    The lock serializes installs through this manager instance.
     """
 
     def __init__(self,
@@ -95,7 +90,7 @@ class SecureModelUpdateManager:
         """
         try:
             new_tuple = self._parse_semver(new_version)
-            return not current_version or new_tuple > self._parse_semver(current_version)
+            return current_version is None or new_tuple > self._parse_semver(current_version)
         except (ValueError, TypeError):
             return False
 
@@ -195,7 +190,7 @@ class SecureModelUpdateManager:
 
             # Persist the high-water mark before publishing the model. A crash may require
             # operator recovery but cannot permit an older signed package to be replayed.
-            version_file.write_text(package.version, encoding="utf-8")
+            self._persist_version(version_file, package.version)
 
             # Atomic swap to target path
             os.replace(temp_path, target_path)
@@ -217,6 +212,21 @@ class SecureModelUpdateManager:
                     pass
 
             return False, f"Installation error, rollback executed: {str(e)}"
+
+    @staticmethod
+    def _persist_version(version_file, version):
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=version_file.parent,
+                                             prefix=version_file.name+".", suffix=".tmp", delete=False) as stream:
+                temporary = Path(stream.name)
+                stream.write(version)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, version_file)
+        finally:
+            if temporary is not None and temporary.exists():
+                temporary.unlink()
 
     def rollback(self, target_filename: str) -> bool:
         """Manually trigger rollback to last known good backup."""

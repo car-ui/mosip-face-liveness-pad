@@ -105,3 +105,30 @@ explicit simulator UI startup/settling/exit smoke run completed. These checks
 validate software behavior. No new successful physical action session or
 physical attack rejection is claimed. The final source package must also be
 verified after commit before updating the laptop launcher.
+
+
+## Timed improvement pass, 19 October
+
+Work continues locally until 19:23 IST. Publication and demo remain excluded.
+The first native Android rebuild exhausted host memory. A one-worker,
+interpreted JVM build with a 256 MB heap is being checked before attempting
+larger platform builds. No background service, phone or unrelated process is
+stopped to make room.
+
+Priorities are a rebuilt detector package, clock and proof-lifecycle regression
+checks, readable native action progress, safe image decoding, then native
+configuration adoption if the available toolchain supports its validation.
+Each milestone needs its own evidence; old APK results do not cover new code.
+
+
+Timed implementation record: native clock and proof-expiry regressions passed,
+including negative/wrapping monotonic origins. Native prompts now have two
+seconds of reading time and show completed-action counts. Invalid numeric timing
+settings fail closed in Python. Native cached configuration reads per-workflow
+thresholds and mandatory-active modes; exact proof is bound to role and policy.
+Desktop upstream controller checks confirm role selection and pre-matcher veto.
+The image guard preserves JPEG, PNG, JP2 and raw J2K paths with explicit bounds.
+Real JP2/J2K gradients decode through desktop OpenCV; malformed-header checks
+passed 2000 cases. Offline model version publication is atomic and an empty
+ceiling cannot authorize a downgrade. The Python suite passed 186 checks with
+fresh D: caches; the earlier root-cache interruptions remain retained.

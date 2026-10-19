@@ -8,10 +8,15 @@ public final class NativeActiveSessionCheck {
     private static final byte[] JPEG = {(byte)255,(byte)216,1,2,(byte)255,(byte)217};
     private static final NativePadEngine.Decision CLEAR = new NativePadEngine.Decision(true,"PASSIVE_CLEAR",.99);
     private static final class Fixture {
-        final AtomicLong clock = new AtomicLong();
-        final NativeActiveSession session = new NativeActiveSession(10000, clock::get, new SecureRandom() {
-            public boolean nextBoolean() { return true; }
-        });
+        final AtomicLong clock;
+        final NativeActiveSession session;
+        Fixture() { this(0); }
+        Fixture(long origin) {
+            clock = new AtomicLong(origin);
+            session = new NativeActiveSession(10000, clock::get, new SecureRandom() {
+                public boolean nextBoolean() { return true; }
+            });
+        }
         long sequence;
         byte[] candidate = JPEG;
         void frame(double ear, double turn) throws Exception {
@@ -21,9 +26,11 @@ public final class NativeActiveSessionCheck {
         void neutral(int n) throws Exception { for (int i=0;i<n;i++) frame(.3,0); }
         void complete() throws Exception {
             neutral(7);
+            neutral(20);
             for(int i=0;i<3;i++) frame(.1,0);
             neutral(2);
             neutral(3);
+            neutral(20);
             for(int i=0;i<3;i++) frame(.3,-.4);
             neutral(2);
         }
@@ -54,6 +61,12 @@ public final class NativeActiveSessionCheck {
         require(accepted.session.state()==NativeActiveSession.State.COMPLETE,"Action sequence did not complete");
         require(accepted.session.consume(JPEG),"Exact frame was not consumable");
         require(!accepted.session.consume(JPEG),"Evidence reused");
+        require(accepted.session.completedActions()==2,"Completed action count lost");
+        Fixture reading=new Fixture();reading.neutral(7);
+        for(int i=0;i<3;i++)reading.frame(.1,0);
+        reading.neutral(2);
+        require(reading.session.completedActions()==0 && reading.session.prompt().startsWith("Close both eyes"),
+                "Movement during instruction reading earned action credit");
         Fixture wrong=new Fixture();wrong.complete();
         require(!wrong.session.consume(new byte[]{1,2,3}),"Different final candidate accepted");
         Fixture staticPhoto=new Fixture();staticPhoto.neutral(40);
@@ -69,6 +82,7 @@ public final class NativeActiveSessionCheck {
         attack.session.observe(++attack.sequence,geometry(.1,0),new NativePadEngine.Decision(false,"PRESENTATION_ATTACK",.01),JPEG);
         require(attack.session.state()==NativeActiveSession.State.VERIFYING,"One suspect frame terminated session");
         require(attack.session.prompt().startsWith("Checking liveness"),"Suspect frame retained action progress");
+        require(attack.session.completedActions()==0,"Suspect evidence retained completed-action count");
         for(int i=0;i<5;i++) {
             attack.clock.addAndGet(100_000_000L);
             attack.session.observe(++attack.sequence,geometry(.1,0),new NativePadEngine.Decision(false,"PRESENTATION_ATTACK",.01),JPEG);
@@ -87,6 +101,12 @@ public final class NativeActiveSessionCheck {
         require(!expired.session.consume(JPEG),"Expired completion accepted");
         Fixture stale=new Fixture();stale.complete();stale.clock.addAndGet(3_000_000_000L);
         require(!stale.session.consume(JPEG),"Completion older than two seconds accepted");
+        Fixture rollback=new Fixture();rollback.complete();rollback.clock.addAndGet(-100_000_000L);
+        require(!rollback.session.consume(JPEG),"Clock rollback after completion accepted");
+        for(long origin:new long[]{-20_000_000_000L,Long.MAX_VALUE-1_000_000_000L}) {
+            Fixture arbitrary=new Fixture(origin);arbitrary.complete();
+            require(arbitrary.session.consume(JPEG),"Valid arbitrary monotonic clock origin rejected");
+        }
         Fixture cancelled=new Fixture();cancelled.complete();cancelled.session.cancel();
         require(!cancelled.session.consume(JPEG),"Cancelled stream proof accepted");
         Fixture gap=new Fixture();gap.neutral(3);gap.clock.addAndGet(2_000_000_000L);gap.frame(.1,0);

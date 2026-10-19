@@ -9,16 +9,19 @@ public final class NativeActiveSession {
     public enum State { VERIFYING, COMPLETE, REJECTED, CONSUMED }
     private enum Action { BLINK, TURN_IMAGE_LEFT, TURN_IMAGE_RIGHT }
     private final LongSupplier clock;
-    private final long deadline;
+    private final long startedAt, timeoutNanos;
     private final Action[] actions;
     private State state = State.VERIFYING;
     private int action, phase, stable;
     private long lastSequence = -1, lastTime = -1, heldSince;
+    private boolean observed;
     private long completedAt;
+    private long actionPromptAt;
     private byte[] candidateDigest;
     private int padStreak;
     private boolean padClear;
-    private long padStarted = -1, padHeldSince, padLast = -1;
+    private Long padStarted, padLast;
+    private long padHeldSince;
 
     public NativeActiveSession(long timeoutMillis) {
         this(timeoutMillis, System::nanoTime, new SecureRandom());
@@ -28,7 +31,8 @@ public final class NativeActiveSession {
     NativeActiveSession(long timeoutMillis, LongSupplier clock, SecureRandom random) {
         if (timeoutMillis < 1000 || timeoutMillis > 60000) throw new IllegalArgumentException("Invalid action timeout");
         this.clock = clock;
-        deadline = clock.getAsLong() + timeoutMillis * 1_000_000L;
+        startedAt = clock.getAsLong();
+        timeoutNanos = timeoutMillis * 1_000_000L;
         Action turn = random.nextBoolean() ? Action.TURN_IMAGE_LEFT : Action.TURN_IMAGE_RIGHT;
         actions = random.nextBoolean() ? new Action[]{Action.BLINK,turn} : new Action[]{turn,Action.BLINK};
     }
@@ -36,6 +40,12 @@ public final class NativeActiveSession {
     public synchronized State state() {
         expire(); return state;
     }
+
+    public synchronized int completedActions() {
+        expire(); return state == State.REJECTED ? 0 : action;
+    }
+
+    public int requiredActions() { return actions.length; }
 
     public synchronized String prompt() {
         expire();
@@ -50,7 +60,7 @@ public final class NativeActiveSession {
     /** Missing/multiple faces invalidate all actions. Call this for failed frame geometry. */
     public synchronized void invalidateFrame() {
         if (state != State.VERIFYING) return;
-        padStreak = 0; padClear = false; padStarted = padLast = -1;
+        padStreak = 0; padClear = false; padStarted = padLast = null;
         clearActions();
     }
 
@@ -65,18 +75,21 @@ public final class NativeActiveSession {
         expire();
         if (state != State.VERIFYING) return state;
         long now = clock.getAsLong();
-        if (sequence <= lastSequence || now < lastTime) return reject();
+        if (sequence <= lastSequence || (observed && now - lastTime < 0)) return reject();
         lastSequence = sequence;
-        if (lastTime >= 0 && now - lastTime > 1_000_000_000L) invalidateFrame();
+        if (observed && now - lastTime > 1_000_000_000L) invalidateFrame();
         lastTime = now;
+        observed = true;
         if (!observePad(pad, now)) return state;
         if (face == null || !Double.isFinite(face.presence) || face.presence < .9 || !Double.isFinite(face.leftEar) || !Double.isFinite(face.rightEar)
                 || !Double.isFinite(face.turnRatio)) { invalidateFrame(); return state; }
         boolean open = face.leftEar >= .23 && face.rightEar >= .23;
         boolean neutral = open && Math.abs(face.turnRatio) < .12;
         if (phase == 0) {
-            if (hold(neutral, now, 3, 150_000_000L)) { phase = 1; stable = 0; }
+            if (hold(neutral, now, 3, 150_000_000L)) { phase = 1; stable = 0; actionPromptAt = now; }
         } else if (phase == 1) {
+            // PAD still runs during reading time; movements here earn no action credit.
+            if (now - actionPromptAt < 2_000_000_000L) { stable = 0; return state; }
             boolean target = actions[action] == Action.BLINK ? face.leftEar < .18 && face.rightEar < .18 :
                     open && (actions[action] == Action.TURN_IMAGE_LEFT ? face.turnRatio < -.25 : face.turnRatio > .25);
             long duration = actions[action] == Action.BLINK ? 80_000_000L : 150_000_000L;
@@ -103,9 +116,9 @@ public final class NativeActiveSession {
         boolean clear = ("PASSIVE_CLEAR".equals(pad.reason) || "ACTIVE_CHALLENGE_REQUIRED".equals(pad.reason))
                 && pad.score > .45;
         if (!attack && !clear) { reject(); return false; }
-        if (padLast >= 0 && now - padLast > 750_000_000L) invalidateFrame();
+        if (padLast != null && now - padLast > 750_000_000L) invalidateFrame();
         padLast = now;
-        if (padStarted < 0) padStarted = now;
+        if (padStarted == null) padStarted = now;
         if (clear && padClear) return true;
         if (attack) { padClear = false; clearActions(); }
         int direction = attack ? -1 : 1;
@@ -116,7 +129,7 @@ public final class NativeActiveSession {
             reject(); return false;
         }
         if (clear && padStreak >= 5 && now - padHeldSince >= 250_000_000L) {
-            padClear = true; padStarted = -1; return true;
+            padClear = true; padStarted = null; return true;
         }
         if (now - padStarted >= 10_000_000_000L) reject();
         return false;
@@ -129,7 +142,9 @@ public final class NativeActiveSession {
     }
     private void expire() {
         long now = clock.getAsLong();
-        if ((state == State.VERIFYING || state == State.COMPLETE) && now > deadline) reject();
+        if ((state == State.VERIFYING || state == State.COMPLETE)
+                && (now - startedAt < 0 || now - startedAt > timeoutNanos
+                    || (observed && now - lastTime < 0))) reject();
         if (state == State.COMPLETE && now - completedAt > 2_000_000_000L) reject();
     }
     public synchronized void cancel() { reject(); }

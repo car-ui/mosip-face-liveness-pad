@@ -18,6 +18,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import io.mosip.facepad.CameraOwnedPadGate;
 import io.mosip.facepad.CameraActiveEvidence;
 import io.mosip.facepad.NativeActiveSession;
+import io.mosip.facepad.BoundedImage;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.util.*;
@@ -178,6 +179,7 @@ public final class NativePadCameraActivity extends AppCompatActivity {
     }
     /** Decode EXIF orientation and strip metadata before analysis and ISO encoding. */
     static byte[] normalize(byte[] bytes) throws Exception {
+        BoundedImage.requireJpeg(bytes);
         android.media.ExifInterface exif=new android.media.ExifInterface(new ByteArrayInputStream(bytes));
         int orientation=exif.getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION,1);
         Bitmap bitmap=BitmapFactory.decodeByteArray(bytes,0,bytes.length);
@@ -193,11 +195,14 @@ public final class NativePadCameraActivity extends AppCompatActivity {
             case 8:transform.setRotate(270);break;
             default:break;
         }
-        Bitmap upright=Bitmap.createBitmap(bitmap,0,0,bitmap.getWidth(),bitmap.getHeight(),transform,true);
-        try(ByteArrayOutputStream output=new ByteArrayOutputStream()) {
-            if(!upright.compress(Bitmap.CompressFormat.JPEG,90,output))throw new IOException("JPEG encoding failed");
-            return output.toByteArray();
-        } finally { if(upright!=bitmap)upright.recycle();bitmap.recycle(); }
+        Bitmap upright=null;
+        try {
+            upright=Bitmap.createBitmap(bitmap,0,0,bitmap.getWidth(),bitmap.getHeight(),transform,true);
+            try(ByteArrayOutputStream output=new ByteArrayOutputStream()) {
+                if(!upright.compress(Bitmap.CompressFormat.JPEG,90,output))throw new IOException("JPEG encoding failed");
+                return output.toByteArray();
+            }
+        } finally { if(upright!=null && upright!=bitmap)upright.recycle();bitmap.recycle(); }
     }
     /** Uncalibrated research image-quality score, separate from PAD confidence. */
     static int frameQuality(byte[] jpeg) throws Exception {

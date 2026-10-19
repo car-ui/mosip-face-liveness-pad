@@ -26,6 +26,8 @@ def run(java_home: Path, onnx_jar: Path, opencv_jar: Path, output: Path):
     sources = sorted((ROOT / "integrations/native/common/io/mosip/facepad").glob("*.java"))
     sources.append(ROOT / "integrations/native/tests/NativeLandmarkEngineCheck.java")
     sources.append(ROOT / "integrations/native/tests/NativeActiveSessionCheck.java")
+    sources.append(ROOT / "integrations/native/tests/BoundedImageCheck.java")
+    sources.append(ROOT / "integrations/native/tests/NativePadPolicyCheck.java")
     subprocess.run([str(java_home / "bin" / ("javac" + suffix)), "-J-Xmx192m", "--release", "8", "-cp", classpath,
                     "-d", str(output), *map(str,sources)], check=True)
     result = subprocess.run([str(java_home / "bin" / ("java" + suffix)), "-Xmx128m", "-XX:+UseSerialGC",
@@ -41,6 +43,19 @@ def run(java_home: Path, onnx_jar: Path, opencv_jar: Path, output: Path):
     print(actions.stdout)
     if actions.returncode:
         raise SystemExit(f"Action check failed; inspect {output / 'native-action-check.log'}")
+    headers = subprocess.run([str(java_home / "bin" / ("java" + suffix)), "-Xmx32m", "-XX:+UseSerialGC",
+                              "-cp", classpath, "BoundedImageCheck", str(ROOT / "tests/sample_images/astronaut.png")],
+                             text=True, capture_output=True, timeout=30)
+    (output / "image-header-check.log").write_text(headers.stdout + headers.stderr, encoding="utf-8")
+    print(headers.stdout)
+    if headers.returncode:
+        raise SystemExit(f"Image header check failed; inspect {output / 'image-header-check.log'}")
+    policy = subprocess.run([str(java_home / "bin" / ("java" + suffix)), "-Xmx32m", "-XX:+UseSerialGC",
+                             "-cp", classpath, "NativePadPolicyCheck"], text=True, capture_output=True, timeout=30)
+    (output / "native-policy-check.log").write_text(policy.stdout + policy.stderr, encoding="utf-8")
+    print(policy.stdout)
+    if policy.returncode:
+        raise SystemExit(f"Policy check failed; inspect {output / 'native-policy-check.log'}")
 
 
 if __name__ == "__main__":

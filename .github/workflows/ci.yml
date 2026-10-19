@@ -55,6 +55,8 @@ jobs:
         java -cp output/local/java NativeCaptureGateTest
         javac --release 8 -d output/local/java integrations/native/common/io/mosip/facepad/BoundedMjpegReader.java integrations/native/tests/BoundedMjpegReaderCheck.java
         java -cp output/local/java BoundedMjpegReaderCheck
+        javac --release 8 -d output/local/java integrations/native/common/io/mosip/facepad/BoundedImage.java integrations/native/tests/BoundedImageCheck.java
+        java -cp output/local/java BoundedImageCheck tests/sample_images/astronaut.png
 
     - name: Set up desktop native runtime
       uses: actions/setup-java@v4

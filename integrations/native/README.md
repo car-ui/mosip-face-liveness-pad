@@ -1,5 +1,27 @@
 # Native capture checkpoints
 
+## Current native source, 19 October
+
+The shared source now uses a hash-pinned portable YuNet decoder. PAD and action
+landmarks use the same face box. Native sessions collect bounded PAD evidence,
+clear action credit on suspect frames, allow reading time, and display action
+counts. JPEG/PNG/JP2/J2K dimensions are checked before image allocation. See
+[image limits](../../docs/ENCODED_IMAGE_BOUNDS.md).
+
+The adapters read workflow-specific thresholds and active settings from the
+host clients' configuration caches. Operator/supervisor proof is bound to its
+role and parsed policy. See [native policy keys](../../docs/NATIVE_POLICY.md).
+Current desktop controller checks exercise configuration selection, malformed
+policy rejection and PAD veto before matching. The recorded portrait is rejected
+by the current model/crop, so it does not exercise positive identity matching.
+The earlier positive fixture results below describe older builds.
+
+Historical Android APK/instrumentation results below do not validate these new
+sources. A new camera-SBI app/test build succeeded; final source/package checks
+and the registration-client rebuild are recorded separately. No physical attack
+accuracy, production certificate trust or live native UI success is claimed.
+
+
 This directory adds an offline, in-process PAD checkpoint to pinned MOSIP client sources. It supplements the Python prototype. It does not establish a completed live registration, a live client UI rejection, or physical attack accuracy.
 
 | Client | Upstream | Commit |

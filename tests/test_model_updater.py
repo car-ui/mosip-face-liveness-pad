@@ -82,3 +82,31 @@ def test_model_updater_atomic_install_and_rollback():
         assert rollback_ok is True
         with open(installed_path, "rb") as f:
             assert f.read() == initial_payload
+
+def test_empty_persisted_version_does_not_allow_a_signed_downgrade(tmp_path):
+    updater = SecureModelUpdateManager(str(tmp_path), allow_insecure_test_key=True)
+    target = tmp_path / "model.onnx"
+    target.write_bytes(b"installed-version-three")
+    (tmp_path / "model.onnx.version").write_text("")
+    older = updater.generate_signed_package("model", "2.0.0", b"older-signed-model")
+    ok, _ = updater.install_update(older, "model.onnx")
+    assert not ok
+    assert target.read_bytes() == b"installed-version-three"
+
+
+def test_version_publication_failure_preserves_installed_model_and_ceiling(tmp_path, monkeypatch):
+    updater = SecureModelUpdateManager(str(tmp_path), allow_insecure_test_key=True)
+    assert updater.install_update(updater.generate_signed_package("model", "1.0.0", b"first"), "model.onnx")[0]
+    replace = os.replace
+
+    def fail_ceiling(source, destination):
+        if str(destination).endswith(".version"):
+            raise OSError("injected version publication failure")
+        return replace(source, destination)
+
+    monkeypatch.setattr(os, "replace", fail_ceiling)
+    ok, _ = updater.install_update(updater.generate_signed_package("model", "2.0.0", b"second"), "model.onnx")
+    assert not ok
+    assert (tmp_path / "model.onnx").read_bytes() == b"first"
+    assert (tmp_path / "model.onnx.version").read_text() == "1.0.0"
+    assert not list(tmp_path.glob("*.tmp"))

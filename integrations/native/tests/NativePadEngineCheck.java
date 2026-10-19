@@ -25,6 +25,16 @@ public final class NativePadEngineCheck {
                 require("NO_FACE".equals(engine.evaluateBgr(blank, true).reason), "Unexpected blank reason");
             } finally { blank.release(); }
             require(!engine.evaluateEncoded(new byte[]{1,2,3}, false).accepted, "Malformed image accepted");
+            for(String name:new String[]{"dimensions-gradient.jp2","dimensions-gradient.j2k"}) {
+                byte[] encoded=Files.readAllBytes(root.resolve("integrations/native/tests/fixtures/"+name));
+                MatOfByte compressed=new MatOfByte(encoded);Mat decoded=null;
+                try {
+                    decoded=org.opencv.imgcodecs.Imgcodecs.imdecode(compressed,org.opencv.imgcodecs.Imgcodecs.IMREAD_COLOR);
+                    require(decoded.cols()==64 && decoded.rows()==48 && decoded.type()==CvType.CV_8UC3,
+                            "JPEG2000 compatibility fixture did not decode");
+                    require("INVALID_IMAGE".equals(engine.evaluateEncoded(encoded,false).reason),"Undersized JPEG2000 image accepted");
+                } finally {compressed.release();if(decoded!=null)decoded.release();}
+            }
             boolean invalidTensor = false;
             tensor[0] = Float.NaN;
             try { engine.scoreTensor(tensor); } catch (Exception e) { invalidTensor = true; }

@@ -11,6 +11,18 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def stream_sha256(stream):
+    digest = hashlib.sha256()
+    for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+        digest.update(chunk)
+    return digest.hexdigest()
+
+
+def file_sha256(path: Path):
+    with path.open("rb") as stream:
+        return stream_sha256(stream)
+
+
 def require_passed(text: str, expected: int = 6):
     if (not re.search(rf"^OK \({expected} tests\)\s*$", text, re.MULTILINE)
             or "FAILURES!!!" in text or "INSTRUMENTATION_FAILED" in text
@@ -21,14 +33,24 @@ def require_passed(text: str, expected: int = 6):
 
 def verify_apk(path: Path):
     with zipfile.ZipFile(path) as archive:
+        names = archive.namelist()
+        if len(names) != len(set(names)):
+            raise ValueError("Duplicate APK archive entry")
+        models = ["minifasnet_v2.onnx", "facemesh_v2.onnx", "face_detection_yunet_2023mar.onnx"]
+        notices = ["CAMERA-SBI-LICENSE.txt", "LANDMARK-MODEL-LICENSE.txt", "MODEL-LICENSE.txt",
+                   "ONNX-Runtime-LICENSE.txt", "OpenCV-LICENSE.txt", "FACE-DETECTOR-LICENSE.txt"]
+        required = {"assets/facepad/" + name for name in models + notices}
+        if not required.issubset(set(names)):
+            raise ValueError("APK is missing a current model or runtime notice")
         if archive.testzip() is not None:
             raise ValueError("APK archive integrity failure")
-        for name in ["minifasnet_v2.onnx", "facemesh_v2.onnx"]:
-            expected = hashlib.sha256((ROOT / "assets/models" / name).read_bytes()).digest()
-            if hashlib.sha256(archive.read("assets/facepad/" + name)).digest() != expected:
+        for name in models:
+            expected = file_sha256(ROOT / "assets/models" / name)
+            with archive.open("assets/facepad/" + name) as stream:
+                actual = stream_sha256(stream)
+            if actual != expected:
                 raise ValueError(f"APK model mismatch: {name}")
-        for name in ["CAMERA-SBI-LICENSE.txt", "LANDMARK-MODEL-LICENSE.txt", "MODEL-LICENSE.txt",
-                     "ONNX-Runtime-LICENSE.txt", "OpenCV-LICENSE.txt"]:
+        for name in notices:
             if len(archive.read("assets/facepad/" + name)) < 100:
                 raise ValueError(f"Missing runtime notice: {name}")
 
@@ -61,7 +83,7 @@ def main():
               "serial": args.serial, "avd": args.avd_name, "tests": 8, "status": "RUNNING", "apks": []}
     for path in [args.apk, args.test_apk]:
         report["apks"].append({"file": path.name, "bytes": path.stat().st_size,
-                               "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
+                               "sha256": file_sha256(path)})
     result = args.output / "result.json"
     result.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     try:
@@ -81,7 +103,7 @@ def main():
             call("shell", "am", "force-stop", "nprime.reg.sbi.face")
             raise RuntimeError("Native instrumentation exceeded five minutes") from failure
         require_passed(log.read_text(encoding="utf-8"), 8)
-        report.update(status="PASS", result_sha256=hashlib.sha256(log.read_bytes()).hexdigest())
+        report.update(status="PASS", result_sha256=file_sha256(log))
     except Exception:
         report["status"] = "FAIL"
         raise

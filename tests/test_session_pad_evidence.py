@@ -1,6 +1,25 @@
 """Video decision policy tests with explicit scores/clocks, not accuracy claims."""
 from src.core.config import PADVerdict
 from src.core.session_pad import SessionPADGate, EvidenceState
+import pytest
+
+
+@pytest.mark.parametrize("field,value", [
+    ("attack_frames", 1.5), ("clear_frames", True),
+    ("attack_seconds", float("nan")), ("clear_seconds", float("inf")),
+    ("max_gap_seconds", float("nan")), ("max_wait_seconds", float("nan")),
+    ("max_wait_seconds", "10"),
+])
+def test_invalid_policy_values_cannot_disable_bounded_collection(field, value):
+    with pytest.raises(ValueError, match="policy"):
+        SessionPADGate(**{field: value})
+
+
+@pytest.mark.parametrize("timestamp", [None, "1", True, float("nan"), float("inf")])
+def test_invalid_observation_clock_returns_terminal_error(timestamp):
+    gate = SessionPADGate()
+    assert gate.observe(PADVerdict.BONA_FIDE_LIVE, timestamp).state == EvidenceState.ERROR
+    assert gate.observe(PADVerdict.BONA_FIDE_LIVE, 1).state == EvidenceState.ERROR
 
 
 def test_single_low_frame_blocks_but_does_not_finish_trial():

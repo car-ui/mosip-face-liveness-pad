@@ -23,6 +23,7 @@ import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
 import org.opencv.core.Mat;
 import org.opencv.core.Rect;
+import org.opencv.core.Core;
 import org.opencv.imgproc.Imgproc;
 import io.mosip.registration.clientmanager.constant.Modality;
 import io.mosip.registration.clientmanager.constant.RegistrationConstants;
@@ -80,6 +81,24 @@ public class NativePadAcceptanceTest {
         for (int i = 0; i < input.length; i++) input[i] = i % 256;
         // Reference from Python ORT and the exact packaged model hash. Synthetic tensor only.
         assertEquals(8.380277904507238e-6, engine.scoreTensor(input), 1e-7);
+    }
+
+    @Test public void actualPackagedYuNetRejectsTwoRecordedFaces() throws Exception {
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        Method factory = AndroidPadCheckpoint.class.getDeclaredMethod("engine", Context.class);
+        factory.setAccessible(true);
+        NativePadEngine engine = (NativePadEngine) factory.invoke(null, context);
+        Bitmap photo;
+        try(InputStream input=InstrumentationRegistry.getInstrumentation().getContext().getAssets().open("astronaut.png")) {
+            photo=BitmapFactory.decodeStream(input);
+        }
+        assertNotNull(photo);
+        Mat rgba=new Mat(),bgr=new Mat(),two=new Mat();
+        try {
+            Utils.bitmapToMat(photo,rgba);Imgproc.cvtColor(rgba,bgr,Imgproc.COLOR_RGBA2BGR);
+            Core.hconcat(Arrays.asList(bgr,bgr),two);
+            assertEquals("MULTIPLE_FACES",engine.evaluateBgr(two,true).reason);
+        } finally {photo.recycle();rgba.release();bgr.release();two.release();}
     }
 
     @Test public void actualAndroidLandmarksOnRecordedFixture() throws Exception {
@@ -157,8 +176,13 @@ public class NativePadAcceptanceTest {
 
     @Test public void residentApiRejectsBeforeStorage() throws Exception { exerciseApi(false); }
     @Test public void onboardingApiRejectsBeforeStorage() throws Exception { exerciseApi(true); }
+    @Test public void disabledCachedPolicyCannotBypassOnboardingCheckpoint() throws Exception { exerciseApi(true,true); }
 
     private void exerciseApi(boolean operator) throws Exception {
+        exerciseApi(operator,false);
+    }
+
+    private void exerciseApi(boolean operator,boolean disabled) throws Exception {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         AuditManagerService audit = mock(AuditManagerService.class);
         Biometrics095Service sbi = mock(Biometrics095Service.class);
@@ -177,8 +201,9 @@ public class NativePadAcceptanceTest {
         when(activity.getContentResolver()).thenReturn(context.getContentResolver());
         when(activity.getAssets()).thenReturn(context.getAssets());
         when(activity.getCacheDir()).thenReturn(context.getCacheDir());
-        BiometricsDetailsApi api = new BiometricsDetailsApi(audit, new ObjectMapper(), sbi, registrations,
-                mock(GlobalParamRepository.class), onboarding);
+        GlobalParamRepository config=mock(GlobalParamRepository.class);
+        if(disabled)when(config.getCachedStringGlobalParam("mosip.facepad.enabled")).thenReturn("false");
+        BiometricsDetailsApi api = new BiometricsDetailsApi(audit, new ObjectMapper(), sbi, registrations,config,onboarding);
         set(api, "activity", activity); set(api, "currentModality", Modality.FACE);
         set(api, "fieldId", operator ? "operatorBiometrics" : "syntheticResident");
         AtomicReference<Throwable> rejection = new AtomicReference<>();
@@ -193,7 +218,7 @@ public class NativePadAcceptanceTest {
             InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> api.parseRCaptureResponse(bundle));
             assertNull("Capture was reported as accepted", success.get());
             assertNotNull("Rejection callback missing", rejection.get());
-            assertTrue(rejection.get().getMessage(), rejection.get().getMessage().contains("NO_FACE"));
+            assertTrue(rejection.get().getMessage(), rejection.get().getMessage().contains(disabled ? "liveness disabled" : "NO_FACE"));
             verify(registration, never()).addBiometric(anyString(), anyString(), anyInt(), any(BiometricsDto.class));
             assertTrue("Operator storage changed despite rejection", operatorStorage.isEmpty());
         } finally { response.delete(); }

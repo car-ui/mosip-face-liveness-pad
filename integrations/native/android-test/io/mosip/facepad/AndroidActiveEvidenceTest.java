@@ -130,7 +130,7 @@ public class AndroidActiveEvidenceTest {
             .put("error",new JSONObject().put("errorCode","0").put("errorInfo","Success"));
         return new JSONObject().put("biometrics",new JSONArray().put(capture)).toString().getBytes(StandardCharsets.UTF_8);
     }
-    private void exerciseActualOnboardingApi(Biometrics095Service service,String jwt) throws Exception {
+    private void exerciseActualOnboardingPadVeto(Biometrics095Service service,String jwt) throws Exception {
         List<BiometricsDto> stored=new ArrayList<>();
         UserOnboardService onboarding=mock(UserOnboardService.class);
         when(onboarding.getCaptureTransactionId()).thenReturn(transaction);
@@ -158,10 +158,11 @@ public class AndroidActiveEvidenceTest {
             try(FileOutputStream output=new FileOutputStream(file)) {output.write(response(jwt));}
             android.os.Bundle bundle=new android.os.Bundle();bundle.putParcelable(RegistrationConstants.SBI_INTENT_RESPONSE_KEY,android.net.Uri.fromFile(file));
             InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> api.parseRCaptureResponse(bundle));
-            assertNull(failure.get()==null?"":failure.get().toString(),failure.get());assertEquals("Ok",success.get());assertEquals(1,stored.size());
+            assertNull(success.get());assertNotNull(failure.get());assertEquals(0,stored.size());
+            assertTrue(failure.get().getMessage(),failure.get().getMessage().contains("PRESENTATION_ATTACK"));
             success.set(null);
             InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> api.parseRCaptureResponse(bundle));
-            assertNull(success.get());assertNotNull(failure.get());assertEquals(1,stored.size());
+            assertNull(success.get());assertNotNull(failure.get());assertEquals(0,stored.size());
         } finally {file.delete();}
     }
     @Test public void realParserVerifiesRsaBeforeActiveCheckpointAndRejectsTampering() throws Exception {
@@ -183,8 +184,9 @@ public class AndroidActiveEvidenceTest {
         JSONObject value=payload();String jwt=sign(value,keys);
         List<BiometricsDto> verified=parse(service,jwt,transaction);
         assertEquals(1,verified.size());
-        exerciseActualOnboardingApi(service,jwt);
-        try {AndroidPadCheckpoint.requireClear(context,verified,true,transaction);fail("Replay accepted");}catch(IOException expected){}
+        exerciseActualOnboardingPadVeto(service,jwt);
+        try {AndroidPadCheckpoint.requireClear(context,verified,true,transaction);fail("Signed metadata overrode PAD attack");}
+        catch(IOException expected) {assertTrue(expected.getMessage(),expected.getMessage().contains("PRESENTATION_ATTACK"));}
         String[] parts=jwt.split("\\.");value.getJSONObject("facePad").put("state","INCOMPLETE");
         String tampered=parts[0]+"."+encode(value.toString().getBytes(StandardCharsets.UTF_8))+"."+parts[2];
         try {parse(service,tampered,transaction);fail("Tampered signature accepted");}catch(BiometricsServiceException expected){}

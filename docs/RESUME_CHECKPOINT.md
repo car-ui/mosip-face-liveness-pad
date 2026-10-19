@@ -56,3 +56,29 @@ calls, and a completed action double could not override the recorded portrait's
 PAD attack verdict. This fixture no longer exercises positive matcher acceptance.
 See native-yunet-controller-check.json. Earlier resource failures remain in logs;
 Android rebuilds, physical attack accuracy and live client UI remain unverified.
+
+
+Timed pass in progress until 19:23 IST on 19 October. Latest working Python
+source passes 186 tests in a fresh D: copy and the original workspace with
+PYTHONPYCACHEPREFIX on D:. Root default-cache runs had early collection/runtime
+interruptions; preserve logs and use a fresh cache. The source regression was
+not reproduced with fresh cache locations. scripts/check_local.ps1 provides
+isolated caches/logs and a machine-readable result; full wrapper run is pending.
+Native clock rollback, arbitrary clock origins, two-second instruction reading,
+action counts, bounded JPEG/PNG/JP2/J2K preflight and cached workflow policies are
+implemented. Pure Java header/policy/session checks and actual Java model checks
+passed. Patched desktop controllers compiled with --release 11 on JDK 21 and
+passed role-specific cache and PAD-veto checks. Both updated patches prepared
+from clean pinned upstream clones. See NATIVE_POLICY.md and ENCODED_IMAGE_BOUNDS.md.
+The reference camera SBI and test APK rebuilt successfully with the new detector;
+subsequent JP2 guard changes need its final incremental rebuild. Android client
+build failed spawning Flutter/Git under Windows paging-file pressure. Retry with
+one JVM, bounded compiler/heap and the previous two-ABI Flutter target set before
+considering a private SDK wrapper. Do not modify the installed Flutter SDK.
+A Java 11 toolchain was located at C:/CodexTools/temurin-11.0.32/jdk-11.0.32.1+1;
+Maven is at C:/CodexTools/apache-maven-3.9.16. Prefer it for the final desktop
+reactor build/check rather than assuming Java 11 is unavailable.
+Offline updater now rejects an empty saved ceiling and stages/fsyncs the version
+record before replacement. Six updater tests passed. Offline imports no longer
+load vision libraries eagerly. Keep all artifacts/temp/cache on D:. No pushes,
+GitHub Actions, physical phone actions, user camera requests or demo work.

@@ -2,6 +2,8 @@ import io.mosip.facepad.NativeLandmarkEngine;
 import io.mosip.facepad.NativePadEngine;
 import io.mosip.facepad.NativeFrameChallenge;
 import io.mosip.facepad.NativeActiveSession;
+import io.mosip.facepad.NativeActiveSessionCheck;
+import io.mosip.facepad.NativePadPolicy;
 import java.nio.*;
 import java.nio.file.*;
 import java.io.IOException;
@@ -49,6 +51,22 @@ public final class NativeLandmarkEngineCheck {
                     if (active.state() == NativeActiveSession.State.COMPLETE || active.consume(bytes))
                         throw new AssertionError("Repeated static photograph completed active challenge");
                     System.out.println("PASS actual PAD/landmark frame bridge does not complete actions on repeated recorded photo; state=" + active.state());
+                    java.lang.reflect.Field session = NativeFrameChallenge.class.getDeclaredField("session");
+                    session.setAccessible(true);
+                    NativePadPolicy original = NativePadPolicy.defaults(NativePadPolicy.Workflow.OPERATOR);
+                    for(NativePadPolicy changed:new NativePadPolicy[]{
+                            NativePadPolicy.defaults(NativePadPolicy.Workflow.SUPERVISOR),
+                            NativePadPolicy.read(key -> key.endsWith("passive.threshold") ? "0.95" : null,NativePadPolicy.Workflow.OPERATOR)}) {
+                        NativeFrameChallenge proof = new NativeFrameChallenge(pad,engine,10000,original);
+                        session.set(proof,NativeActiveSessionCheck.completedForControllerTest(bytes));
+                        if(proof.consume(bytes,changed) || proof.state()!=NativeActiveSession.State.REJECTED)
+                            throw new AssertionError("Completed action double crossed role/policy boundary");
+                    }
+                    NativeFrameChallenge unchanged = new NativeFrameChallenge(pad,engine,10000,original);
+                    session.set(unchanged,NativeActiveSessionCheck.completedForControllerTest(bytes));
+                    if(!unchanged.consume(bytes,original) || unchanged.consume(bytes,original))
+                        throw new AssertionError("Unchanged proof was not consumed exactly once");
+                    System.out.println("PASS frame proof bound to workflow and policy snapshot; injected completion double only");
                 } finally { jpeg.release(); }
             }
         } finally { image.release(); }

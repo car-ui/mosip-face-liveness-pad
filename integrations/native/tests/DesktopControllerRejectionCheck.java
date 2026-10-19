@@ -112,6 +112,24 @@ public final class DesktopControllerRejectionCheck extends BaseController {
         }
         if (captures.get() != 2 || matches.get() != 0) throw new AssertionError("Matcher called despite rejection");
         System.out.println("PASS upstream BaseController operator/supervisor rejection: captures=2, identityMatcherCalls=0");
+        String supervisorKey="mosip.facepad.supervisor.passive.threshold";
+        Object previousPolicy=ApplicationContext.map().put(supervisorKey,"malformed");
+        try {
+            try { controller.captureAndValidateFace("SYNTHETIC-TEST-ONLY",true,true);throw new AssertionError("Invalid supervisor policy accepted"); }
+            catch(IOException expected) {
+                if(!expected.getMessage().contains("native configuration"))throw expected;
+            }
+            try { controller.captureAndValidateFace("SYNTHETIC-TEST-ONLY",true,false);throw new AssertionError("Blank operator accepted"); }
+            catch(IOException expected) {
+                if(!expected.getMessage().contains("NO_FACE"))throw expected;
+            }
+            if(matches.get()!=0)throw new AssertionError("Configuration failure reached matcher");
+            System.out.println("PASS actual authentication controller selects supervisor/operator cached policies separately; malformed policy blocks before matching");
+        } finally {
+            if(previousPolicy==null)ApplicationContext.map().remove(supervisorKey);
+            else ApplicationContext.map().put(supervisorKey,previousPolicy);
+        }
+        int capturesBeforePortrait=captures.get();
         if (args.length >= 1) {
             // Attributed static NASA fixture, not a physical attack or a camera capture.
             ByteArrayOutputStream portraitJpeg = new ByteArrayOutputStream();
@@ -141,7 +159,7 @@ public final class DesktopControllerRejectionCheck extends BaseController {
                     if (!expected.getMessage().contains(reason)) throw expected;
                 }
             }
-            if (captures.get() != 4 || matches.get() != 0) throw new AssertionError("Matcher called without active evidence");
+            if (captures.get() != capturesBeforePortrait+2 || matches.get() != 0) throw new AssertionError("Matcher called without active evidence");
             System.out.println("PASS recorded NASA portrait rejected for operator/supervisor; identityMatcherCalls=0; passiveClear=" + passiveClear + "; attackRejected=" + attackRejected);
             // Inject only session geometry for this controller-path test. Production
             // sessions receive actual PAD/landmark observations from the native stream.

@@ -1,0 +1,26 @@
+{
+  "upstream_commit": "935306e2fd38bff2803697468e595026b1d18cec",
+  "checks": [
+    {
+      "check": "DesktopControllerRejectionCheck",
+      "status": "PASS",
+      "results": [
+        "PASS actual upstream Streamer: consecutive frames, bounded EOF rejection and disconnect cleanup",
+        "PASS registration checkpoint rejects decoded blank ISO: NO_FACE",
+        "PASS upstream GenericBiometricsController rejects blank ISO before returning candidates for storage",
+        "PASS upstream BaseController operator/supervisor rejection: captures=2, identityMatcherCalls=0",
+        "PASS actual authentication controller selects supervisor/operator cached policies separately; malformed policy blocks before matching",
+        "PASS recorded NASA portrait rejected for operator/supervisor; identityMatcherCalls=0; passiveClear=false; attackRejected=true",
+        "PASS completed action double cannot override PAD attack; identityMatcherCalls=0",
+        "Evidence scope: recorded photo rejection through upstream controllers; positive matcher path not exercised with this rejected fixture; no live UI or physical attack claim."
+      ],
+      "log": "DesktopControllerRejectionCheck.log"
+    }
+  ],
+  "runtime": "Temporarily verified on isolated JDK 21; shared components target Java 8; patched desktop controllers target Java 11",
+  "limitations": [
+    "Recorded and synthetic inputs; no live client UI",
+    "Positive identity matching not exercised with the rejected portrait",
+    "No physical attack or production PKI claim"
+  ]
+}

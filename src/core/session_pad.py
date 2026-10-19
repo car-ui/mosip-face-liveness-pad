@@ -6,6 +6,15 @@ import math
 from .config import PADVerdict
 
 
+def _finite_number(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
+
+
 class EvidenceState(str, Enum):
     COLLECTING = "COLLECTING"
     CLEAR = "CLEAR"
@@ -25,7 +34,9 @@ class EvidenceResult:
 class SessionPADGate:
     def __init__(self, attack_frames=5, attack_seconds=.5, clear_frames=5,
                  clear_seconds=.25, max_gap_seconds=.75, max_wait_seconds=10):
-        if (attack_frames < 1 or clear_frames < 1 or attack_seconds < 0 or clear_seconds < 0
+        if (any(isinstance(v, bool) or not isinstance(v, int) for v in (attack_frames, clear_frames))
+                or not all(_finite_number(v) for v in (attack_seconds, clear_seconds, max_gap_seconds, max_wait_seconds))
+                or attack_frames < 1 or clear_frames < 1 or attack_seconds < 0 or clear_seconds < 0
                 or max_gap_seconds <= 0 or max_wait_seconds <= 0):
             raise ValueError("Invalid PAD evidence policy")
         self.attack_frames_required = attack_frames
@@ -47,7 +58,7 @@ class SessionPADGate:
     def observe(self, verdict, now):
         if self._terminal is not None:
             return self._terminal
-        if not math.isfinite(now) or (self._last_time is not None and now < self._last_time):
+        if not _finite_number(now) or (self._last_time is not None and now < self._last_time):
             return self._result(EvidenceState.ERROR, "Invalid evidence clock")
         if self._episode_start is None:
             self._episode_start = now

@@ -32,12 +32,16 @@ def run(java_home: Path, onnx_jar: Path, opencv_jar: Path, output: Path):
     subprocess.run([str(javac), "-J-Xmx192m", "--release", "8", "-cp", classpath,
                     "-d", str(output), str(ROOT / "integrations/native/common/io/mosip/facepad/NativePadEngine.java"),
                     str(ROOT / "integrations/native/common/io/mosip/facepad/NativeYuNet.java"),
+                    str(ROOT / "integrations/native/common/io/mosip/facepad/BoundedImage.java"),
+                    str(ROOT / "integrations/native/common/io/mosip/facepad/NativePadPolicy.java"),
                     str(ROOT / "integrations/native/tests/NativePadEngineCheck.java")], check=True)
     result = subprocess.run([str(java), "-Xmx128m", "-XX:+UseSerialGC", "-Djava.io.tmpdir=" + str(output),
                              "-cp", classpath, "NativePadEngineCheck", str(ROOT), str(tensor), str(expected)],
-                            text=True, capture_output=True, check=True)
+                            text=True, capture_output=True, timeout=120)
     (output / "native-engine-check.log").write_text(result.stdout + result.stderr, encoding="utf-8")
     print(result.stdout)
+    if result.returncode:
+        raise SystemExit(f"Native engine check failed; inspect {output / 'native-engine-check.log'}")
 
 
 if __name__ == "__main__":
