@@ -112,7 +112,7 @@ class LivenessConfig:
         active_liveness_enabled=True,
         min_challenges=1,
         max_challenges=2,
-        challenge_timeout_seconds=7.0,
+        challenge_timeout_seconds=12.0,
         max_retries=3
     ))
     
@@ -123,7 +123,7 @@ class LivenessConfig:
         active_liveness_enabled=True,
         min_challenges=2,
         max_challenges=2,
-        challenge_timeout_seconds=5.0,
+        challenge_timeout_seconds=12.0,
         max_retries=2
     ))
     
@@ -134,7 +134,7 @@ class LivenessConfig:
         active_liveness_enabled=True,
         min_challenges=2,
         max_challenges=3,
-        challenge_timeout_seconds=5.0,
+        challenge_timeout_seconds=12.0,
         max_retries=2
     ))
     

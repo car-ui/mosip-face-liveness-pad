@@ -52,7 +52,8 @@ class FaceQualityAssessor:
         cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
         self.face_cascade = cv2.CascadeClassifier(cascade_path)
 
-    def detect_faces(self, frame: np.ndarray, known_box: Optional[Tuple[int, int, int, int]] = None) -> List[DetectedFace]:
+    def detect_faces(self, frame: np.ndarray, known_box: Optional[Tuple[int, int, int, int]] = None,
+                     landmark_boxes=None) -> List[DetectedFace]:
         # A tracked box cannot establish that no second face is present.
         # Fast downscaled Haar detection for 30+ FPS
         h, w = frame.shape[:2]
@@ -76,6 +77,23 @@ class FaceQualityAssessor:
                 h=int(bh / scale),
                 confidence=0.95
             ))
+        # Supplement the frontal detector with fresh multi-face landmark detections.
+        # Keep every disjoint Haar face so a second person cannot be hidden.
+        for x, y, bw, bh in landmark_boxes or []:
+            if bw <= 0 or bh <= 0:
+                continue
+            overlaps = False
+            for face in faces:
+                intersection = (max(0, min(x + bw, face.x + face.w) - max(x, face.x)) *
+                                max(0, min(y + bh, face.y + face.h) - max(y, face.y)))
+                if intersection / max(1, min(bw * bh, face.w * face.h)) > 0.5:
+                    overlaps = True
+                    break
+            if not overlaps:
+                faces.append(DetectedFace(x, y, bw, bh, 0.95))
+        # Two current landmark faces must remain two, even if their boxes overlap.
+        if landmark_boxes and len(landmark_boxes) > 1 and len(faces) < 2:
+            faces = [DetectedFace(*box, 0.95) for box in landmark_boxes]
         return faces
 
     def assess_quality(self, frame: np.ndarray, faces: List[DetectedFace]) -> QualityMetrics:

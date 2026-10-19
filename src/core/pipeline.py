@@ -100,6 +100,7 @@ class LivenessPipeline:
         self._passive_frames_analyzed = 0
         self._state_start_time = time.time()
         self._last_face_box: Optional[Tuple[int, int, int, int]] = None
+        self._terminal_result = None
 
     def set_workflow(self, workflow: WorkflowType) -> None:
         self.workflow = workflow
@@ -117,6 +118,8 @@ class LivenessPipeline:
         self._state_start_time = time.time()
         self.challenge_manager.reset()
         self.temporal_buffer.clear()
+        self._terminal_result = None
+        self._last_face_box = None
         
         self.audit_logger.log_event(
             AuditEventType.CAPTURE_STARTED,
@@ -130,6 +133,8 @@ class LivenessPipeline:
         if self.state in (PipelineState.CAPTURE_SUCCESS, PipelineState.ATTACK_REJECTED,
                           PipelineState.MAX_RETRIES_EXCEEDED, PipelineState.DEVICE_ERROR):
             passed = self.state == PipelineState.CAPTURE_SUCCESS
+            if self._terminal_result is not None:
+                return self._terminal_result
             return PipelineStepResult(
                 state=self.state,
                 decision=LivenessDecision.PASSED if passed else LivenessDecision.FAILED,
@@ -153,6 +158,10 @@ class LivenessPipeline:
             result = self._process_frame(frame)
             if result.state.value in self.config.guidance_messages:
                 result.detailed_guidance = self.config.guidance_messages[result.state.value]
+            if result.state in (PipelineState.ATTACK_REJECTED, PipelineState.MAX_RETRIES_EXCEEDED,
+                                PipelineState.DEVICE_ERROR):
+                result.detailed_guidance += " Press R to restart."
+                self._terminal_result = result
             return result
         except Exception:
             self.state = PipelineState.DEVICE_ERROR
@@ -206,7 +215,8 @@ class LivenessPipeline:
 
         # 1. Face Detection & Quality Assessment (ISO/IEC 19794-5)
         known_box = telemetry.get("face_box")
-        faces = self.quality_assessor.detect_faces(bgr, known_box=known_box)
+        faces = self.quality_assessor.detect_faces(
+            bgr, known_box=known_box, landmark_boxes=telemetry.get("face_boxes"))
         quality = self.quality_assessor.assess_quality(bgr, faces)
 
         # Handle face detection / quality errors
@@ -216,6 +226,11 @@ class LivenessPipeline:
             self._passive_frames_analyzed = 0
             self.challenge_manager.completed_challenges.clear()
             if self.state == PipelineState.ACTIVE_CHALLENGE:
+                self.audit_logger.log_event(
+                    AuditEventType.ACTIVE_CHALLENGE_FAILED,
+                    session_id=self.session_id, workflow=self.workflow.value,
+                    details={"reason": quality.error_message, "face_count": quality.face_count,
+                             "challenge": challenge_state.challenge.value if challenge_state else None})
                 self.challenge_manager.increment_retry()
                 self.state = (PipelineState.RETRY_PENDING if self.challenge_manager.can_retry()
                               else PipelineState.MAX_RETRIES_EXCEEDED)
@@ -505,7 +520,9 @@ class LivenessPipeline:
                     AuditEventType.ACTIVE_CHALLENGE_FAILED,
                     session_id=self.session_id,
                     workflow=self.workflow.value,
-                    details={"retry": self.challenge_manager.current_retry, "max": self.policy.max_retries}
+                    details={"retry": self.challenge_manager.current_retry, "max": self.policy.max_retries,
+                             "reason": "timeout", "challenge": updated_challenge.challenge.value,
+                             "elapsed_seconds": round(time.time() - updated_challenge.start_time, 2)}
                 )
 
                 if self.challenge_manager.can_retry():
@@ -593,7 +610,7 @@ class LivenessPipeline:
                     )
                 else:
                     # Proceed to next challenge
-                    self.challenge_manager.generate_next_challenge()
+                    updated_challenge = self.challenge_manager.generate_next_challenge()
 
             return PipelineStepResult(
                 state=self.state,

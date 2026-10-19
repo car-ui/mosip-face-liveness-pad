@@ -126,6 +126,7 @@ class ActiveLivenessDetector:
         h, w = bgr_frame.shape[:2]
         telemetry = {
             "landmarks_detected": False,
+            "face_boxes": [],
             "blink_score": 0.0,
             "ear": 0.30,
             "smile_score": 0.0,
@@ -145,6 +146,14 @@ class ActiveLivenessDetector:
             rgb = cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2RGB)
             mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
             res = self._landmarker.detect(mp_image)
+            # These boxes belong to this frame, never to an earlier tracked face.
+            for landmarks in res.face_landmarks or []:
+                xs = [lm.x * w for lm in landmarks]
+                ys = [lm.y * h for lm in landmarks]
+                x1, y1 = max(0, int(min(xs))), max(0, int(min(ys)))
+                x2, y2 = min(w, int(max(xs))), min(h, int(max(ys)))
+                if x2 > x1 and y2 > y1:
+                    telemetry["face_boxes"].append((x1, y1, x2 - x1, y2 - y1))
 
             if res.face_landmarks and len(res.face_landmarks) > 0:
                 raw_landmarks = res.face_landmarks[0]

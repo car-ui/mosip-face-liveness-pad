@@ -15,7 +15,7 @@ from ..devices.base import FaceCaptureDevice, DeviceType, MockScenario
 from ..devices.webcam_device import WebcamCaptureDevice
 from ..devices.mock_l0_device import MockL0Device
 from ..core.pipeline import LivenessPipeline, PipelineState, PipelineStepResult
-from ..core.config import WorkflowType, LivenessConfig, PADMode
+from ..core.config import WorkflowType, LivenessConfig, PADMode, ChallengeType
 from ..core.enrollment import ResidentEnrollmentManager, EnrollmentStage
 
 
@@ -42,6 +42,32 @@ class DesktopRegistrationClient:
         self.device: FaceCaptureDevice = MockL0Device(scenario=mock_scenario) if use_mock_device else WebcamCaptureDevice(0)
         self.window_name = "Face liveness research prototype - Decode 04"
         self.is_running = False
+        self._prompt_key = None
+        self._prompt_detail = ""
+        self._prompt_changed_at = 0.0
+
+    def _readable_prompt(self, result):
+        """Keep the requested action visible while secondary feedback settles."""
+        challenge = result.active_challenge
+        if result.state != PipelineState.ACTIVE_CHALLENGE or challenge is None:
+            self._prompt_key = None
+            return result.status_text, result.detailed_guidance
+        titles = {
+            ChallengeType.BLINK: "Blink once, then open your eyes",
+            ChallengeType.SMILE: "Smile naturally",
+            ChallengeType.TURN_LEFT: "Turn slightly to YOUR LEFT, then face camera",
+            ChallengeType.TURN_RIGHT: "Turn slightly to YOUR RIGHT, then face camera",
+            ChallengeType.LOOK_UP: "Look slightly up, then face camera",
+            ChallengeType.LOOK_DOWN: "Look slightly down, then face camera",
+        }
+        key = (self.pipeline.session_id, challenge.challenge, challenge.start_time)
+        now = time.monotonic()
+        if key != self._prompt_key or now - self._prompt_changed_at >= 1.0:
+            self._prompt_key = key
+            self._prompt_detail = challenge.feedback_message
+            self._prompt_changed_at = now
+        remaining = max(0, int(np.ceil(challenge.timeout_seconds - (time.time() - challenge.start_time))))
+        return titles.get(challenge.challenge, "Follow the instruction"), f"{self._prompt_detail}  {remaining}s"
 
     def toggle_device(self):
         """Switches dynamically between Physical Webcam and Mock L0 Simulator."""
@@ -279,7 +305,7 @@ class DesktopRegistrationClient:
                                     (30, 50, 45), (70, 230, 140), 0.38) + 8
 
         retry_color = (60, 35, 40) if result.current_retry > 1 else (35, 45, 60)
-        self._draw_badge(canvas, f"ATTEMPT {result.current_retry + 1}/{result.max_retries}", (badge_x, 34),
+        self._draw_badge(canvas, f"ATTEMPT {min(result.current_retry + 1, result.max_retries)}/{result.max_retries}", (badge_x, 34),
                          retry_color, (230, 220, 230), 0.38)
 
         # 4b. RESIDENT REGISTRATION 3-STEP PROGRESSION TRACKER
@@ -332,12 +358,15 @@ class DesktopRegistrationClient:
         cv2.circle(canvas, (c_x1 + 32, c_y1 + 38), 14, status_dot_color, 1, cv2.LINE_AA)
 
         # Primary Status Prompt
-        cv2.putText(canvas, result.status_text, (c_x1 + 56, c_y1 + 35),
-                    cv2.FONT_HERSHEY_DUPLEX, 0.65, (255, 255, 255), 1, cv2.LINE_AA)
+        prompt, detail = self._readable_prompt(result)
+        prompt_scale = min(0.65, 590 / max(1, cv2.getTextSize(prompt, cv2.FONT_HERSHEY_DUPLEX, 1, 1)[0][0]))
+        cv2.putText(canvas, prompt, (c_x1 + 56, c_y1 + 35),
+                    cv2.FONT_HERSHEY_DUPLEX, prompt_scale, (255, 255, 255), 1, cv2.LINE_AA)
 
         # Secondary Detailed Guidance
-        cv2.putText(canvas, result.detailed_guidance, (c_x1 + 56, c_y1 + 58),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.44, (165, 175, 195), 1, cv2.LINE_AA)
+        detail_scale = min(0.44, 590 / max(1, cv2.getTextSize(detail, cv2.FONT_HERSHEY_SIMPLEX, 1, 1)[0][0]))
+        cv2.putText(canvas, detail, (c_x1 + 56, c_y1 + 58),
+                    cv2.FONT_HERSHEY_SIMPLEX, detail_scale, (165, 175, 195), 1, cv2.LINE_AA)
 
         # Capsule Progress Bar inside Action Card
         bar_x = c_x2 - 140
