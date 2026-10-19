@@ -12,7 +12,9 @@ The preview displays the frame being analyzed and the current action prompt. Cam
 
 The implementation normalizes all eight EXIF orientations before analysis and removes metadata when it re-encodes the JPEG. It chooses a supported JPEG size between 480 by 360 and 1280 by 1280 pixels and keeps two camera buffers. The choice favors lower image size to limit inference work. Camera throughput, sustained thermal behavior and successful human actions still need physical testing.
 
-The final image-quality score combines whole-frame exposure and Laplacian sharpness. It is an uncalibrated research heuristic, separate from PAD confidence. The app compares it with the existing request's quality threshold. It is not a measured ISO image-quality score.
+The final image-quality score combines whole-frame exposure and Laplacian sharpness. It is an uncalibrated research heuristic, separate from PAD confidence. The app compares it with the existing request's quality threshold. It is not a measured ISO image-quality score. ISO captures above 750 KiB fail before returning an Activity result, to leave room under Android's Binder transaction limit.
+
+The debug source set adds a separate **PAD physical test** launcher. It invokes the same camera activity with a fresh transaction, a 30-second limit and quality threshold 60, then saves an anonymous trial result. It has no registration, authentication or production-signing role. See [the physical test runbook](PHYSICAL_TEST_RUNBOOK.md). Release builds exclude this launcher.
 
 ## Reproduce the source
 
@@ -30,6 +32,8 @@ The patch updates the legacy root app to Android Gradle Plugin 8.3.2, namespace 
 gradle -p CAMERA_SBI_CHECKOUT --no-daemon --max-workers=1 :app:assembleDebug :app:assembleDebugAndroidTest
 ```
 
+For a smaller debug package, pass `-PfacePadAbi=arm64-v8a` for an ARM64 phone or `-PfacePadAbi=x86_64` for an x86_64 emulator. Omitting it retains the universal APK. Other values fail at configuration time. The smaller packages retain the exact code, models, notices and relevant native libraries from the universal build; removing other architectures does not demonstrate lower runtime memory use or faster inference.
+
 The reference application's MPL-2.0 license is included in `third_party/android-camera-mds-MPL-2.0.txt`. The patch does not redistribute its bundled third-party JARs. Review those upstream dependencies before distributing an assembled SBI application.
 
 ## Evidence limits
@@ -44,6 +48,6 @@ The Android parser tests use a generated RSA fixture key through an explicit tes
 
 ## Clean-runner Android CI
 
-`.github/workflows/native-android.yml` builds the exact reference SBI revision on Ubuntu with JDK 21 and Gradle 8.5, then runs the six instrumentation tests on an API 34 x86_64 Google ATD emulator. Both emulated cameras are disabled. It runs for relevant changes on `main` and pull requests, or by manual workflow dispatch. The first hosted run must pass before treating this workflow as independently reproduced evidence.
+`.github/workflows/native-android.yml` builds the exact reference SBI revision on Ubuntu with JDK 21 and Gradle 8.5, then runs eight instrumentation tests on an API 34 x86_64 Google ATD emulator. Both emulated cameras are disabled. It runs for relevant changes on `main` and pull requests, or by manual workflow dispatch. The earlier six-test version completed successfully in [hosted run 39165055387](https://github.com/car-ui/mosip-face-liveness-pad/actions/runs/39165055387), with raw output and APK checksums retained in the native validation report. The eight-test debug-launcher version has local emulator evidence. Further pushes use `[skip ci]` while the account's Actions allowance is exhausted. No additional hosted run is required to execute the driver locally on the explicitly named test emulator.
 
-The workflow uses commit-pinned actions and read-only repository permissions. The [emulator action's documented KVM setup](https://github.com/ReactiveCircus/android-emulator-runner#running-hardware-accelerated-emulators-on-linux-runners) supplies acceleration. The test driver refuses any emulator whose AVD name differs from its explicit target. It checks the APK's exact models and notices before installation and preserves raw instrumentation output, diagnostic logs and APK checksums. It requires a complete six-test success report; an `adb` exit code alone is insufficient. The artifact contains logs and checksums, without redistributing the assembled reference SBI APK.
+The workflow uses commit-pinned actions and read-only repository permissions. The [emulator action's documented KVM setup](https://github.com/ReactiveCircus/android-emulator-runner#running-hardware-accelerated-emulators-on-linux-runners) supplies acceleration. The test driver refuses any emulator whose AVD name differs from its explicit target. It checks the APK's exact models and notices before installation and preserves raw instrumentation output, diagnostic logs and APK checksums. It requires a complete eight-test success report; an `adb` exit code alone is insufficient. The artifact contains logs and checksums, without redistributing the assembled reference SBI APK.

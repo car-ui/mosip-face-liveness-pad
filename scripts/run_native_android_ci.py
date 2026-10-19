@@ -58,7 +58,7 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     verify_apk(args.apk)
     report = {"scope": "Reference SBI, camera-disabled emulator; no human actions, physical attacks or production PKI",
-              "serial": args.serial, "avd": args.avd_name, "tests": 6, "status": "RUNNING", "apks": []}
+              "serial": args.serial, "avd": args.avd_name, "tests": 8, "status": "RUNNING", "apks": []}
     for path in [args.apk, args.test_apk]:
         report["apks"].append({"file": path.name, "bytes": path.stat().st_size,
                                "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
@@ -70,20 +70,17 @@ def main():
             if "Success" not in output:
                 raise RuntimeError("APK installation did not succeed")
         call("shell", "pm", "grant", "nprime.reg.sbi.face", "android.permission.CAMERA")
+        log = args.output / "instrumentation.txt"
         try:
-            output = call("shell", "am", "instrument", "-w", "-r", "-e", "class",
-                          "nprime.reg.sbi.googlevision.CameraOwnerPadTest",
-                          "nprime.reg.sbi.face.test/androidx.test.runner.AndroidJUnitRunner", timeout=300)
+            with log.open("w", encoding="utf-8", newline="\n") as stream:
+                subprocess.run([*prefix, "shell", "am", "instrument", "-w", "-r", "-e", "class",
+                                "nprime.reg.sbi.googlevision.CameraOwnerPadTest,nprime.reg.sbi.googlevision.PhysicalPadHarnessTest",
+                                "nprime.reg.sbi.face.test/androidx.test.runner.AndroidJUnitRunner"],
+                               stdout=stream, stderr=subprocess.STDOUT, text=True, timeout=300, check=True)
         except subprocess.TimeoutExpired as failure:
-            output = failure.output or b""
-            if isinstance(output, bytes):
-                output = output.decode("utf-8", errors="replace")
-            (args.output / "instrumentation.txt").write_text(output, encoding="utf-8")
             call("shell", "am", "force-stop", "nprime.reg.sbi.face")
             raise RuntimeError("Native instrumentation exceeded five minutes") from failure
-        log = args.output / "instrumentation.txt"
-        log.write_text(output, encoding="utf-8", newline="\n")
-        require_passed(output)
+        require_passed(log.read_text(encoding="utf-8"), 8)
         report.update(status="PASS", result_sha256=hashlib.sha256(log.read_bytes()).hexdigest())
     except Exception:
         report["status"] = "FAIL"
@@ -94,7 +91,7 @@ def main():
             (args.output / "logcat.txt").write_text(call("logcat", "-d", "-s", "AndroidRuntime", "TestRunner"), encoding="utf-8")
         except Exception:
             pass
-    print("PASS six reference SBI tests; raw output and exact APK checksums saved")
+    print("PASS eight reference SBI/debug harness tests; raw output and exact APK checksums saved")
 
 
 if __name__ == "__main__":

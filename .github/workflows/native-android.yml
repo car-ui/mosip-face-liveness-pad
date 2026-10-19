@@ -11,8 +11,12 @@ on:
       - 'integrations/native/common/**'
       - 'integrations/native/camera-sbi/**'
       - 'integrations/native/camera-sbi-test/**'
+      - 'integrations/native/camera-sbi-debug/**'
       - 'integrations/native/camera-sbi.patch'
       - 'assets/models/**'
+      - 'third_party/**'
+      - 'integrations/native/assets/**'
+      - 'tests/sample_images/**'
   pull_request:
     branches: [main]
     paths:
@@ -22,8 +26,12 @@ on:
       - 'integrations/native/common/**'
       - 'integrations/native/camera-sbi/**'
       - 'integrations/native/camera-sbi-test/**'
+      - 'integrations/native/camera-sbi-debug/**'
       - 'integrations/native/camera-sbi.patch'
       - 'assets/models/**'
+      - 'third_party/**'
+      - 'integrations/native/assets/**'
+      - 'tests/sample_images/**'
 
 permissions:
   contents: read

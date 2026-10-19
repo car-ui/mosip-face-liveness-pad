@@ -422,5 +422,89 @@
       "memoryScope": "Whole instrumentation target process after benchmark, not incremental model memory"
     },
     "scope": "Real Android JNI/model, actual SBI response parser and actual BiometricsDetailsApi onboarding storage path. Ephemeral RSA fixture crypto provider; production certificate-chain trust and repositories are test doubles. Completed action metadata is simulated for the static NASA portrait. No real camera, physical attacks or full UI/packet workflow."
-  }
+  },
+  "hosted_camera_sbi": {
+    "scope": "Reference SBI, camera-disabled emulator; no human actions, physical attacks or production PKI",
+    "serial": "emulator-5554",
+    "avd": "facepad-ci",
+    "tests": 6,
+    "status": "PASS",
+    "apks": [
+      {
+        "file": "app-debug.apk",
+        "bytes": 235747731,
+        "sha256": "ba7474e6779bd2544520f045c78fa6dee952637b983c88f5a62ca5e56c7d3477"
+      },
+      {
+        "file": "app-debug-androidTest.apk",
+        "bytes": 1878126,
+        "sha256": "69590587bb01f07dc9f599cb5df0c5d6db612f47dc43b81d096746c9b14dbbd0"
+      }
+    ],
+    "result_sha256": "202e77eb3828a3647c9cbb4c4739588b314015e0de54f22f10c5c688a5bc306f",
+    "workflow_run": "https://github.com/car-ui/mosip-face-liveness-pad/actions/runs/39165055387",
+    "source_commit": "b8bad30",
+    "result_log": "evidence/github-camera-sbi-instrumentation.txt"
+  },
+  "physical_test_harness": {
+    "scope": "Eight emulator tests. Real native models and static fixtures; launcher UI smoke test; fabricated metadata tests. No human trials or production PKI.",
+    "serial": "emulator-5554",
+    "avd": "NATIVE_PAD_API34",
+    "tests": 8,
+    "status": "PASS",
+    "apks": [
+      {
+        "file": "app-debug.apk",
+        "bytes": 235874020,
+        "sha256": "876dcefdbf9119c089514e7d34078db56e226e02ee441eaf1e967ee1757eba39"
+      },
+      {
+        "file": "app-debug-androidTest.apk",
+        "bytes": 1883452,
+        "sha256": "9b3c293bb9694a65ca23c2c41ede51d53c8a36d62662b4effd6e8828c0988657"
+      }
+    ],
+    "result_sha256": "7622979a9dad1165a8b18e05db5e8b57f35be7398ba5961d722ad3e8cc1f9641",
+    "result_log": "evidence/physical-harness-instrumentation.txt",
+    "elapsed_seconds": 66.354,
+    "release_manifest_check": "PASS debug launcher absent from all merged release manifests"
+  },
+  "physical_abi_emulator": {
+    "scope": "Eight tests on x86_64 ABI-filtered APK. Real native models, static fixtures, debug UI smoke and fabricated metadata. No human/attack trials. ARM64 package contents verified, not executed on hardware.",
+    "serial": "emulator-5554",
+    "avd": "NATIVE_PAD_API34",
+    "tests": 8,
+    "status": "PASS",
+    "apks": [
+      {
+        "file": "native-pad-physical-x86_64-debug.apk",
+        "bytes": 94074395,
+        "sha256": "650ec6cee165351429bcb92ae59621b6fdd64c5a56345e67f8f811dbedaba797"
+      },
+      {
+        "file": "native-pad-physical-androidTest.apk",
+        "bytes": 1878435,
+        "sha256": "a206c106d1c62bc1aa3e3dc2efa327cf1cd26f5e98c04d4863616229a452ce61"
+      }
+    ],
+    "result_sha256": "e6b2d026817dbf4d31ebbc63c42a28c41201ec9585ebc920fdb0253820bde7c6",
+    "result_log": "evidence/physical-abi-instrumentation.txt",
+    "elapsed_seconds": 56.611
+  },
+  "physical_trial_packages": [
+    {
+      "file": "native-pad-physical-arm64-debug.apk",
+      "bytes": 57873690,
+      "sha256": "bab264cf74029ad4490da6e274fa186356c7ad954d6f1d3cbd0a134a4ebdd60e",
+      "abi": "arm64-v8a",
+      "equivalence": "All DEX, retained native libraries and facepad assets match tested universal APK"
+    },
+    {
+      "file": "native-pad-physical-x86_64-debug.apk",
+      "bytes": 94074395,
+      "sha256": "650ec6cee165351429bcb92ae59621b6fdd64c5a56345e67f8f811dbedaba797",
+      "abi": "x86_64",
+      "equivalence": "All DEX, retained native libraries and facepad assets match tested universal APK"
+    }
+  ]
 }

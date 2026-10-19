@@ -51,7 +51,7 @@ SLIDES = [
      '<tr><td>Webcam interface and L0/L1 simulators</td><td>Physical L1 and multiple vendor validation</td></tr>'
      '<tr><td>Tested policy logic and a dataset evaluator</td><td>Consented subjects, real attacks, fixed test thresholds</td></tr>'
      '<tr><td>Android APK and offline model execution</td><td>Measured Android RAM, latency, power, and thermal behavior</td></tr></tbody></table>',
-     'Pinned desktop controllers reject synthetic ISO captures. Four Android emulator tests cover model inference and rejection before storage. The SBI parser and identity matcher are explicit test doubles. Full native camera/UI flows and active evidence remain incomplete.'),
+     'Pinned desktop controllers reject synthetic ISO captures. Twelve Android client tests include native inference, the actual signed response parser and one-use onboarding acceptance through a fixture crypto provider. Eight reference camera/debug-launcher tests pass locally. Physical actions, production PKI and complete native camera/UI workflows remain unverified.'),
     ("The next proof belongs in the real client",
      '<p class="lead">On Desktop and Android, show a real attack being rejected before the client accepts a face or completes authentication.</p>'
      '<div class="final-check"><span>Same session</span><span>Same verified image</span><span>No bypass path</span></div>'

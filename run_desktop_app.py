@@ -1,8 +1,6 @@
-"""
-Entry point to launch the MOSIP Desktop Registration Client
-Supports:
-- Live physical L0 webcam capture
-- Mock biometric device simulation with 10 evaluator demonstration modes
+"""Launch the face-liveness research prototype with a webcam or explicit simulator.
+
+This program is separate from the official MOSIP Registration Client.
 """
 
 import sys
@@ -13,21 +11,21 @@ from src.core.config import WorkflowType, PADMode
 
 
 DEMO_MODES = {
-    "1": ("Live Person (High Confidence Passive Pass)", MockScenario.BONA_FIDE_LIVE, 0.70),
-    "2": ("Uncertain Passive -> Dynamic Active Challenge", MockScenario.BONA_FIDE_LIVE, 0.95),
-    "3": ("Printed Photo Presentation Attack (PAD Rejection)", MockScenario.STATIC_PHOTO_ATTACK, 0.85),
-    "4": ("Smartphone Screen Replay Attack (Moiré & Glare Rejection)", MockScenario.SCREEN_REPLAY_ATTACK, 0.85),
-    "5": ("Static Photo against Active Challenge (Times Out & Fails)", MockScenario.STATIC_PHOTO_ATTACK, 0.95),
-    "6": ("Multiple Faces Detection (Integrity Violation Rejection)", MockScenario.MULTIPLE_FACES, 0.85),
-    "7": ("Poor Lighting Environment (Quality Rejection & User Guidance)", MockScenario.POOR_LIGHTING_DARK, 0.85),
-    "8": ("Device Disconnect (Mid-stream Hardware Failure Handling)", MockScenario.DEVICE_DISCONNECT, 0.85),
-    "9": ("Blurry Frame & Defocus (Sharpness Quality Rejection)", MockScenario.BLURRY_FRAME, 0.85),
-    "10": ("No Face Detected (Positioning Guidance Prompt)", MockScenario.NO_FACE, 0.85)
+    "1": ("Simulated portrait fixture; result depends on policy", MockScenario.BONA_FIDE_LIVE, 0.70),
+    "2": ("Simulated fixture with a stricter passive threshold", MockScenario.BONA_FIDE_LIVE, 0.95),
+    "3": ("Synthetic printed-photo fixture", MockScenario.STATIC_PHOTO_ATTACK, 0.85),
+    "4": ("Synthetic screen-replay fixture", MockScenario.SCREEN_REPLAY_ATTACK, 0.85),
+    "5": ("Static fixture against active verification", MockScenario.STATIC_PHOTO_ATTACK, 0.95),
+    "6": ("Synthetic multiple-face fixture", MockScenario.MULTIPLE_FACES, 0.85),
+    "7": ("Synthetic low-light fixture", MockScenario.POOR_LIGHTING_DARK, 0.85),
+    "8": ("Simulated device disconnect", MockScenario.DEVICE_DISCONNECT, 0.85),
+    "9": ("Synthetic blurred fixture", MockScenario.BLURRY_FRAME, 0.85),
+    "10": ("Synthetic no-face fixture", MockScenario.NO_FACE, 0.85)
 }
 
 
 def main():
-    parser = argparse.ArgumentParser(description="MOSIP Desktop Registration Client - Face Liveness & PAD Subsystem")
+    parser = argparse.ArgumentParser(description="Face liveness research prototype; separate from the official MOSIP Registration Client")
     parser.add_argument("--mock", action="store_true", help="Launch using Mock L0 Simulator instead of physical webcam")
     parser.add_argument("--scenario", type=str, default="BONA_FIDE_LIVE",
                         choices=[s.value for s in MockScenario],
@@ -51,7 +49,7 @@ def main():
     if args.demo:
         label, scenario, threshold = DEMO_MODES[args.demo]
         print("=" * 65)
-        print(f"LAUNCHING EVALUATOR DEMO #{args.demo}: {label}")
+        print(f"LAUNCHING SIMULATED PROTOTYPE DEMO #{args.demo}: {label}")
         print("=" * 65)
         mock_scenario = scenario
     elif args.scenario:

@@ -1,12 +1,6 @@
-"""
-Modern Enterprise Desktop Registration Client UI (MOSIP Aligned)
-Features a sleek glassmorphic biometric kiosk interface:
-- Anti-aliased Apple FaceID / KYC style facial guide oval with optical alignment brackets
-- Peripheral cinematic vignette focusing user attention
-- Floating translucent glass status cards with dynamic feedback pills
-- Directional indicator badges (arrows, icons) for active challenges
-- Rounded capsule progress bars with animated tracking
-- Clean enterprise status telemetry (ISO 19794-5 / ISO 30107)
+"""OpenCV research prototype for face positioning, PAD and action prompts.
+
+It does not create an official registration packet or perform identity matching.
 """
 
 import sys
@@ -46,7 +40,7 @@ class DesktopRegistrationClient:
         self._prev_frame_time = time.time()
         self._fps = 30.0
         self.device: FaceCaptureDevice = MockL0Device(scenario=mock_scenario) if use_mock_device else WebcamCaptureDevice(0)
-        self.window_name = "MOSIP Registration Client - Face Liveness & PAD (Decode 04)"
+        self.window_name = "Face liveness research prototype - Decode 04"
         self.is_running = False
 
     def toggle_device(self):
@@ -434,20 +428,20 @@ class DesktopRegistrationClient:
                         cv2.FONT_HERSHEY_DUPLEX, 0.65, (10, 30, 15), 2, cv2.LINE_AA)
 
             if self.workflow == WorkflowType.RESIDENT_REGISTRATION:
-                cv2.putText(canvas, "MOSIP RESIDENT ENROLLMENT SUCCESSFUL", (m_x1 + 85, m_y1 + 38),
+                cv2.putText(canvas, "PROTOTYPE CAPTURE ACCEPTED", (m_x1 + 85, m_y1 + 38),
                             cv2.FONT_HERSHEY_DUPLEX, 0.56, (255, 255, 255), 1, cv2.LINE_AA)
-                cv2.putText(canvas, f"Resident ID: {self.enrollment_manager.resident_id}  •  Status: ENROLLED", (m_x1 + 86, m_y1 + 64),
+                cv2.putText(canvas, f"Demo ID: {self.enrollment_manager.resident_id} | Local demo record", (m_x1 + 86, m_y1 + 64),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.44, (120, 230, 160), 1, cv2.LINE_AA)
                 rec = self.enrollment_manager.current_record
                 tok_str = (rec.biometric_token_hash[:16] + "...") if rec and rec.biometric_token_hash else "Capture digest"
-                cv2.putText(canvas, f"Liveness: Verified  •  Token: {tok_str}", (m_x1 + 86, m_y1 + 88),
+                cv2.putText(canvas, f"Capture digest: {tok_str}", (m_x1 + 86, m_y1 + 88),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.40, (170, 210, 190), 1, cv2.LINE_AA)
-                cv2.putText(canvas, "Press [R] to Enroll Next Resident  |  [Q] Exit", (m_x1 + 86, m_y1 + 114),
+                cv2.putText(canvas, "Press [R] for a new trial | [Q] Exit", (m_x1 + 86, m_y1 + 114),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.38, (160, 175, 190), 1, cv2.LINE_AA)
             else:
-                cv2.putText(canvas, "LIVENESS CHECK PASSED", (m_x1 + 85, m_y1 + 46),
+                cv2.putText(canvas, "PROTOTYPE CAPTURE ACCEPTED", (m_x1 + 85, m_y1 + 46),
                             cv2.FONT_HERSHEY_DUPLEX, 0.68, (255, 255, 255), 2, cv2.LINE_AA)
-                cv2.putText(canvas, "Liveness Confirmed • Token Encrypted", (m_x1 + 86, m_y1 + 76),
+                cv2.putText(canvas, "Identity matching has not been performed", (m_x1 + 86, m_y1 + 76),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.44, (120, 220, 150), 1, cv2.LINE_AA)
                 cv2.putText(canvas, "Press [R] to start a new session", (m_x1 + 86, m_y1 + 104),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.38, (160, 175, 190), 1, cv2.LINE_AA)
@@ -466,9 +460,9 @@ class DesktopRegistrationClient:
             cv2.putText(canvas, "X", (m_x1 + 35, m_y1 + modal_h // 2 + 8),
                         cv2.FONT_HERSHEY_DUPLEX, 0.65, (255, 255, 255), 2, cv2.LINE_AA)
 
-            cv2.putText(canvas, "MOSIP RESIDENT ENROLLMENT REJECTED", (m_x1 + 85, m_y1 + 40),
+            cv2.putText(canvas, "PROTOTYPE CAPTURE REJECTED", (m_x1 + 85, m_y1 + 40),
                         cv2.FONT_HERSHEY_DUPLEX, 0.56, (255, 255, 255), 1, cv2.LINE_AA)
-            cv2.putText(canvas, f"Resident ID: {self.enrollment_manager.resident_id}  •  Status: TERMINATED", (m_x1 + 86, m_y1 + 68),
+            cv2.putText(canvas, f"Demo ID: {self.enrollment_manager.resident_id} | Trial ended", (m_x1 + 86, m_y1 + 68),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.44, (120, 120, 240), 1, cv2.LINE_AA)
             cv2.putText(canvas, "Verification incomplete. Press [R] to restart.", (m_x1 + 86, m_y1 + 96),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.38, (180, 180, 200), 1, cv2.LINE_AA)
@@ -488,8 +482,8 @@ class DesktopRegistrationClient:
         self.pipeline.reset()
         processed_frames = 0
 
-        print("\n=== MOSIP Face Liveness & Resident Enrollment Client Started ===")
-        print(f"Active Resident ID: {self.enrollment_manager.resident_id}")
+        print("\n=== Face liveness research prototype started ===")
+        print(f"Active Demo ID: {self.enrollment_manager.resident_id}")
         print("Hotkeys:")
         print("  'r' - Reset session")
         print("  'n' - Generate new Resident ID (Enrollment)")
@@ -544,7 +538,7 @@ class DesktopRegistrationClient:
             self.pipeline._captured_biometric = None
             self.pipeline.active_detector.close()
             cv2.destroyAllWindows()
-            print("MOSIP Face Liveness Client exited safely.")
+            print("Face liveness prototype exited safely.")
 
 
 if __name__ == "__main__":

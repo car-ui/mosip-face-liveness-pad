@@ -152,6 +152,7 @@ public final class NativePadCameraActivity extends AppCompatActivity {
                 BitmapFactory.decodeByteArray(jpeg,0,jpeg.length,dimensions);
                 byte[] iso=BioFace.generateFaceISO2011(jpeg,dimensions.outHeight,dimensions.outWidth,"00");
                 if(iso==null || !BioFace.isFaceISO2011Valid(iso))throw new IOException("ISO encoding failed");
+                if(iso.length>750*1024)throw new IOException("ISO capture exceeds safe activity-result size");
                 String evidence=CameraActiveEvidence.completed(iso,getIntent().getStringExtra("FacePadTransactionId"));
                 ui.post(() -> {
                     if(!running || !finished.compareAndSet(false,true))return;

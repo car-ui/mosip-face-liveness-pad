@@ -41,6 +41,7 @@ def prepare(platform: str, checkout: Path):
     shutil.copyfile(base / "assets/haarcascade_frontalface_default.xml", resources / "haarcascade_frontalface_default.xml")
     if platform == "camera-sbi":
         shutil.copyfile(ROOT / "third_party/android-camera-mds-MPL-2.0.txt", resources / "CAMERA-SBI-LICENSE.txt")
+        shutil.copytree(base / "camera-sbi-debug", module.parent / "debug", dirs_exist_ok=True)
     if platform in ("android", "camera-sbi"):
         tests = module.parent / "androidTest"
         shutil.copytree(base / ("android-test" if platform == "android" else "camera-sbi-test"), tests / "java", dirs_exist_ok=True)
