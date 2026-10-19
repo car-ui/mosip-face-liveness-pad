@@ -181,4 +181,18 @@ This checkpoint establishes the successful completion and verification of the fu
    - Executed full 199-test suite against the freshly extracted source package: all 199 tests passed in 24.87s (`D:/CodexWork/native-face-pad-20261018/extracted-check-suite-verified/20261019T160055551Z-287a7ea0/result.json`).
    - Retargeted launcher `D:/CodexWork/native-face-pad-20261018/artifacts/START-LAPTOP-PHYSICAL-TRIAL.cmd` to `source-check-70f02e7`, added `PYTHONPYCACHEPREFIX=D:\CodexWork\native-face-pad-20261018\pycache`, preserved strict ONNX mode, and validated via `--check` flag (exit code 0, without opening physical camera).
 
+8. **Native Policy Extension & Release Package 4485441**:
+   - Implemented configurable `actionCount` (1..4), `timeoutSeconds` (5..60), and `maxRetries` (0..5) with fail-closed bounds checking in `NativePadPolicy.java`.
+   - Added test coverage in `NativePadPolicyCheck.java` for defaults, role-based overrides, alternate keys (`mosip.facepad.<role>.action.count`, `timeout_seconds`, `max_retries`), and strict rejection of out-of-bounds/malformed values.
+   - Re-verified landmark/action pipeline (`scripts/check_native_landmarks.py` passed all stages).
+   - Synchronized `NativePadPolicy.java` across prepared checkouts (`desktop`, `android`, `camera-sbi`).
+   - Re-verified all 3 checkouts via `scripts/verify_native_preparation.py`: 0 mismatches, patch present=True.
+   - Updated documentation in `docs/NATIVE_POLICY.md`, `docs/REQUIREMENTS_MATRIX.md`, and `config/native-policy.example.properties`.
+   - Full Python test suite passed: 199 passed in 46.34s on repository checkout (`D:/CodexWork/native-face-pad-20261018/tmp/local-check-policy/20261019T174246758Z-d1f9fbdb/result.json`).
+   - Packaged release archive `D:/CodexWork/native-face-pad-20261018/artifacts/face-liveness-source-4485441.zip` (SHA-256: `641b1713a15708cfbb606bae33c59905a16cd628691fb11a7d2857e9ad64e64f`).
+   - Extracted to fresh directory `D:/CodexWork/native-face-pad-20261018/source-check-4485441` and verified all 201 file hashes against `RELEASE_MANIFEST.json`.
+   - Executed full 199-test suite against the freshly extracted source package: all 199 tests passed in 27.39s (`D:/CodexWork/native-face-pad-20261018/extracted-check-suite-4485441/20261019T174650451Z-dc2fb848/result.json`).
+   - Retargeted launcher `D:/CodexWork/native-face-pad-20261018/artifacts/START-LAPTOP-PHYSICAL-TRIAL.cmd` to `source-check-4485441` and verified via `--check` flag (exit code 0).
+   - Both `origin/new/hackathon-quality` and `origin/main` synchronized at commit `44854414c43cc3dcbfc52c1d2688ab978c5419d5`.
+
 
