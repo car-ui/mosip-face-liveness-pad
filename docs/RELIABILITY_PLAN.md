@@ -132,3 +132,29 @@ Real JP2/J2K gradients decode through desktop OpenCV; malformed-header checks
 passed 2000 cases. Offline model version publication is atomic and an empty
 ceiling cannot authorize a downgrade. The Python suite passed 186 checks with
 fresh D: caches; the earlier root-cache interruptions remain retained.
+
+## Final reliability and build execution pass, 19 October (Late Evening)
+
+This pass concludes the end-to-end native build, validation, and release packaging cycle:
+
+1. **Host Memory & D8 Dex Merging Resolution**:
+   - Diagnosed root causes of AGP build failures:
+     - Jetifier heap exhaustion resolved by ignoring non-legacy modern dependencies (`opencv`, `onnxruntime`, Flutter debug engine JARs).
+     - D8 external dex archive merger out-of-memory error resolved by removing aggressive GC heap shrinking (`-XX:MinHeapFreeRatio=5 -XX:MaxHeapFreeRatio=15`) and setting bounded heap to 1536 MB (`-Xmx1536m`), matching project properties.
+   - Both Android Registration Client APKs (`app-x86_64-debug.apk`, `app-arm64-v8a-debug.apk`) and `app-debug-androidTest.apk` built cleanly in 8m 54s, with full zip integrity, verified model SHA-256 hashes, licenses, and v2 APK signatures.
+   - Reference Camera SBI rebuilt in 30 seconds (`camera-sbi-debug.apk` and `camera-sbi-androidTest.apk`) with verified models and v2 APK signatures.
+
+2. **Native Pipeline Parity & Rejection Checks**:
+   - `scripts/check_native_landmarks.py` passed all 9 stages: Java/Python landmark inference (`maxAbsError=0.0`), recorded photo crop geometry, action progression, sequence checks, clock rollback rejection, and cached policy snapshot binding.
+   - `scripts/check_native_detector.py` verified 8 real fixture cases of the portable Java YuNet detector against OpenCV's `cv2.FaceDetectorYN`, correctly resolving multi-face detection.
+   - `scripts/check_native_engine.py` confirmed ONNX forward pass parity on `minifasnet_v2.onnx` (`liveScore=0.9918`) and model tampering rejection.
+   - `scripts/verify_native_evidence.py` verified all 24 packaged evidence checksums.
+
+3. **Complete Suite & Package Extraction Verification**:
+   - All 199 tests passed via `scripts/check_local.ps1` in 31.93s on the repository tree.
+   - Scoped PowerShell error handling so non-fatal stderr warnings (e.g. OpenCV libpng sRGB profile warnings) do not abort the pipeline.
+   - Created verified source archive `face-liveness-source-fcf76d1.zip` (201 tracked files, SHA-256: `3e3c6fd8c3b5065453694d0955210c20999e54af43a963b676ff553121d9faa5`).
+   - Extracted to clean directory `source-check-70f02e7` and verified all 201 file hashes against `RELEASE_MANIFEST.json`.
+   - Executed full 199-test suite on the fresh extraction: all 199 passed in 24.87s.
+   - Retargeted launcher `START-LAPTOP-PHYSICAL-TRIAL.cmd` to `source-check-70f02e7` with isolated `PYTHONPYCACHEPREFIX`, strict ONNX mode, and validated `--check` flag without opening camera.
+
