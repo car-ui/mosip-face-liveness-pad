@@ -15,7 +15,12 @@ turned face is missed. Haar still runs on every frame. Disjoint detections and
 multiple landmark faces remain subject to rejection. An old tracked box cannot
 replace a current face detection. PAD thresholds and mandatory operator actions
 are unchanged. Any unacceptable quality frame still invalidates challenge and
-passive history.
+passive history. During an active action, a disputed multiple-face count blocks
+acceptance and clears action history immediately. It spends an attempt only if
+the extra detection persists for 0.75 seconds. A transient extra box requires a
+fresh action after detection recovers. This is not confirmation that another
+person was present. Failure logs include detector box coordinates for diagnosis,
+without saving camera images.
 
 Regression tests cover fresh detection fallback, stale-box exclusion, multiple
 faces, readable feedback and retained failure reasons. These use controlled

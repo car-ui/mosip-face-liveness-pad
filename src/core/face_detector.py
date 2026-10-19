@@ -124,7 +124,7 @@ class FaceQualityAssessor:
                 is_poorly_lit=False,
                 face_size_ratio=0.0,
                 is_centered=False,
-                error_message="Multiple faces detected. Only one person should be in frame."
+                error_message="More than one possible face detected. Keep other faces or portraits out of view."
             )
         
         # Single face evaluation

@@ -26,7 +26,7 @@ def test_face_detector_multiple_faces():
     
     assert quality.is_acceptable is False
     assert quality.face_count == 2
-    assert "Multiple faces detected" in quality.error_message
+    assert "More than one possible face" in quality.error_message
 
 
 def test_face_detector_lighting_and_blur():

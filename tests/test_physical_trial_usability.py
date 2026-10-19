@@ -65,3 +65,26 @@ def test_failure_reason_survives_subsequent_frames(controlled_pipeline, valid_fr
     assert pipeline.process_frame(valid_frame) is result
     pipeline.reset()
     assert pipeline._terminal_result is None
+
+
+def test_disputed_face_count_blocks_acceptance_without_spending_attempt_on_one_frame(
+        controlled_pipeline, valid_frame, monkeypatch):
+    pipeline = controlled_pipeline
+    pipeline.state = PipelineState.ACTIVE_CHALLENGE
+    challenge = pipeline.challenge_manager.generate_next_challenge()
+    challenge.is_completed = True
+    pipeline.challenge_manager.completed_challenges.append(ChallengeType.BLINK)
+    clock = [10.0]
+    monkeypatch.setattr("src.core.pipeline.time.monotonic", lambda: clock[0])
+    monkeypatch.setattr(pipeline.quality_assessor, "assess_quality", lambda *a: SimpleNamespace(
+        is_acceptable=False, face_count=2, error_message="Extra detection"))
+    result = pipeline.process_frame(valid_frame)
+    assert result.decision == LivenessDecision.IN_PROGRESS
+    assert result.captured_face_image is None
+    assert pipeline.challenge_manager.current_retry == 0
+    assert pipeline.challenge_manager.completed_challenges == []
+    assert pipeline.challenge_manager.active_challenge_state is None
+    clock[0] += .8
+    result = pipeline.process_frame(valid_frame)
+    assert result.state == PipelineState.RETRY_PENDING
+    assert pipeline.challenge_manager.current_retry == 1

@@ -101,6 +101,7 @@ class LivenessPipeline:
         self._state_start_time = time.time()
         self._last_face_box: Optional[Tuple[int, int, int, int]] = None
         self._terminal_result = None
+        self._multiple_faces_since = None
 
     def set_workflow(self, workflow: WorkflowType) -> None:
         self.workflow = workflow
@@ -120,6 +121,7 @@ class LivenessPipeline:
         self.temporal_buffer.clear()
         self._terminal_result = None
         self._last_face_box = None
+        self._multiple_faces_since = None
         
         self.audit_logger.log_event(
             AuditEventType.CAPTURE_STARTED,
@@ -218,6 +220,8 @@ class LivenessPipeline:
         faces = self.quality_assessor.detect_faces(
             bgr, known_box=known_box, landmark_boxes=telemetry.get("face_boxes"))
         quality = self.quality_assessor.assess_quality(bgr, faces)
+        if quality.face_count <= 1:
+            self._multiple_faces_since = None
 
         # Handle face detection / quality errors
         if not quality.is_acceptable:
@@ -226,10 +230,27 @@ class LivenessPipeline:
             self._passive_frames_analyzed = 0
             self.challenge_manager.completed_challenges.clear()
             if self.state == PipelineState.ACTIVE_CHALLENGE:
+                if quality.face_count > 1:
+                    # Block acceptance on the first disputed frame. Invalidate all
+                    # actions immediately, but do not spend an attempt on flicker.
+                    self.challenge_manager.active_challenge_state = None
+                    now = time.monotonic()
+                    if self._multiple_faces_since is None:
+                        self._multiple_faces_since = now
+                    if now - self._multiple_faces_since < 0.75:
+                        return PipelineStepResult(
+                            state=self.state, decision=LivenessDecision.IN_PROGRESS,
+                            status_text="Checking face detection",
+                            detailed_guidance="Detection is uncertain. Face the camera and hold still.",
+                            progress=0.0, quality=quality,
+                            current_retry=self.challenge_manager.current_retry,
+                            max_retries=self.policy.max_retries)
                 self.audit_logger.log_event(
                     AuditEventType.ACTIVE_CHALLENGE_FAILED,
                     session_id=self.session_id, workflow=self.workflow.value,
                     details={"reason": quality.error_message, "face_count": quality.face_count,
+                             "detected_boxes": [(f.x, f.y, f.w, f.h) for f in faces],
+                             "landmark_boxes": telemetry.get("face_boxes", []),
                              "challenge": challenge_state.challenge.value if challenge_state else None})
                 self.challenge_manager.increment_retry()
                 self.state = (PipelineState.RETRY_PENDING if self.challenge_manager.can_retry()
