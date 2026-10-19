@@ -45,3 +45,20 @@ def test_landmark_loss_clears_blink_progress():
     d._evaluate_challenge(s,values(landmarks_detected=False))
     d._evaluate_challenge(s,values())
     assert not s.is_completed and s.baseline_frames_recorded==1
+
+
+def test_preparation_time_cannot_record_action_or_consume_action_deadline(monkeypatch):
+    d = ActiveLivenessDetector(model_path="not-needed-for-telemetry-tests")
+    s = challenge(ChallengeType.BLINK)
+    s.start_time = 100.0
+    s.preparation_seconds = 2.0
+    monkeypatch.setattr("src.core.active_liveness.time.time", lambda: 101.0)
+    d._evaluate_challenge(s, values())
+    assert s.baseline_frames_recorded == 0 and not s.action_detected
+    # Twelve total seconds means ten action seconds after preparation.
+    monkeypatch.setattr("src.core.active_liveness.time.time", lambda: 111.5)
+    d._evaluate_challenge(s, values())
+    assert s.is_active
+    monkeypatch.setattr("src.core.active_liveness.time.time", lambda: 112.1)
+    d._evaluate_challenge(s, values())
+    assert not s.is_active and not s.is_completed

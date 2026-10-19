@@ -138,11 +138,12 @@ class ONNXModelPADBackend(BasePADBackend):
                     manifest = json.load(stream)
                 if manifest["sha256"] != self._model_hash:
                     raise ValueError("Model manifest checksum mismatch")
-                if manifest["profile"] != "minifasnet_v2_2.7":
+                if manifest["profile"] not in ("minifasnet_v2_2.7", "minifasnet_v1se_4.0"):
                     raise ValueError("Unsupported model profile")
                 self.profile = manifest["profile"]
                 self.input_size = (80, 80)
-                self.live_index, self.class_count, self.crop_scale = 1, 3, 2.7
+                self.live_index, self.class_count = 1, 3
+                self.crop_scale = 4.0 if self.profile == "minifasnet_v1se_4.0" else 2.7
                 self._model_version = manifest["version"]
             expected = [1, 3, self.input_size[1], self.input_size[0]]
             if self._session.get_inputs()[0].shape != expected:
@@ -170,7 +171,7 @@ class ONNXModelPADBackend(BasePADBackend):
             raise RuntimeError("ONNX PAD Backend is not available.")
 
         # Standard preprocessing: BGR -> RGB -> Resize -> Normalize to [0, 1]
-        rgb = (bgr_face if self.profile == "minifasnet_v2_2.7"
+        rgb = (bgr_face if self.profile in ("minifasnet_v2_2.7", "minifasnet_v1se_4.0")
                else cv2.cvtColor(bgr_face, cv2.COLOR_BGR2RGB))
         resized = cv2.resize(rgb, self.input_size, interpolation=cv2.INTER_LINEAR)
         
@@ -179,7 +180,7 @@ class ONNXModelPADBackend(BasePADBackend):
         mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
         std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
         normalized = (normalized - mean) / std
-        if self.profile == "minifasnet_v2_2.7":
+        if self.profile in ("minifasnet_v2_2.7", "minifasnet_v1se_4.0"):
             # Upstream functional.to_tensor explicitly returns BGR float [0,255].
             normalized = resized.astype(np.float32)
 

@@ -20,7 +20,7 @@ from src.ui.desktop_client import DesktopRegistrationClient
     ([], [], 0),
 ])
 def test_fresh_landmarks_supplement_haar_without_hiding_second_face(haar, landmarks, count):
-    assessor = FaceQualityAssessor()
+    assessor = FaceQualityAssessor(detector_backend="haar")
     assessor.face_cascade = SimpleNamespace(detectMultiScale=lambda *a, **k: haar)
     frame = np.zeros((240, 320, 3), np.uint8)
     assert len(assessor.detect_faces(frame, known_box=(80, 50, 100, 100),

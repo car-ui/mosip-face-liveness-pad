@@ -42,3 +42,12 @@ def test_manifest_checksum_mismatch_prevents_loading(tmp_path):
     manifest['sha256']='0'*64
     Path(str(path)+'.json').write_text(json.dumps(manifest))
     assert not ONNXModelPADBackend(str(path)).is_available()
+
+
+def test_reference_companion_model_has_distinct_crop_contract():
+    model = MODEL.with_name("minifasnet_v1se.onnx")
+    backend = ONNXModelPADBackend(str(model))
+    assert backend.is_available()
+    assert backend.crop_scale == 4.0
+    assert backend.live_index == 1 and backend.class_count == 3
+    assert np.isfinite(backend.evaluate(np.zeros((80, 80, 3), np.uint8))[:2]).all()

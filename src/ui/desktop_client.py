@@ -66,8 +66,13 @@ class DesktopRegistrationClient:
             self._prompt_key = key
             self._prompt_detail = challenge.feedback_message
             self._prompt_changed_at = now
-        remaining = max(0, int(np.ceil(challenge.timeout_seconds - (time.time() - challenge.start_time))))
-        return titles.get(challenge.challenge, "Follow the instruction"), f"{self._prompt_detail}  {remaining}s"
+        elapsed = time.time() - challenge.start_time
+        preparing = elapsed < challenge.preparation_seconds
+        remaining = max(0, int(np.ceil(challenge.timeout_seconds + challenge.preparation_seconds - elapsed)))
+        title = titles.get(challenge.challenge, "Follow the instruction")
+        if preparing:
+            return "Get ready: " + title, "Face camera first. Action starts in a moment."
+        return title, f"{self._prompt_detail}  {remaining}s"
 
     def toggle_device(self):
         """Switches dynamically between Physical Webcam and Mock L0 Simulator."""
@@ -269,7 +274,6 @@ class DesktopRegistrationClient:
         cv2.line(canvas, (b_x2, b_y2), (b_x2, b_y2 - bracket_len), theme_accent, 2, cv2.LINE_AA)
 
         # 3b. Cinematic Laser Scanner (Top-to-Bottom Biometric Verification Sweep)
-        self._draw_cinematic_scanner(canvas, center_x, center_y, axis_x, axis_y, theme_accent, result.state)
 
         # 4. TOP GLASS CARD: MOSIP Header & Telemetry
         self._draw_rounded_rect(canvas, (24, 20), (target_w - 24, 82), (18, 22, 32),
@@ -278,11 +282,9 @@ class DesktopRegistrationClient:
         # Logo / Branding
         cv2.putText(canvas, "MOSIP DEC{}DE", (44, 57),
                     cv2.FONT_HERSHEY_DUPLEX, 0.72, (255, 90, 30), 2, cv2.LINE_AA)
-        cv2.putText(canvas, "FACE LIVENESS & PAD", (230, 56),
-                    cv2.FONT_HERSHEY_DUPLEX, 0.48, (200, 210, 230), 1, cv2.LINE_AA)
 
         # Right Badges (Workflow, Device, Resident ID, Attempts)
-        badge_x = target_w - 600
+        badge_x = 245
         if self.workflow == WorkflowType.RESIDENT_REGISTRATION:
             badge_x = self._draw_badge(canvas, f"ID: {self.enrollment_manager.resident_id}", (badge_x, 34),
                                         (45, 55, 75), (255, 235, 120), 0.38) + 8
@@ -344,7 +346,7 @@ class DesktopRegistrationClient:
 
         # 5. FLOATING ACTION CARD (Prominently Above / Below Center)
         card_w = 680
-        card_h = 76
+        card_h = 106
         c_x1 = (target_w - card_w) // 2
         c_y1 = int(target_h * 0.76)
         c_x2 = c_x1 + card_w
@@ -369,9 +371,9 @@ class DesktopRegistrationClient:
                     cv2.FONT_HERSHEY_SIMPLEX, detail_scale, (165, 175, 195), 1, cv2.LINE_AA)
 
         # Capsule Progress Bar inside Action Card
-        bar_x = c_x2 - 140
-        bar_y = c_y1 + 26
-        bar_w = 110
+        bar_x = c_x1 + 56
+        bar_y = c_y1 + 78
+        bar_w = 550
         bar_h = 10
         # Track
         self._draw_rounded_rect(canvas, (bar_x, bar_y), (bar_x + bar_w, bar_y + bar_h),
@@ -382,7 +384,7 @@ class DesktopRegistrationClient:
                                 theme_accent, radius=5, alpha=1.0)
         # Percentage label
         pct_text = f"{int(result.progress * 100)}%"
-        cv2.putText(canvas, pct_text, (bar_x + 35, bar_y + 24),
+        cv2.putText(canvas, pct_text, (bar_x + bar_w + 12, bar_y + 9),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.38, (180, 190, 210), 1, cv2.LINE_AA)
 
         # FPS calculation
@@ -432,12 +434,12 @@ class DesktopRegistrationClient:
         
         mode_str = "ON" if self.diagnostic_mode else "OFF"
         controls = f"[R] Reset   [N] New ID   [D] Diagnostic: {mode_str}   |   [1] Resident   [2] Operator   [3] Supervisor   |   [Q] Exit"
-        cv2.putText(canvas, controls, (42, target_h - 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.38, (150, 160, 180), 1, cv2.LINE_AA)
+        cv2.putText(canvas, controls, (42, target_h - 36),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.34, (150, 160, 180), 1, cv2.LINE_AA)
         
         iso_tag = "Research prototype | ISO conformance not evaluated"
-        cv2.putText(canvas, iso_tag, (target_w - 280, target_h - 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.38, (110, 120, 140), 1, cv2.LINE_AA)
+        cv2.putText(canvas, iso_tag, (42, target_h - 21),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.30, (110, 120, 140), 1, cv2.LINE_AA)
 
         # 8. SUCCESS & REJECTION MODALS
         if result.state == PipelineState.CAPTURE_SUCCESS:
@@ -489,11 +491,13 @@ class DesktopRegistrationClient:
             cv2.putText(canvas, "X", (m_x1 + 35, m_y1 + modal_h // 2 + 8),
                         cv2.FONT_HERSHEY_DUPLEX, 0.65, (255, 255, 255), 2, cv2.LINE_AA)
 
-            cv2.putText(canvas, "PROTOTYPE CAPTURE REJECTED", (m_x1 + 85, m_y1 + 40),
+            cv2.putText(canvas, "LIVENESS CHECK DID NOT PASS", (m_x1 + 85, m_y1 + 40),
                         cv2.FONT_HERSHEY_DUPLEX, 0.56, (255, 255, 255), 1, cv2.LINE_AA)
-            cv2.putText(canvas, f"Demo ID: {self.enrollment_manager.resident_id} | Trial ended", (m_x1 + 86, m_y1 + 68),
+            score_text = (f"Model score: {result.pad_result.liveness_score:.3f} | Cutoff: {self.config.pad_attack_rejection_threshold:.3f}"
+                          if result.pad_result else "Capture rejected by liveness policy")
+            cv2.putText(canvas, score_text, (m_x1 + 86, m_y1 + 68),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.44, (120, 120, 240), 1, cv2.LINE_AA)
-            cv2.putText(canvas, "Verification incomplete. Press [R] to restart.", (m_x1 + 86, m_y1 + 96),
+            cv2.putText(canvas, "False rejections are possible. Press [R] to retry.", (m_x1 + 86, m_y1 + 96),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.38, (180, 180, 200), 1, cv2.LINE_AA)
 
         return canvas

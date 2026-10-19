@@ -1,0 +1,18 @@
+{
+  "profile": "minifasnet_v1se_4.0",
+  "version": "1.0.0",
+  "sha256": "ec389bb133aa689f19fff5e413f818355f670f8b02d8c4b23350bb67c2286ddc",
+  "upstreamRepository": "https://github.com/minivision-ai/Silent-Face-Anti-Spoofing",
+  "upstreamCommit": "b6d5f04ad78778917853b25c778acef6d5626d15",
+  "upstreamWeights": "4_0_0_80x80_MiniFASNetV1SE.pth",
+  "upstreamWeightsSha256": "84ee1d37d96894d5e82de5a57df044ef80a58be2b218b5ed7cdfd875ec2f5990",
+  "sourceSha256": "6c3159a459838b079c34e3656762549b7375444d994611fac92688259dbe313f",
+  "license": "Apache-2.0",
+  "input": "BGR float32 0..255, NCHW [1,3,80,80], 4.0x crop",
+  "output": "three logits; live class index 1; softmax once",
+  "conversionValidation": {
+    "randomTensors": 6,
+    "maximumAbsoluteLogitDifference": 2.0265579223632812e-06
+  },
+  "accuracyValidation": "NOT_EVALUATED. Conversion parity is not attack detection accuracy."
+}

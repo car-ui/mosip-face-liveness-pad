@@ -80,7 +80,8 @@ class ChallengeManager:
             is_completed=False,
             progress=0.0,
             action_detected=False,
-            feedback_message=prompts.get(selected, "Please follow the on-screen instruction")
+            feedback_message=prompts.get(selected, "Please follow the on-screen instruction"),
+            preparation_seconds=2.0,
         )
         return self.active_challenge_state
 

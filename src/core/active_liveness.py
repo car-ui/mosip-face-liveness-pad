@@ -32,6 +32,7 @@ class ChallengeState:
     baseline_value: Optional[float] = None
     baseline_frames_recorded: int = 0
     consecutive_action_frames: int = 0
+    preparation_seconds: float = 0.0
 
     @property
     def challenge_type(self) -> ChallengeType:
@@ -214,10 +215,14 @@ class ActiveLivenessDetector:
         elapsed = time.time() - state.start_time
         
         # Timeout enforcement
-        if elapsed > state.timeout_seconds:
+        if elapsed > state.timeout_seconds + state.preparation_seconds:
             state.is_active = False
             state.is_completed = False
             state.feedback_message = "Challenge timed out. Please try again."
+            return state
+
+        if elapsed < state.preparation_seconds:
+            state.feedback_message = "Get ready. Face the camera with a relaxed expression."
             return state
 
         if not telemetry["landmarks_detected"]:

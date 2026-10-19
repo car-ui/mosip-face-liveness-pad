@@ -11,6 +11,8 @@ tmp/
 *.log
 *.onnx
 !assets/models/minifasnet_v2.onnx
+!assets/models/minifasnet_v1se.onnx
+!assets/models/face_detection_yunet_2023mar.onnx
 !assets/models/facemesh_v2.onnx
 !tests/fixtures/*.onnx
 output/local/

@@ -1,5 +1,15 @@
 # Validation evidence
 
+The 19 October research rebuild passed 141 Python tests in 21.76 seconds.
+This includes a real YuNet two-face fixture check, explicit duplicate-outline
+and missing-detection regressions, preparation deadline checks and V1SE model
+contract checks. The V1SE export passed six PyTorch/ONNX comparisons with maximum
+absolute logit difference `2.0265579223632812e-06`. The fixture-based OpenCV UI was
+rendered and inspected, revealing and fixing overlapping action text/progress
+and header/footer text. See [the research review](RESEARCH_AND_REBUILD.md) for
+the comparisons, rejected model choices and remaining physical evidence gaps.
+These checks do not establish successful live actions or physical attack accuracy.
+
 Local checks were run on Windows on 18 October 2026 with CPython 3.11.15 and the declared runtime dependencies. The source initially contained 64 tests; the revised suite contains 120. The latest Windows run on 19 October passed all 120 tests in 21.34 seconds. The earlier fresh dependency environment run passed in 17.54 seconds. An earlier source ZIP extraction passed all 119 tests before the final timeout regression was added. A Starlette warning notes its future TestClient preference for `httpx2`; the currently pinned `httpx` TestClient checks pass.
 
 ## Commands and scope

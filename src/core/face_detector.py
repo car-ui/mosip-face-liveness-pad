@@ -9,6 +9,9 @@ Designed according to ISO/IEC 19794-5 face biometric quality requirements:
 
 from dataclasses import dataclass
 from typing import Optional, List, Tuple
+from pathlib import Path
+import hashlib
+import json
 import cv2
 import numpy as np
 
@@ -42,18 +45,48 @@ class FaceQualityAssessor:
                  min_brightness: float = 48.0,
                  max_brightness: float = 215.0,
                  min_face_ratio: float = 0.025,
-                 max_face_ratio: float = 0.90):
+                 max_face_ratio: float = 0.90,
+                 detector_backend: str = "yunet"):
         self.min_sharpness = min_sharpness
         self.min_brightness = min_brightness
         self.max_brightness = max_brightness
         self.min_face_ratio = min_face_ratio
         self.max_face_ratio = max_face_ratio
+        self.detector_backend = detector_backend
+        self.neural_detector = None
+        if detector_backend == "yunet":
+            model = Path(__file__).resolve().parents[2] / "assets/models/face_detection_yunet_2023mar.onnx"
+            manifest = json.loads(model.with_suffix(".onnx.json").read_text())
+            if hashlib.sha256(model.read_bytes()).hexdigest() != manifest["sha256"]:
+                raise ValueError("Face detector checksum mismatch")
+            self.neural_detector = cv2.FaceDetectorYN.create(str(model), "", (320, 320),
+                                                           0.9, 0.3, 5000)
+        elif detector_backend != "haar":
+            raise ValueError("Unsupported face detector backend")
         
         cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
         self.face_cascade = cv2.CascadeClassifier(cascade_path)
 
     def detect_faces(self, frame: np.ndarray, known_box: Optional[Tuple[int, int, int, int]] = None,
                      landmark_boxes=None) -> List[DetectedFace]:
+        if self.detector_backend == "yunet":
+            h, w = frame.shape[:2]
+            self.neural_detector.setInputSize((w, h))
+            _, detections = self.neural_detector.detect(frame)
+            faces = []
+            for row in detections if detections is not None else []:
+                x, y, bw, bh = row[:4]
+                x1, y1 = max(0, int(x)), max(0, int(y))
+                x2, y2 = min(w, int(x + bw)), min(h, int(y + bh))
+                if x2 > x1 and y2 > y1:
+                    faces.append(DetectedFace(x1, y1, x2 - x1, y2 - y1,
+                                              float(row[-1]), row[4:14].reshape(5, 2)))
+            # One source determines face geometry. Never union its one-face
+            # result with a different outline of the same face from landmarks.
+            # Independently observed multiple landmark faces still block capture.
+            if len(landmark_boxes or []) > 1 and len(faces) < len(landmark_boxes):
+                return [DetectedFace(*box, 0.95) for box in landmark_boxes]
+            return faces
         # A tracked box cannot establish that no second face is present.
         # Fast downscaled Haar detection for 30+ FPS
         h, w = frame.shape[:2]

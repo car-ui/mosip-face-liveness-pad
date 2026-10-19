@@ -6,6 +6,16 @@ The exported MiniFASNet V2 ONNX model is derived from `minivision-ai/Silent-Face
 
 ## Native inference runtimes
 
+The Python prototype's YuNet detector is the OpenCV Zoo March 2023 ONNX asset,
+pinned at commit `47534e27c9851bb1128ccc0102f1145e27f23f98`. Its MIT license is
+retained in `third_party/YuNet-LICENSE.txt`; the adjacent model manifest records
+its SHA-256 and exact download URL. It is not the OpenCV 5.x May 2026 export.
+
+The optional MiniFASNet V1SE research companion is exported from the same pinned
+Minivision repository under Apache-2.0. Its own manifest records the 4.0 crop
+contract, weight hash and numerical parity check. It is available to the
+comparison script and is not automatically enabled in the verification pipeline.
+
 Android uses ONNX Runtime 1.23.2 under the MIT license and OpenCV 4.12.0 under Apache License 2.0. Copies of the upstream notices are retained in `third_party/ONNX-Runtime-LICENSE.txt` and `third_party/OpenCV-LICENSE.txt`. The native preparer installs both notices alongside the model in application resources, since the Android client's general packaging rules exclude some META-INF license files. Desktop uses ONNX Runtime 1.30.0 and OpenCV 4.5.3-4; those packages retain their own notices. The Haar cascade also retains its Intel/OpenCV notice in the XML file.
 
 ## Font, landmark model and image fixture

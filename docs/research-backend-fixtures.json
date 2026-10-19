@@ -1,0 +1,115 @@
+{
+  "scope": "Detection and model/crop diagnostics only. No physical PAD labels, APCER/BPCER, identity or completed challenge proof.",
+  "imagesSaved": false,
+  "input": "static fixtures",
+  "modelHashes": {
+    "v2": "5281b4a621b1a2a7570d88bc3a37ac5273ab3082b61d1e284b9847660909cbef",
+    "v1se": "ec389bb133aa689f19fff5e413f818355f670f8b02d8c4b23350bb67c2286ddc"
+  },
+  "summary": {
+    "haar": {
+      "frames": 3,
+      "zeroFaces": 1,
+      "oneFace": 2,
+      "multipleFaces": 0,
+      "detectionMsP50": 10.225,
+      "detectionMsP95": 192.29319999999998,
+      "v2ScoreRange": [
+        0.228,
+        0.867
+      ]
+    },
+    "yunet": {
+      "frames": 3,
+      "zeroFaces": 1,
+      "oneFace": 1,
+      "multipleFaces": 1,
+      "detectionMsP50": 39.468,
+      "detectionMsP95": 39.5904,
+      "v2ScoreRange": [
+        0.816,
+        0.816
+      ]
+    }
+  },
+  "observations": [
+    {
+      "frame": 0,
+      "source": "static_photo",
+      "detector": "haar",
+      "face_count": 1,
+      "landmark_face_count": 1,
+      "detection_ms": 212.523,
+      "quality_ok": true,
+      "v2_score": 0.867,
+      "v2_verdict": "BONA_FIDE_LIVE",
+      "v1se_score": 0.959,
+      "v1se_verdict": "BONA_FIDE_LIVE",
+      "research_mean_live_score": 0.913,
+      "v2_crop_shift_score_range": [
+        0.462,
+        0.928
+      ]
+    },
+    {
+      "frame": 0,
+      "source": "static_photo",
+      "detector": "yunet",
+      "face_count": 1,
+      "landmark_face_count": 1,
+      "detection_ms": 39.604,
+      "quality_ok": true,
+      "v2_score": 0.816,
+      "v2_verdict": "UNCERTAIN",
+      "v1se_score": 0.974,
+      "v1se_verdict": "BONA_FIDE_LIVE",
+      "research_mean_live_score": 0.895,
+      "v2_crop_shift_score_range": [
+        0.816,
+        0.957
+      ]
+    },
+    {
+      "frame": 1,
+      "source": "two_photo_faces",
+      "detector": "haar",
+      "face_count": 1,
+      "landmark_face_count": 0,
+      "detection_ms": 10.225,
+      "quality_ok": false,
+      "v2_score": 0.228,
+      "v2_verdict": "PRESENTATION_ATTACK",
+      "v1se_score": 0.946,
+      "v1se_verdict": "BONA_FIDE_LIVE",
+      "research_mean_live_score": 0.587,
+      "v2_crop_shift_score_range": [
+        0.03,
+        0.228
+      ]
+    },
+    {
+      "frame": 1,
+      "source": "two_photo_faces",
+      "detector": "yunet",
+      "face_count": 2,
+      "landmark_face_count": 0,
+      "detection_ms": 21.376
+    },
+    {
+      "frame": 2,
+      "source": "blank",
+      "detector": "haar",
+      "face_count": 0,
+      "landmark_face_count": 0,
+      "detection_ms": 4.08
+    },
+    {
+      "frame": 2,
+      "source": "blank",
+      "detector": "yunet",
+      "face_count": 0,
+      "landmark_face_count": 0,
+      "detection_ms": 39.468
+    }
+  ]
+}

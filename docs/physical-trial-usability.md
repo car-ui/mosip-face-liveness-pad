@@ -29,3 +29,13 @@ required to determine whether the changes resolve the reported turning failure.
 
 This laptop application is a research prototype. It does not prove rejection
 inside an official MOSIP client or perform identity authentication.
+
+A subsequent user-reported live trial was rejected at model score 0.371 against
+cutoff 0.45. This is an apparent bona fide rejection, not physical attack evidence.
+A separate 60-frame camera diagnostic then scored 0.665 to 0.999 with every frame
+passing quality checks and no score below the cutoff. Those frames were not
+saved, identity was not verified, and this was not a completed challenge session.
+The changing observations require further investigation and calibration with
+labelled live and attack trials. The rejection display now shows its score and
+cutoff, acknowledges possible false rejections, and omits an unrelated resident
+demo identifier. Decision thresholds remain unchanged.

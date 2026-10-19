@@ -8,6 +8,12 @@ The repository includes a local browser console, an OpenCV desktop demo, a mock 
 
 ## Run locally
 
+The latest laptop trials exposed apparent live-person rejection and face-count
+instability. The [research and rebuild review](docs/RESEARCH_AND_REBUILD.md)
+compares existing solutions, records reproducible failures and explains the
+YuNet detector change, action preparation phase and optional two-model research
+comparison. Physical reliability is not established by the automated tests.
+
 Use CPython 3.11. The application binds to `127.0.0.1:4501`. Internet access is needed for initial dependency installation; inference and challenge generation run locally afterward.
 
 ```powershell

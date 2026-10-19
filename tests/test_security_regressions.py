@@ -115,7 +115,7 @@ def test_detector_exception_fails_closed(controlled_pipeline, valid_frame, monke
 
 
 def test_known_face_box_does_not_hide_second_face(monkeypatch):
-    assessor = FaceQualityAssessor()
+    assessor = FaceQualityAssessor(detector_backend="haar")
     class Cascade:
         def detectMultiScale(self, *a, **k):
             return [(10, 10, 50, 50), (100, 10, 50, 50)]

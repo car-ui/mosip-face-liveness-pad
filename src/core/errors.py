@@ -65,7 +65,7 @@ SAFE_USER_MESSAGES: Dict[BiometricErrorCode, str] = {
     
     # Security-safe liveness failure message
     BiometricErrorCode.PASSIVE_LIVENESS_FAILED: "Liveness verification could not be completed. Please try again.",
-    BiometricErrorCode.PAD_ATTACK_DETECTED: "Face verification could not be completed. Please present a live face.",
+    BiometricErrorCode.PAD_ATTACK_DETECTED: "Liveness model rejected this capture. Adjust lighting and retry.",
     BiometricErrorCode.SCREEN_REPLAY_DETECTED: "Face verification could not be completed. Please try again.",
     BiometricErrorCode.PRINT_PHOTO_DETECTED: "Face verification could not be completed. Please try again.",
     

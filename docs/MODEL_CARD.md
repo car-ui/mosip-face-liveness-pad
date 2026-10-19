@@ -37,6 +37,14 @@ The selective checkout avoids an upstream filename that Windows cannot check out
 
 ## Intended use and limits
 
+The 19 October research rebuild adds a separately manifested V1SE model with
+4.0 crop scale for explicit comparisons. The default verification pipeline still
+uses V2 alone. Its six conversion comparisons had maximum absolute logit error
+`2.0265579223632812e-06`. No accuracy advantage is established for model fusion.
+See [the research review](RESEARCH_AND_REBUILD.md) and the committed diagnostic
+fixture report. The Python face detector is now the separately licensed YuNet
+model; native detector changes require their own integration and validation.
+
 Use for offline prototype development and controlled evaluation. Training data composition, consent, coverage, and target-population representativeness have not been independently established in this project. Upstream performance figures are not this project's measured results.
 
 RGB PAD is sensitive to camera sensors, image processing, illumination, print/display materials, crop accuracy, and face pose. The [upstream README](https://github.com/minivision-ai/Silent-Face-Anti-Spoofing/blob/b6d5f04ad78778917853b25c778acef6d5626d15/README_EN.md) describes deployment-dependent limitations. A blinking or smiling face can still be replayed or synthesized; action detection does not prove source authenticity. There is no claim of reliable mask, deepfake, injection, or adaptive replay detection here.
