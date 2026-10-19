@@ -160,10 +160,10 @@ index e3e0bf37d1..84a7d93960 100644
  	}
  
 diff --git a/registration/registration-client/src/main/java/io/mosip/registration/controller/device/Streamer.java b/registration/registration-client/src/main/java/io/mosip/registration/controller/device/Streamer.java
-index 105567a999..06daa8b71c 100644
+index 105567a999..ec25b71ea8 100644
 --- a/registration/registration-client/src/main/java/io/mosip/registration/controller/device/Streamer.java
 +++ b/registration/registration-client/src/main/java/io/mosip/registration/controller/device/Streamer.java
-@@ -3,197 +3,162 @@ package io.mosip.registration.controller.device;
+@@ -3,197 +3,163 @@ package io.mosip.registration.controller.device;
  import java.io.ByteArrayInputStream;
  import java.io.IOException;
  import java.io.InputStream;
@@ -453,6 +453,7 @@ index 105567a999..06daa8b71c 100644
 +                String previousPrompt = null;
 +                while (current(inputStream, token) && !Thread.currentThread().isInterrupted()) {
 +                    byte[] frame = retrieveNextImage(inputStream);
++                    io.mosip.facepad.BoundedImage.requireJpeg(frame);
 +                    Image image = new Image(new ByteArrayInputStream(frame));
 +                    if (image.isError()) throw new IOException("Camera JPEG could not be decoded");
 +                    if (active != null) {

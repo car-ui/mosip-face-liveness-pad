@@ -65,8 +65,10 @@ public final class NativeActiveSessionCheck {
         Fixture reading=new Fixture();reading.neutral(7);
         for(int i=0;i<3;i++)reading.frame(.1,0);
         reading.neutral(2);
-        require(reading.session.completedActions()==0 && reading.session.prompt().startsWith("Close both eyes"),
+        require(reading.session.completedActions()==0 && reading.session.prompt().startsWith("Get ready to blink"),
                 "Movement during instruction reading earned action credit");
+        reading.neutral(15);
+        require(reading.session.prompt().startsWith("Blink once"),"Action instruction did not follow preparation");
         Fixture wrong=new Fixture();wrong.complete();
         require(!wrong.session.consume(new byte[]{1,2,3}),"Different final candidate accepted");
         Fixture staticPhoto=new Fixture();staticPhoto.neutral(40);

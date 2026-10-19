@@ -51,10 +51,15 @@ public final class NativeActiveSession {
         expire();
         if (state != State.VERIFYING) return state.name();
         if (!padClear) return "Checking liveness. Keep your face in view";
-        if (phase == 0 || phase == 2) return "Look straight at the camera with both eyes open";
-        if (actions[action] == Action.BLINK) return "Close both eyes, then open them";
-        return actions[action] == Action.TURN_IMAGE_LEFT ? "Move your nose toward the left side of the preview" :
-                "Move your nose toward the right side of the preview";
+        if (phase == 0 && action == 0) return "Look straight at the camera with both eyes open";
+        if (phase == 0 || (phase == 1 && clock.getAsLong() - actionPromptAt < 2_000_000_000L)) {
+            if (actions[action] == Action.BLINK) return "Get ready to blink. Wait for the next instruction.";
+            return "Get ready to turn toward the " + (actions[action] == Action.TURN_IMAGE_LEFT ? "LEFT" : "RIGHT")
+                    + " side of the preview. Keep facing the camera for now.";
+        }
+        if (actions[action] == Action.BLINK) return "Blink once, then open both eyes";
+        return actions[action] == Action.TURN_IMAGE_LEFT ? "Move your nose toward the left side of the preview, then face the camera" :
+                "Move your nose toward the right side of the preview, then face the camera";
     }
 
     /** Missing/multiple faces invalidate all actions. Call this for failed frame geometry. */

@@ -92,3 +92,31 @@ calls, and a completed action double could not override the recorded portrait's
 PAD attack verdict. This fixture no longer exercises positive matcher acceptance.
 See native-yunet-controller-check.json. Earlier resource failures remain in logs;
 Android rebuilds, physical attack accuracy and live client UI remain unverified.
+
+## Publication checkpoint, 19 October 2026
+
+The user subsequently authorized pushing this work and merging into the default
+branch. The freshly fetched default is main at 2ac8c92. This supersedes the
+previous local-only instruction; demo work and visibility changes remain excluded.
+
+The latest five-module desktop reactor build passed using Java 11 in 58.739
+seconds, including the preview JPEG preflight and revised preparation prompts.
+The final portable native action check passed after recompiling current source.
+The new prepared-source verifier passed 13 unit tests. Both Android prepared
+checkouts passed generated-source/assets and patch verification, at 30 camera-SBI
+and 27 registration-client files. This is not a final APK rebuild or execution.
+The desktop verifier matched 21 generated files, but reverse patch checking
+failed against the prepared POM's build-only changes. That check remains FAIL.
+
+The earlier full Python source runs passed 186 tests. The final wrapper attempt
+failed during collection inside Python/pytest with SystemError before tests ran.
+Its FAIL report is retained under D:/CodexWork/native-face-pad-20261018/push-regression.
+The 13 new verifier tests passed separately. Do not report 199 passing together.
+
+Final Android APK rebuilds, native JavaFX lifecycle checks, physical attacks,
+live official-client workflows, real identity matching and L1/vendor validation
+are still pending. Parallel agents were interrupted by the account usage limit.
+The successful desktop build log is desktop-final-jdk11-reactor-build.log under
+the same D: artifact root. The laptop launcher still targets the older f5a678d
+source extraction; it has not been retargeted to the publication checkpoint.
+The original supplied PDFs and private camera evidence remain excluded from Git.
