@@ -14,6 +14,13 @@ compares existing solutions, records reproducible failures and explains the
 YuNet detector change, action preparation phase and optional two-model research
 comparison. Physical reliability is not established by the automated tests.
 
+The subsequent [reliability plan and execution record](docs/RELIABILITY_PLAN.md)
+documents the bounded video evidence policy, camera settling period, optional
+MobileNetV3 comparison and remaining accuracy work. Suspect frames block capture
+immediately; terminal PAD rejection now requires sustained evidence. Engine
+failures remain immediate errors. Neither a suspect frame nor an inconclusive
+session can produce a verified image.
+
 Use CPython 3.11. The application binds to `127.0.0.1:4501`. Internet access is needed for initial dependency installation; inference and challenge generation run locally afterward.
 
 ```powershell

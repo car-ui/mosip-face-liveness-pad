@@ -15,7 +15,7 @@ from ..devices.base import FaceCaptureDevice, DeviceType, MockScenario
 from ..devices.webcam_device import WebcamCaptureDevice
 from ..devices.mock_l0_device import MockL0Device
 from ..core.pipeline import LivenessPipeline, PipelineState, PipelineStepResult
-from ..core.config import WorkflowType, LivenessConfig, PADMode, ChallengeType
+from ..core.config import WorkflowType, LivenessConfig, PADMode, ChallengeType, LivenessDecision
 from ..core.enrollment import ResidentEnrollmentManager, EnrollmentStage
 
 
@@ -45,12 +45,18 @@ class DesktopRegistrationClient:
         self._prompt_key = None
         self._prompt_detail = ""
         self._prompt_changed_at = 0.0
+        self._verification_ready_at = 0.0
+        self._last_reset_key_at = 0.0
 
     def _readable_prompt(self, result):
         """Keep the requested action visible while secondary feedback settles."""
         challenge = result.active_challenge
         if result.state != PipelineState.ACTIVE_CHALLENGE or challenge is None:
             self._prompt_key = None
+            if result.state == PipelineState.ATTACK_REJECTED and result.pad_result is not None:
+                return "Could not verify liveness", (
+                    f"Model score {result.pad_result.liveness_score:.3f}; "
+                    f"cutoff {self.config.pad_attack_rejection_threshold:.3f}. Press R for a new trial.")
             return result.status_text, result.detailed_guidance
         titles = {
             ChallengeType.BLINK: "Blink once, then open your eyes",
@@ -477,7 +483,7 @@ class DesktopRegistrationClient:
                 cv2.putText(canvas, "Press [R] to start a new session", (m_x1 + 86, m_y1 + 104),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.38, (160, 175, 190), 1, cv2.LINE_AA)
 
-        elif result.state == PipelineState.ATTACK_REJECTED:
+        elif result.state == PipelineState.ATTACK_REJECTED and self.diagnostic_mode:
             modal_w = 540
             modal_h = 135
             m_x1 = (target_w - modal_w) // 2
@@ -513,6 +519,7 @@ class DesktopRegistrationClient:
         cv2.resizeWindow(self.window_name, 960, 720)
         self.is_running = True
         self.pipeline.reset()
+        self._verification_ready_at = time.monotonic() + 2.0
         processed_frames = 0
 
         print("\n=== Face liveness research prototype started ===")
@@ -538,7 +545,16 @@ class DesktopRegistrationClient:
                     break
 
                 # Run Liveness & PAD pipeline
-                result = self.pipeline.process_frame(frame)
+                if time.monotonic() < self._verification_ready_at:
+                    # Exposure/white-balance settling frames never enter evidence.
+                    result = PipelineStepResult(
+                        state=PipelineState.FACE_DETECTION,
+                        decision=LivenessDecision.IN_PROGRESS,
+                        status_text="Camera settling",
+                        detailed_guidance="Face the camera. Verification starts in a moment.",
+                        progress=0.0, max_retries=self.pipeline.policy.max_retries)
+                else:
+                    result = self.pipeline.process_frame(frame)
                 
                 # Render Clean Modern UI
                 display = self.draw_ui_overlay(frame.image, result)
@@ -551,8 +567,12 @@ class DesktopRegistrationClient:
                 if cv2.getWindowProperty(self.window_name, cv2.WND_PROP_VISIBLE) < 1:
                     break
                 elif key == ord('r'):
-                    self.enrollment_manager.reset(new_resident=False)
-                    self.pipeline.reset()
+                    now = time.monotonic()
+                    if now - self._last_reset_key_at >= .75:
+                        self.enrollment_manager.reset(new_resident=False)
+                        self.pipeline.reset()
+                        self._verification_ready_at = now + 2.0
+                    self._last_reset_key_at = now
                 elif key == ord('n') or key == ord('N'):
                     self.enrollment_manager.reset(new_resident=True)
                     self.pipeline.reset()

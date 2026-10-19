@@ -6,6 +6,13 @@ The exported MiniFASNet V2 ONNX model is derived from `minivision-ai/Silent-Face
 
 ## Native inference runtimes
 
+The optional `anti-spoof-mn3.onnx` research model is the original ONNX asset
+distributed by OpenVINO Open Model Zoo, 2022.1. Its SHA-384 was checked against
+the pinned official descriptor before packaging. The original model's MIT
+license is retained in `third_party/Anti-Spoof-MN3-LICENSE.txt`. Its adjacent
+manifest records the descriptor commit, download URL, SHA-256, RGB channel
+normalization and probability output contract. It is not enabled by default.
+
 The Python prototype's YuNet detector is the OpenCV Zoo March 2023 ONNX asset,
 pinned at commit `47534e27c9851bb1128ccc0102f1145e27f23f98`. Its MIT license is
 retained in `third_party/YuNet-LICENSE.txt`; the adjacent model manifest records

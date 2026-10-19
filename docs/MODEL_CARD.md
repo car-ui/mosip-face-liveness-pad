@@ -37,6 +37,15 @@ The selective checkout avoids an upstream filename that Windows cannot check out
 
 ## Intended use and limits
 
+The optional `anti-spoof-mn3.onnx` profile is a different MobileNetV3 classifier,
+not another MiniFASNet serialization. Its original Open Model Zoo asset is
+SHA-384 verified and retained with the model's MIT license. It requires RGB
+128 by 128 input with its declared channel mean/scale and returns two
+probabilities with live class 0. The runtime validates them without a second
+softmax. Its manifest documents the full contract and provenance. It is an
+explicit research option and is not the default or an automatic fallback.
+See `RELIABILITY_PLAN.md` for the research, comparison and limitations.
+
 The 19 October research rebuild adds a separately manifested V1SE model with
 4.0 crop scale for explicit comparisons. The default verification pipeline still
 uses V2 alone. Its six conversion comparisons had maximum absolute logit error

@@ -1,0 +1,15 @@
+{
+  "profile": "anti_spoof_mn3",
+  "version": "omz-2022.1",
+  "sha256": "c4c99af04603b62d7e44f6f4daeb33e0daeccc696008c0b1d62f6f5cebbb3262",
+  "upstreamRepository": "https://github.com/kprokofi/light-weight-face-anti-spoofing",
+  "upstreamCommit": "82a2c26bacff5462c6f9320c34ae0363ccbed497",
+  "sourceUrl": "https://storage.openvinotoolkit.org/repositories/open_model_zoo/public/2022.1/anti-spoof-mn3/anti-spoof-mn3.onnx",
+  "descriptorRepository": "https://github.com/openvinotoolkit/open_model_zoo",
+  "descriptorCommit": "2c9b5c563ab3a202d085a42e2bbfc48f77961f4b",
+  "verifiedSourceSha384": "6de4534964b723397b3e8c995cadcf43bc007cc2f9930b95ae25f76adccece5d1d4d058d0b15117b9e4a9f758424f92a",
+  "license": "MIT",
+  "input": "RGB float32 NCHW [1,3,128,128], subtract [151.2405,119.595,107.8395], divide [63.0105,56.457,55.0035], tight face crop",
+  "output": "two probabilities; live class 0; do not apply softmax",
+  "accuracyValidation": "NOT_EVALUATED for target camera or physical attacks. Explicit research option, not automatic fallback."
+}

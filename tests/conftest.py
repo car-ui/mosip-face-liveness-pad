@@ -5,6 +5,7 @@ from src.core.config import PADVerdict
 from src.core.face_detector import DetectedFace, QualityMetrics
 from src.core.passive_pad import PADResult, HeuristicPADBackend
 from src.core.pipeline import LivenessPipeline
+from src.core.session_pad import SessionPADGate
 from src.devices.base import VideoFrame
 
 
@@ -27,6 +28,10 @@ def controlled_pipeline(monkeypatch):
     # Avoid native inference in control-flow tests. Real detector tests remain separate.
     monkeypatch.setattr("src.core.pipeline.ActiveLivenessDetector._setup_landmarker", lambda self: None)
     pipeline = LivenessPipeline()
+    # Legacy control-flow tests use a single-observation gate. Dedicated video
+    # evidence tests exercise the real multi-frame policy and clock separately.
+    pipeline.pad_gate = SessionPADGate(attack_frames=1, attack_seconds=0,
+                                       clear_frames=1, clear_seconds=0)
     face = DetectedFace(80, 50, 160, 140, .99)
     monkeypatch.setattr(pipeline.quality_assessor, "detect_faces", lambda *a, **k: [face])
     monkeypatch.setattr(pipeline.quality_assessor, "assess_quality", lambda *a: QualityMetrics(

@@ -98,6 +98,7 @@ class ONNXModelPADBackend(BasePADBackend):
         self.live_index = 0
         self.class_count = 2
         self.crop_scale = 1.0
+        self.output_kind = "logits"
         self._init_session()
 
     def _init_session(self) -> None:
@@ -138,12 +139,18 @@ class ONNXModelPADBackend(BasePADBackend):
                     manifest = json.load(stream)
                 if manifest["sha256"] != self._model_hash:
                     raise ValueError("Model manifest checksum mismatch")
-                if manifest["profile"] not in ("minifasnet_v2_2.7", "minifasnet_v1se_4.0"):
+                if manifest["profile"] not in ("minifasnet_v2_2.7", "minifasnet_v1se_4.0", "anti_spoof_mn3"):
                     raise ValueError("Unsupported model profile")
                 self.profile = manifest["profile"]
-                self.input_size = (80, 80)
-                self.live_index, self.class_count = 1, 3
-                self.crop_scale = 4.0 if self.profile == "minifasnet_v1se_4.0" else 2.7
+                if self.profile == "anti_spoof_mn3":
+                    self.input_size = (128, 128)
+                    self.live_index, self.class_count = 0, 2
+                    self.crop_scale = 1.0
+                    self.output_kind = "probabilities"
+                else:
+                    self.input_size = (80, 80)
+                    self.live_index, self.class_count = 1, 3
+                    self.crop_scale = 4.0 if self.profile == "minifasnet_v1se_4.0" else 2.7
                 self._model_version = manifest["version"]
             expected = [1, 3, self.input_size[1], self.input_size[0]]
             if self._session.get_inputs()[0].shape != expected:
@@ -183,6 +190,10 @@ class ONNXModelPADBackend(BasePADBackend):
         if self.profile in ("minifasnet_v2_2.7", "minifasnet_v1se_4.0"):
             # Upstream functional.to_tensor explicitly returns BGR float [0,255].
             normalized = resized.astype(np.float32)
+        elif self.profile == "anti_spoof_mn3":
+            normalized = (resized.astype(np.float32) - np.array(
+                [151.2405, 119.595, 107.8395], dtype=np.float32)) / np.array(
+                [63.0105, 56.457, 55.0035], dtype=np.float32)
 
         # Transpose to NCHW format
         blob = np.transpose(normalized, (2, 0, 1))
@@ -195,8 +206,14 @@ class ONNXModelPADBackend(BasePADBackend):
             raise ValueError("Model output does not match its declared class contract")
 
         # Compute Softmax
-        exp_logits = np.exp(logits - np.max(logits))
-        probs = exp_logits / np.sum(exp_logits)
+        if self.output_kind == "probabilities":
+            if (np.any(logits < 0) or np.any(logits > 1)
+                    or not np.isclose(np.sum(logits), 1.0, atol=1e-4)):
+                raise ValueError("Invalid output probabilities")
+            probs = logits
+        else:
+            exp_logits = np.exp(logits - np.max(logits))
+            probs = exp_logits / np.sum(exp_logits)
 
         # Binary output assumption: [prob_live, prob_spoof]
         if len(probs) >= 2:
@@ -212,6 +229,8 @@ class ONNXModelPADBackend(BasePADBackend):
 
         details = {
             "model_type": "ONNX_DEEP_LEARNING",
+            "profile": self.profile,
+            "output_kind": self.output_kind,
             "model_path": os.path.basename(self.model_path or ""),
             "model_hash": self._model_hash[:16] + "..." if self._model_hash != "N/A" else "N/A",
             "inference_provider": self._active_provider,

@@ -14,6 +14,7 @@ Implements the hybrid passive-active workflow defined in MOSIP Decode Problem 04
 
 import time
 import uuid
+from collections import deque
 from enum import Enum
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, Tuple
@@ -27,6 +28,7 @@ from .active_liveness import ActiveLivenessDetector, ChallengeState
 from .challenge_manager import ChallengeManager
 from .temporal_buffer import TemporalLivenessBuffer, TemporalAnalysisResult
 from .errors import BiometricErrorCode, get_safe_user_message
+from .session_pad import SessionPADGate, EvidenceState
 from .audit_logger import BiometricAuditLogger, AuditEventType
 from ..devices.base import VideoFrame
 
@@ -102,6 +104,8 @@ class LivenessPipeline:
         self._last_face_box: Optional[Tuple[int, int, int, int]] = None
         self._terminal_result = None
         self._multiple_faces_since = None
+        self.pad_gate = SessionPADGate()
+        self._pad_score_trace = deque(maxlen=60)
 
     def set_workflow(self, workflow: WorkflowType) -> None:
         self.workflow = workflow
@@ -122,6 +126,8 @@ class LivenessPipeline:
         self._terminal_result = None
         self._last_face_box = None
         self._multiple_faces_since = None
+        self.pad_gate.reset()
+        self._pad_score_trace.clear()
         
         self.audit_logger.log_event(
             AuditEventType.CAPTURE_STARTED,
@@ -132,6 +138,14 @@ class LivenessPipeline:
 
     def process_frame(self, frame: VideoFrame) -> PipelineStepResult:
         """Fail closed at the engine boundary; callers never receive partial biometrics."""
+        if (self.challenge_manager.current_retry >= self.policy.max_retries
+                and self.state not in (PipelineState.CAPTURE_SUCCESS, PipelineState.ATTACK_REJECTED,
+                                       PipelineState.DEVICE_ERROR)):
+            self.state = PipelineState.MAX_RETRIES_EXCEEDED
+            self._captured_biometric = None
+            self.temporal_buffer.clear()
+            self.challenge_manager.active_challenge_state = None
+            self.challenge_manager.completed_challenges.clear()
         if self.state in (PipelineState.CAPTURE_SUCCESS, PipelineState.ATTACK_REJECTED,
                           PipelineState.MAX_RETRIES_EXCEEDED, PipelineState.DEVICE_ERROR):
             passed = self.state == PipelineState.CAPTURE_SUCCESS
@@ -225,6 +239,8 @@ class LivenessPipeline:
 
         # Handle face detection / quality errors
         if not quality.is_acceptable:
+            self.pad_gate.reset()
+            self._pad_score_trace.clear()
             # Never carry passive scores or completed actions across a missing/changed face.
             self.temporal_buffer.clear()
             self._passive_frames_analyzed = 0
@@ -324,8 +340,33 @@ class LivenessPipeline:
             self.temporal_buffer.clear()
 
         # 3. PASSIVE LIVENESS & PAD EVALUATION
+        pad_result = self.pad_detector.evaluate_passive_liveness(bgr, face_box)
+        self._pad_score_trace.append(pad_result.liveness_score)
+        evidence = self.pad_gate.observe(pad_result.verdict, time.monotonic())
+        if evidence.state != EvidenceState.CLEAR:
+            self.temporal_buffer.clear()
+            self._passive_frames_analyzed = 0
+            self.challenge_manager.completed_challenges.clear()
+            self.challenge_manager.active_challenge_state = None
+            if evidence.state in (EvidenceState.ERROR, EvidenceState.INCONCLUSIVE):
+                self.state = PipelineState.DEVICE_ERROR
+                return PipelineStepResult(
+                    state=self.state, decision=LivenessDecision.ERROR,
+                    status_text="Liveness inconclusive" if evidence.state == EvidenceState.INCONCLUSIVE else "Liveness engine unavailable",
+                    detailed_guidance=evidence.reason, progress=0, pad_result=pad_result,
+                    quality=quality, can_retry=False)
+            if evidence.state == EvidenceState.COLLECTING:
+                self.state = PipelineState.PASSIVE_LIVENESS
+                return PipelineStepResult(
+                    state=self.state, decision=LivenessDecision.IN_PROGRESS,
+                    status_text="Checking liveness over several frames",
+                    detailed_guidance="Face the camera and hold a relaxed expression.",
+                    progress=0.1, quality=quality, pad_result=pad_result,
+                    current_retry=self.challenge_manager.current_retry,
+                    max_retries=self.policy.max_retries)
+            # A confirmed rejection follows the existing terminal path below.
+            self.state = PipelineState.PASSIVE_LIVENESS
         if self.state == PipelineState.PASSIVE_LIVENESS:
-            pad_result = self.pad_detector.evaluate_passive_liveness(bgr, face_box)
 
             # Update temporal sliding buffer
             self.temporal_buffer.add_frame(
@@ -341,7 +382,7 @@ class LivenessPipeline:
             )
             temp_analysis = self.temporal_buffer.analyze()
 
-            # 1. Definite Presentation Attack -> REJECT immediately
+            # A sustained attack verdict confirmed by the session gate is terminal.
             if pad_result.verdict == PADVerdict.PRESENTATION_ATTACK:
                 meta = pad_result.model_metadata
                 meta_dict = {
@@ -359,6 +400,9 @@ class LivenessPipeline:
                     details={
                         "attack_type": pad_result.attack_type,
                         "liveness_score": pad_result.liveness_score,
+                        "confirmation_frames": evidence.attack_frames,
+                        "confirmation_min_seconds": self.pad_gate.attack_seconds,
+                        "recent_frame_scores": list(self._pad_score_trace),
                         "mode": pad_result.mode_used,
                         "model_provenance": meta_dict
                     }
@@ -510,7 +554,6 @@ class LivenessPipeline:
         # 4. ACTIVE LIVENESS CHALLENGE EVALUATION
         if self.state == PipelineState.ACTIVE_CHALLENGE:
             # An action must never override a PAD attack or an unavailable PAD engine.
-            pad_result = self.pad_detector.evaluate_passive_liveness(bgr, face_box)
             if pad_result.verdict in (PADVerdict.PRESENTATION_ATTACK, PADVerdict.PROCESSING_ERROR):
                 is_attack = pad_result.verdict == PADVerdict.PRESENTATION_ATTACK
                 self.state = PipelineState.ATTACK_REJECTED if is_attack else PipelineState.DEVICE_ERROR

@@ -12,6 +12,7 @@ tmp/
 *.onnx
 !assets/models/minifasnet_v2.onnx
 !assets/models/minifasnet_v1se.onnx
+!assets/models/anti-spoof-mn3.onnx
 !assets/models/face_detection_yunet_2023mar.onnx
 !assets/models/facemesh_v2.onnx
 !tests/fixtures/*.onnx

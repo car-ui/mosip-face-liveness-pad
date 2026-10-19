@@ -49,10 +49,12 @@ def main():
     if not 1 <= args.frames <= 600:
         parser.error("Use 1 to 600 frames")
     detectors = {name: FaceQualityAssessor(detector_backend=name) for name in ("haar", "yunet")}
-    models = {name: PassivePADDetector(str(ROOT / f"assets/models/minifasnet_{name}.onnx"),
-                                      mode=PADMode.ONNX_ONLY) for name in ("v2", "v1se")}
+    filenames = {"v2": "minifasnet_v2.onnx", "v1se": "minifasnet_v1se.onnx",
+                 "mn3": "anti-spoof-mn3.onnx"}
+    models = {name: PassivePADDetector(str(ROOT / "assets/models" / filename),
+                                      mode=PADMode.ONNX_ONLY) for name, filename in filenames.items()}
     if any(not model._onnx_backend.is_available() for model in models.values()):
-        parser.error("Both verified model files and manifests are required")
+        parser.error("All verified model files and manifests are required")
     active = ActiveLivenessDetector()
     rows = []
     camera = WebcamCaptureDevice() if args.camera else None
@@ -100,7 +102,7 @@ def main():
         active.close()
     report = {"scope": "Detection and model/crop diagnostics only. No physical PAD labels, APCER/BPCER, identity or completed challenge proof.",
               "imagesSaved": False, "input": "camera" if args.camera else "static fixtures",
-              "modelHashes": {n: hashlib.sha256((ROOT / f"assets/models/minifasnet_{n}.onnx").read_bytes()).hexdigest()
+              "modelHashes": {n: hashlib.sha256((ROOT / "assets/models" / filenames[n]).read_bytes()).hexdigest()
                               for n in models},
               "summary": summarize(rows), "observations": rows}
     args.output.parent.mkdir(parents=True, exist_ok=True)

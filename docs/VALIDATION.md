@@ -1,5 +1,12 @@
 # Validation evidence
 
+The subsequent reliability pass followed `RELIABILITY_PLAN.md` and passed 151
+tests in 28.06 seconds. It adds explicit-clock video-evidence checks, rejection
+at attempted action completion, sparse-frame and invalid-clock failures, and
+MN3 normalization/probability-contract checks. An eight-frame simulator UI
+startup, settling and exit smoke run completed. This changes the Python session
+decision policy; it does not establish physical accuracy or update native gates.
+
 The 19 October research rebuild passed 141 Python tests in 21.76 seconds.
 This includes a real YuNet two-face fixture check, explicit duplicate-outline
 and missing-detection regressions, preparation deadline checks and V1SE model
