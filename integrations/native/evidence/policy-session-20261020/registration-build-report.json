@@ -1,0 +1,200 @@
+{
+  "status": "PASS",
+  "scope": "Build, model hashes, notices and ZIP integrity only; signatures and instrumentation recorded separately",
+  "apks": [
+    {
+      "path": "D:\\CodexWork\\native-face-pad-20261018\\artifacts\\native-final-20261020\\registration-client-x86_64-debug.apk",
+      "sha256": "10423abfc8266a81cb794e82e1d13fd3f96f1d796f982019fe231fbf36257daf",
+      "bytes": 261099740,
+      "abis": [
+        "x86_64"
+      ]
+    },
+    {
+      "path": "D:\\CodexWork\\native-face-pad-20261018\\artifacts\\native-final-20261020\\registration-client-arm64-v8a-debug.apk",
+      "sha256": "f2e19b34b508d39c5d54db510f309dc6d58dcd4c218c2f5bdd178483958f72a0",
+      "bytes": 223263713,
+      "abis": [
+        "arm64-v8a"
+      ]
+    },
+    {
+      "path": "D:\\CodexWork\\native-face-pad-20261018\\artifacts\\native-final-20261020\\registration-client-debug-androidTest.apk",
+      "sha256": "9235a76f780ecbddc4b506a8385c5883f92c439256ce01d82c5733d2f4c926bf",
+      "bytes": 2825720,
+      "abis": []
+    }
+  ],
+  "preparation": "D:\\CodexWork\\native-face-pad-20261018\\android-final-20261020-preparation.json",
+  "buildLog": "D:\\CodexWork\\native-face-pad-20261018\\client-final-20261020-build.log",
+  "signatureStatus": "PASS",
+  "sourceCommitAtValidation": "de68e6f",
+  "sourceFingerprints": {
+    "status": "PASS",
+    "platform": "android",
+    "upstreamCommit": "8f4643a694f3b5e66e0491f077a8630ab5667658",
+    "patchPresent": true,
+    "filesChecked": 27,
+    "mismatches": [],
+    "fingerprints": [
+      {
+        "path": "android/app/src/main/java/io/mosip/facepad/BoundedImage.java",
+        "sha256": "5fc9fa3aaaccf83b4803ffff3be590c7ba56c395c787f6eed70f635885383c31"
+      },
+      {
+        "path": "android/app/src/main/java/io/mosip/facepad/BoundedMjpegReader.java",
+        "sha256": "de9bb3189a4b9baa187920e25a9647c1c9065d14361480f0701a74a0a798e5d0"
+      },
+      {
+        "path": "android/app/src/main/java/io/mosip/facepad/NativeActiveSession.java",
+        "sha256": "19ba4b294d457b9928c213517302cf4a58d8b7c49ccc17c7a043fec2aea9e714"
+      },
+      {
+        "path": "android/app/src/main/java/io/mosip/facepad/NativeFrameChallenge.java",
+        "sha256": "c4874d2e45da1f00fee0a4ac206c203872083b8d62c505645e4d57609b5e1fa2"
+      },
+      {
+        "path": "android/app/src/main/java/io/mosip/facepad/NativeLandmarkEngine.java",
+        "sha256": "928b394f9506946b0dd644914f236d005045f6ec7b7e06314b769df4166d599d"
+      },
+      {
+        "path": "android/app/src/main/java/io/mosip/facepad/NativePadEngine.java",
+        "sha256": "a9af7387b058a552d2e61aaff628aa5bda0358696ff4b0015cc55f241f3f0905"
+      },
+      {
+        "path": "android/app/src/main/java/io/mosip/facepad/NativePadPolicy.java",
+        "sha256": "8ab0f47641640eb87bffaef0562cb54f56f5ee7424acc8e9b322c0f079f9d236"
+      },
+      {
+        "path": "android/app/src/main/java/io/mosip/facepad/NativeYuNet.java",
+        "sha256": "64d7c646530ec8e500a1f6dff9be73bb82400ff0026152fbbdc78be7d635dc06"
+      },
+      {
+        "path": "android/app/src/main/java/io/mosip/facepad/AndroidActiveEvidence.java",
+        "sha256": "bda054fc08cd3f9948ddec85cc3bf96faecb65f389bbe134c5856f54c1398a2f"
+      },
+      {
+        "path": "android/app/src/main/java/io/mosip/facepad/AndroidPadCheckpoint.java",
+        "sha256": "9763d2bff93a321923247e099ff1336141b63475c8dce3b35897eda3f7289d47"
+      },
+      {
+        "path": "android/app/src/main/assets/facepad/minifasnet_v2.onnx",
+        "sha256": "5281b4a621b1a2a7570d88bc3a37ac5273ab3082b61d1e284b9847660909cbef"
+      },
+      {
+        "path": "android/app/src/main/assets/facepad/minifasnet_v2.onnx.json",
+        "sha256": "44eb32abc96706f2996838995417832f3c3ca62558c782b628bc2ec52021cd81"
+      },
+      {
+        "path": "android/app/src/main/assets/facepad/facemesh_v2.onnx",
+        "sha256": "09c96e67163c660431d37eccc24d40172e514fe4f5768ebf507941e3cb9e3bfb"
+      },
+      {
+        "path": "android/app/src/main/assets/facepad/facemesh_v2.onnx.json",
+        "sha256": "8039df9c70d5df9ffe35d629e82784d775c536872943856608a23d61027ede14"
+      },
+      {
+        "path": "android/app/src/main/assets/facepad/face_detection_yunet_2023mar.onnx",
+        "sha256": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4"
+      },
+      {
+        "path": "android/app/src/main/assets/facepad/face_detection_yunet_2023mar.onnx.json",
+        "sha256": "65e59b154ca6d20a9614bc46c37cff7caa54dfd12e40ae87d56558cec7d28873"
+      },
+      {
+        "path": "android/app/src/main/assets/facepad/MODEL-LICENSE.txt",
+        "sha256": "daf94bf1dc9cc5700fe5af2c7c0cbd1836e70d509ed78fd0bebef7432edee6fb"
+      },
+      {
+        "path": "android/app/src/main/assets/facepad/LANDMARK-MODEL-LICENSE.txt",
+        "sha256": "8707eef0533987efc5b155d64761eeb6e20793f50b9bd1a68dad1cf4719d0ed8"
+      },
+      {
+        "path": "android/app/src/main/assets/facepad/FACE-DETECTOR-LICENSE.txt",
+        "sha256": "c83b8120c50ccbd4c4f96edf53141bdd566ebb8f8e9227e415326aa1b1aba958"
+      },
+      {
+        "path": "android/app/src/main/assets/facepad/ONNX-Runtime-LICENSE.txt",
+        "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+      },
+      {
+        "path": "android/app/src/main/assets/facepad/OpenCV-LICENSE.txt",
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+      },
+      {
+        "path": "android/app/src/main/assets/facepad/haarcascade_frontalface_default.xml",
+        "sha256": "0f7d4527844eb514d4a4948e822da90fbb16a34a0bbbbc6adc6498747a5aafb0"
+      },
+      {
+        "path": "android/app/src/androidTest/java/io/mosip/facepad/AndroidActiveEvidenceTest.java",
+        "sha256": "b75d38a1123e475243beac3fae39f4f4a03a20839dc4453f736ded3dfa73d1b3"
+      },
+      {
+        "path": "android/app/src/androidTest/java/io/mosip/registration_client/api_services/NativePadAcceptanceTest.java",
+        "sha256": "765d97a1464f44ce38ce246739150491dbc53c34d86d99fe70a35c330684fab4"
+      },
+      {
+        "path": "android/app/src/androidTest/assets/astronaut.png",
+        "sha256": "88431cd9653ccd539741b555fb0a46b61558b301d4110412b5bc28b5e3ea6cb5"
+      },
+      {
+        "path": "android/app/src/androidTest/assets/blank-face.iso",
+        "sha256": "94d916ccc2bd18227d432c79a8b8da100ed606e1d27d6ce40e13393d3cafa37e"
+      },
+      {
+        "path": "android/app/src/androidTest/assets/portrait-face.iso",
+        "sha256": "b0e01bb66a9516682fa13d5fd6a3e87b89d23f7df9ba934af68fd650e299c030"
+      }
+    ],
+    "textLineEndings": "LF",
+    "scope": "Prepared generated source/assets and patch hunks. Not a build, full upstream-content attestation or physical validation."
+  },
+  "validationLogs": [
+    {
+      "path": "D:\\CodexWork\\native-face-pad-20261018\\camera-final-20261020-build.log",
+      "sha256": "4f83137f97002b5f3996c852f5ceeb618f13c0f78c0f13ce6ef4256ac0bd31ec"
+    },
+    {
+      "path": "D:\\CodexWork\\native-face-pad-20261018\\client-final-20261020-build.log",
+      "sha256": "46565ba7d93c5de9f1e3ae6a2c4c2c1053d1be78854d632b7f29b16689bed351"
+    },
+    {
+      "path": "D:\\CodexWork\\native-face-pad-20261018\\camera-final-20261020-signature.log",
+      "sha256": "b9c6879e48d25a9786d2beb8a15738c06edce7d06f2722dd860894618592bd09"
+    },
+    {
+      "path": "D:\\CodexWork\\native-face-pad-20261018\\camera-final-20261020-test-signature.log",
+      "sha256": "b9c6879e48d25a9786d2beb8a15738c06edce7d06f2722dd860894618592bd09"
+    },
+    {
+      "path": "D:\\CodexWork\\native-face-pad-20261018\\registration-client-x86_64-debug.apk-signature-20261020.log",
+      "sha256": "b9c6879e48d25a9786d2beb8a15738c06edce7d06f2722dd860894618592bd09"
+    },
+    {
+      "path": "D:\\CodexWork\\native-face-pad-20261018\\registration-client-arm64-v8a-debug.apk-signature-20261020.log",
+      "sha256": "b9c6879e48d25a9786d2beb8a15738c06edce7d06f2722dd860894618592bd09"
+    },
+    {
+      "path": "D:\\CodexWork\\native-face-pad-20261018\\registration-client-debug-androidTest.apk-signature-20261020.log",
+      "sha256": "b9c6879e48d25a9786d2beb8a15738c06edce7d06f2722dd860894618592bd09"
+    }
+  ],
+  "instrumentation": {
+    "status": "PASS",
+    "serial": "emulator-5554",
+    "avd": "NATIVE_PAD_API34",
+    "tests": 17,
+    "scope": "Camera-disabled isolated emulator instrumentation, not physical testing or live official-client workflow",
+    "apks": [
+      {
+        "file": "D:\\CodexWork\\native-face-pad-20261018\\artifacts\\native-final-20261020\\registration-client-x86_64-debug.apk",
+        "sha256": "10423abfc8266a81cb794e82e1d13fd3f96f1d796f982019fe231fbf36257daf"
+      },
+      {
+        "file": "D:\\CodexWork\\native-face-pad-20261018\\artifacts\\native-final-20261020\\registration-client-debug-androidTest.apk",
+        "sha256": "9235a76f780ecbddc4b506a8385c5883f92c439256ce01d82c5733d2f4c926bf"
+      }
+    ],
+    "result_sha256": "a8b3c3bb00ed979868cb9bc4c1d8c85f015db731c4c562deca5a1854bbdb8b23"
+  }
+}

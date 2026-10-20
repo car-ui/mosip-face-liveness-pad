@@ -1,0 +1,18 @@
+{
+  "status": "PASS",
+  "serial": "emulator-5554",
+  "avd": "NATIVE_PAD_API34",
+  "tests": 17,
+  "scope": "Camera-disabled isolated emulator instrumentation, not physical testing or live official-client workflow",
+  "apks": [
+    {
+      "file": "D:\\CodexWork\\native-face-pad-20261018\\artifacts\\native-final-20261020\\registration-client-x86_64-debug.apk",
+      "sha256": "10423abfc8266a81cb794e82e1d13fd3f96f1d796f982019fe231fbf36257daf"
+    },
+    {
+      "file": "D:\\CodexWork\\native-face-pad-20261018\\artifacts\\native-final-20261020\\registration-client-debug-androidTest.apk",
+      "sha256": "9235a76f780ecbddc4b506a8385c5883f92c439256ce01d82c5733d2f4c926bf"
+    }
+  ],
+  "result_sha256": "a8b3c3bb00ed979868cb9bc4c1d8c85f015db731c4c562deca5a1854bbdb8b23"
+}

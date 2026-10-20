@@ -1,0 +1,14 @@
+{
+  "status": "PASS",
+  "sourceCommitAtValidation": "de68e6ffeb08e1874465104d3fec092a80b97ed2",
+  "registrationTests": 17,
+  "cameraTests": 8,
+  "registrationSeconds": 32.998,
+  "cameraSeconds": 61.596,
+  "apkSignatures": "All 5 APKs verified with Android build-tools35 apksigner",
+  "scope": "Camera-disabled isolated emulator instrumentation and artifact checks; no physical attack testing, no live user capture, identity matching or L1/vendor proof",
+  "reports": [
+    "D:\\CodexWork\\native-face-pad-20261018\\artifacts\\native-final-20261020\\registration-build-report.json",
+    "D:\\CodexWork\\native-face-pad-20261018\\artifacts\\native-final-20261020\\camera-build-report.json"
+  ]
+}

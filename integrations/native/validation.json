@@ -506,5 +506,19 @@
       "abi": "x86_64",
       "equivalence": "All DEX, retained native libraries and facepad assets match tested universal APK"
     }
-  ]
+  ],
+  "policy_session_20261020_registration": {
+    "source_commit": "de68e6ffeb08e1874465104d3fec092a80b97ed2",
+    "result_log": "evidence/policy-session-20261020/registration-instrumentation.txt",
+    "result_sha256": "a8b3c3bb00ed979868cb9bc4c1d8c85f015db731c4c562deca5a1854bbdb8b23",
+    "tests": 17,
+    "scope": "Camera-disabled isolated emulator instrumentation, not physical testing or live official-client workflow"
+  },
+  "policy_session_20261020_camera": {
+    "source_commit": "de68e6ffeb08e1874465104d3fec092a80b97ed2",
+    "result_log": "evidence/policy-session-20261020/camera-instrumentation.txt",
+    "result_sha256": "2828994985eaa8bfce90e427590372dfcffffb6735421c4897087b2e202afcff",
+    "tests": 8,
+    "scope": "Reference SBI, camera-disabled emulator; no human actions, physical attacks or production PKI"
+  }
 }

@@ -186,3 +186,21 @@ This checkpoint establishes the successful completion and verification of the fu
    - Both `origin/new/hackathon-quality` and `origin/main` synchronized at commit `44854414c43cc3dcbfc52c1d2688ab978c5419d5`.
 
 
+
+## Latest continuation, 20 October
+
+Resume from the latest main after fetching. Code milestone de68e6f actually wires
+the policy action count, timeout and retry limit into frame sessions and checks
+Android signed minimum counts. Do not regress this into parser-only support.
+All three native source copies and patches verified. Java11 desktop reactor,
+controller and JavaFX checks passed. Both Android app/test builds passed; current
+API34 camera-disabled instrumentation passed 17 registration and eight camera
+tests. All five APK signatures and app models/notices/ZIP integrity verified.
+Emulator was shut down; no phone actions. Current source tests:199 PASS; clean
+205-file code package de68e6f:199 PASS16.68sec. Launcher retargeted and --checkPASS.
+Current APKs: D:/CodexWork/native-face-pad-20261018/artifacts/native-final-20261020.
+Combined summary.json binds source fingerprints, artifact hashes and test logs.
+Retained public records: integrations/native/evidence/policy-session-20261020.
+See LOCAL_DELIVERY_STATUS.md for the current consolidated state and remaining
+physical, official-client, production trust and native configuration gaps.
+Publication/merge authorized; no Actions, public visibility changes or demo.

@@ -1,0 +1,20 @@
+{
+  "scope": "Reference SBI, camera-disabled emulator; no human actions, physical attacks or production PKI",
+  "serial": "emulator-5554",
+  "avd": "NATIVE_PAD_API34",
+  "tests": 8,
+  "status": "PASS",
+  "apks": [
+    {
+      "file": "camera-sbi-x86_64-debug.apk",
+      "bytes": 94317884,
+      "sha256": "896848133c1c46b2bdfee066c924a6f2441d652d6e8e07cd991384018057208c"
+    },
+    {
+      "file": "camera-sbi-debug-androidTest.apk",
+      "bytes": 1879121,
+      "sha256": "c3a541dbae8bc2e019db931dda996aed8bceb57dbe6d47cbfbda3760a83e96e6"
+    }
+  ],
+  "result_sha256": "2828994985eaa8bfce90e427590372dfcffffb6735421c4897087b2e202afcff"
+}

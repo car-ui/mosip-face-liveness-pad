@@ -1,198 +1,76 @@
 # Local delivery status
 
-19 October 2026. The user requested completion work with GitHub publication and
-the demonstration left out. New changes are saved locally. Existing remote
-visibility and published refs are not changed by this delivery.
+Updated 20 October 2026. Work resumed from the freshly fetched GitHub commit
+`a4d851c`. The code milestone is `de68e6f`; later delivery commits retain its
+build evidence and this checkpoint. Publication and merge to main are authorized.
+Demo recording, visibility changes and external submission remain excluded.
 
-## Completed in this pass
+## Current implementation
 
-- Both Python interfaces now show completed-action counts instead of a
-  per-action percentage that looked like overall verification progress.
-- PAD-related restarts explicitly clear action credit, create an audit event
-  and hold a short recovery interval before new instructions. PAD continues
-  running during recovery. The policy does not retain invalid action credit.
-- Main action instructions remain stable; browser secondary feedback has reading
-  time. Camera/model scores remain separate from completed-action progress.
-- Numeric score observations survive audit filtering under explicit numeric
-  field names; raw image/frame buffers remain blocked.
-- Optional validated offline policy files work in the desktop and service.
-  Authenticated API changes are atomically saved before the running policy is
-  changed. An example configuration and failure-path tests are included.
-- The browser/service default trial deadline is 45 seconds to allow more room
-  for two actions and preparation. Explicit request bounds remain 2 to 60 seconds.
-- Actual laptop observations are summarized without images or subject IDs in
-  `physical-webcam-observations.json`. Of three recorded trials, two ended in
-  accepted prototype capture with completed actions; one was rejected. Some
-  sequences restarted. This is not a population accuracy estimate.
+The native frame session now applies the parsed action count, session timeout
+and recovery limit. Previously those values were parsed but did not change the
+fixed session. Desktop uses the configured timeout. Recovery clears all action
+credit once per interrupted evidence episode and cannot extend the deadline.
+Android checks that signed action counts are bounded and meet the current
+policy minimum before consuming the one-use transaction ledger.
 
-## Validation
+The existing stable action-count display, preparation prompts, temporal PAD
+evidence, portable YuNet detector, image bounds, exact-frame proof, role binding
+and offline policy/model protections remain in place. See NATIVE_POLICY.md and
+CONTINUATION_20261020.md for behavior and limitations.
 
-The workspace suite passed 165 tests in 31.71 seconds. Console JavaScript passed
-Node syntax checking. A rendered static-fixture UI was visually inspected with
-one of two actions completed. The native evidence validator passed 24 checksums
-and matched six Android measurement logs. That last check establishes retained
-evidence integrity, not new native execution or hardware validation. Fresh
-committed-source package verification is performed at delivery.
+## Executed checks
 
-## Requirements that remain genuinely open
+- Full Python suite: 199 passed in 28.86 seconds on the working source.
+- Clean code-package extraction: 205 file hashes verified; 199 tests passed
+  in 16.68 seconds. Package commit de68e6f.
+- Java 11 desktop reactor: all five modules built, 1 minute 16 seconds.
+- Desktop controller and JavaFX preview checks: both passed against the actual
+  patched upstream components, with synthetic/recorded inputs.
+- Native injected action checks passed for configured counts, recovery limits,
+  timeout, PAD veto, sequence, clock and one-use exact-image proof.
+- Registration Android split app and test APK build passed in 2 minutes;
+  17 instrumentation tests passed in 32.998 seconds.
+- Reference camera SBI app and test build passed in 1 minute 2 seconds;
+  eight instrumentation tests passed in 61.596 seconds.
+- All five APK signatures passed. App ZIP integrity, split ABIs, model hashes
+  and license notices passed.
+- All three prepared native checkouts matched their owned source/assets and
+  integration patches. The final evidence validator passed 26 checksums.
 
-The remaining gaps cannot be marked complete by adding prototype features:
+Android execution used the named NATIVE_PAD_API34 emulator with cameras disabled.
+The owned emulator was shut down after testing. No physical phone was operated.
+Retained build reports bind APK hashes to prepared source fingerprints and logs.
+Current reports and raw instrumentation are retained under
+integrations/native/evidence/policy-session-20261020.
 
-1. Independent live and physical print/display/mask trials, with frozen settings,
-   held-out subjects/sources, attack-group errors and nonresponse counts. There
-   is still an apparent live-person rejection in the observed laptop trials.
-2. A complete official desktop/Android client camera-to-acceptance run, including
-   real identity matching where required. The accepted Python prototype trial
-   does not establish official operator or supervisor authentication.
-3. Physical Android and real L1/multiple-vendor integrations, production device
-   certificate trust and actual vendor streaming/format compatibility. Current
-   signed acceptance tests use declared crypto/repository fixtures.
-4. Native platform adoption and validation of newer prototype detector/session
-   policies, and integration with MOSIP's configuration framework. The Python
-   policy-file implementation does not complete those native software tasks.
-   Inspection confirmed the pinned desktop OpenCV 4.5.3 JAR does not contain
-   `FaceDetectorYN`. The Python YuNet adapter therefore cannot be copied into
-   the native client. Adopting it requires a native decoder or a validated
-   dependency upgrade and rebuilt platform artifacts.
+## Local artifacts
 
-The source package, regression checks and research evidence are local reviewable
-deliverables. The full mandatory hackathon scope is not declared complete.
-Publication, repository visibility changes, a public release, demo recording and
-external submission are excluded from this pass.
+Artifact root: D:/CodexWork/native-face-pad-20261018.
 
-## Subsequent native milestone
+- APKs and combined report: artifacts/native-final-20261020/summary.json.
+- Verified code archive: artifacts/face-liveness-source-de68e6f.zip.
+- That archive SHA-256:
+  c2c53131b0d3684fafc38eb4764108d03e945017128e6e7e606ebbd85c6db2d6.
+- The laptop launcher is artifacts/START-LAPTOP-PHYSICAL-TRIAL.cmd. It was
+  retargeted to the tested code extraction and passed --check without a camera.
+- Checkpoint and later packaging details are in RESUME_CHECKPOINT.md.
 
-Portable YuNet detection and bounded session PAD observations are now connected
-in native source. The PAD decision and action landmark crop share the same face
-box. All platform resource preparation includes the detector and its MIT notice.
-See NATIVE_DETECTOR_PLAN.md for executed checks and remaining build limitations.
-Native configuration framework adoption, APK rebuilds and physical native tests
-remain open. Retained APKs must not be described as containing this new source.
+## Remaining requirements
 
-The later validation attempt hit host resource exhaustion. Its result was 159
-passes and six failures, followed by an OpenCV import failure from an exhausted
-Windows paging file. The earlier 165-pass result remains historical evidence,
-not a claim that this later run passed. Desktop controller validation was also
-blocked by memory allocation. New source is saved locally with these limits.
+Physical live/print/display/mask/injection evaluation, frozen-threshold
+calibration, live official-client camera-to-storage workflows, successful real
+identity matching, physical Android and real L1/multiple-vendor integration
+remain unverified. Existing observations are three Python webcam trials from
+one participant, not an accuracy estimate or physical attack evaluation.
 
-To preserve disk headroom, the project model directory and Git storage now use
-Windows directory junctions to D:/CodexWork/native-face-pad-20261018/workspace-models
-and workspace-git. Paths in the checkout still work. The unused broken .venv was
-preserved on D: as preserved-broken-workspace-venv. The supported launcher uses
-the separate working D: Python environment. Repository connectivity was checked.
+Native configuration also remains partial. The reference camera emits two-action
+version 1 evidence. It satisfies client minima of one or two and cannot fulfill
+three or four. Its signed contract lacks session start, retry count and a full
+policy snapshot, so client timeout/retry enforcement across the Android/SBI
+boundary is not established. Native custom action pools, configurable guidance,
+authenticated online synchronization and production device trust remain open.
 
-
-Latest validation after resource recovery: all 165 Python tests passed in 16.51
-seconds. The completion-transition test now uses explicit controlled inputs,
-instead of relying on a real detector and timed gate inside a fixed frame loop.
-The native action test also passed after recompiling the final source. Desktop
-controller checks subsequently passed on the new detector. Blank ISO captures
-were rejected before storage, operator/supervisor rejection made zero matcher
-calls, and a completed action double could not override the recorded portrait's
-PAD attack verdict. This fixture no longer exercises positive matcher acceptance.
-See native-yunet-controller-check.json. Earlier resource failures remain in logs;
-Android rebuilds, physical attack accuracy and live client UI remain unverified.
-
-## Publication checkpoint, 19 October 2026
-
-The user subsequently authorized pushing this work and merging into the default
-branch. The freshly fetched default is main at 2ac8c92. This supersedes the
-previous local-only instruction; demo work and visibility changes remain excluded.
-
-The latest five-module desktop reactor build passed using Java 11 in 58.739
-seconds, including the preview JPEG preflight and revised preparation prompts.
-The final portable native action check passed after recompiling current source.
-The new prepared-source verifier passed 13 unit tests. Both Android prepared
-checkouts passed generated-source/assets and patch verification, at 30 camera-SBI
-and 27 registration-client files. This is not a final APK rebuild or execution.
-The desktop verifier matched 21 generated files, but reverse patch checking
-failed against the prepared POM's build-only changes. That check remains FAIL.
-
-The earlier full Python source runs passed 186 tests. The final wrapper attempt
-failed during collection inside Python/pytest with SystemError before tests ran.
-Its FAIL report is retained under D:/CodexWork/native-face-pad-20261018/push-regression.
-The 13 new verifier tests passed separately. Do not report 199 passing together.
-
-Final Android APK rebuilds, native JavaFX lifecycle checks, physical attacks,
-live official-client workflows, real identity matching and L1/vendor validation
-are still pending. Parallel agents were interrupted by the account usage limit.
-The successful desktop build log is desktop-final-jdk11-reactor-build.log under
-the same D: artifact root. The laptop launcher still targets the older f5a678d
-source extraction; it has not been retargeted to the publication checkpoint.
-The original supplied PDFs and private camera evidence remain excluded from Git.
-
-## Delivery completion checkpoint, 19 October 2026 (Evening)
-
-This checkpoint establishes the successful completion and verification of the full Python test suite, native desktop validation, reference camera-SBI APK rebuild, and Android registration client APK rebuild under explicit resource constraints.
-
-1. **Full Python Suite Execution (199 Tests Passing)**:
-   - Command: `scripts/check_local.ps1` with explicit `-SourceDirectory` targeting the repository checkout, Python runtime `D:/CodexWork/face-pad-clean-20261018/Scripts/python.exe`, and output directory `D:/CodexWork/native-face-pad-20261018/full-suite-run`.
-   - Result: All 199 tests passed (186 core + 13 native preparation) in 33.82s (0 failures, 0 errors, 0 skipped).
-   - Pytest collection diagnosis: The previous `SystemError` during pytest collection at commit `f10cbb2` was caused by AST parsing traceback formatting during an interrupted collection in a shared cache. Executing with isolated pycache on D: (`PYTHONPYCACHEPREFIX=D:/CodexWork/native-face-pad-20261018/full-suite-run/pycache`) and `-p no:cacheprovider` ran cleanly and reproducibly.
-   - Retained report: `D:/CodexWork/native-face-pad-20261018/full-suite-run/20261019T142245795Z-357159ff/result.json`.
-
-2. **Native Desktop Verification & Lifecycle Check**:
-   - Resolved POM reverse patch-check discrepancy: normalized `integrations/native/desktop.patch` and `android.patch` line endings to LF on disk.
-   - `scripts/verify_native_preparation.py` verified all three checkouts:
-     - Desktop: 21 prepared files; 0 mismatches; patch present=True.
-     - Android: 27 prepared files; 0 mismatches; patch present=True.
-     - Camera-SBI: 30 prepared files; 0 mismatches; patch present=True.
-   - Refined `integrations/native/tests/DesktopStreamLifecycleCheck.java`: updated guidance assertion to accept initial bounded PAD session prompt (`"Checking liveness"` or `"Look straight"`) for the synthetic blank frame fixture.
-   - Executed `scripts/check_native_desktop.py` with Java 11 (`C:/CodexTools/temurin-11.0.32/jdk-11.0.32.1+1`), `--preview`, and classpath file `D:/CodexWork/native-face-pad-20261018/desktop-classpath.txt`.
-   - Both `DesktopControllerRejectionCheck` and `DesktopStreamLifecycleCheck` passed cleanly.
-   - Retained report: `D:/CodexWork/native-face-pad-20261018/desktop-publication-check/report.json`.
-
-3. **Reference Camera SBI Rebuild & Verification**:
-   - Rebuilt reference camera SBI debug APK and test APK using isolated Java 21 (`D:/CodexWork/native-face-pad-20261018/jbr-native-check/bin/java.exe`) and single-JVM bounded settings in 30 seconds.
-   - Verified APK ZIP integrity, model hashes (`minifasnet_v2.onnx`, `facemesh_v2.onnx`, `face_detection_yunet_2023mar.onnx`), runtime notices, ABI (`x86_64`), and v2 APK signature with `apksigner`.
-   - Distinct artifacts archived to `D:/CodexWork/native-face-pad-20261018/artifacts/camera-sbi-rebuilt-20261019`:
-     - `camera-sbi-debug.apk`: 94,316,807 bytes, SHA-256 `676ecf0a089b7835730b54c1cd616fc9c75ac3f32662dd6d6835b8ef2844f145`.
-     - `camera-sbi-androidTest.apk`: 1,879,121 bytes, SHA-256 `c3a541dbae8bc2e019db931dda996aed8bceb57dbe6d47cbfbda3760a83e96e6`.
-     - Verification report: `verification.json`.
-
-4. **Android Registration Client Rebuild & Verification**:
-   - Addressed Jetifier heap exhaustion on large modern binaries by adding `opencv`, `onnxruntime`, and Flutter engine debug JARs (`x86_64_debug.*`, `arm64_v8a_debug.*`, `x86_debug.*`, `armeabi_v7a_debug.*`, `flutter_embedding_debug.*`, `io.flutter.*`) to `-Pandroid.jetifier.ignorelist`.
-   - Resolved D8 dex merging out-of-memory error during `:app:mergeExtDexDebug` by removing aggressive GC heap shrinking parameters (`-XX:MinHeapFreeRatio=5 -XX:MaxHeapFreeRatio=15`) and setting bounded heap to 1536 MB (`-Xmx1536m`), matching the project's `gradle.properties` configuration.
-   - Full build (`:app:assembleDebug` and `:app:assembleDebugAndroidTest`) succeeded in 8m 54s (448 actionable tasks: 108 executed, 340 up-to-date).
-   - Verified ZIP integrity, exact model hashes, runtime notices, ABI splits (`x86_64` and `arm64-v8a`), and v2 APK signatures with `apksigner`.
-   - Distinct artifacts archived to `D:/CodexWork/native-face-pad-20261018/artifacts/registration-client-rebuilt-20261019`:
-     - `app-x86_64-debug.apk`: 261,021,276 bytes, SHA-256 `bdc5e259a4a3f997393a1de04e8774dec1f9e4a5a031024439aa4a630ef4c2be`.
-     - `app-arm64-v8a-debug.apk`: 223,185,249 bytes, SHA-256 `55c8a1ab4cbef8810bf1ad9384e09dd650d2074046c9575589cbf0bad547d649`.
-     - `app-debug-androidTest.apk`: 2,802,864 bytes, SHA-256 `408cbffb802be92002ce452bf13acbdb19d5acfd852745d047664baf95a19bc8`.
-     - Verification report: `verification.json`.
-
-5. **Test Inventory and Device Boundaries**:
-   - Verified test count in source:
-     - Registration client test sources: 14 tests (6 in `AndroidActiveEvidenceTest`, 8 in `NativePadAcceptanceTest`).
-     - Camera-SBI test sources: 8 tests (6 in `CameraOwnerPadTest`, 2 in `PhysicalPadHarnessTest`).
-   - No test emulator was running during build or verification (`adb devices` was empty). Per explicit safety instructions, no emulator was launched and no physical phone operations were performed.
-
-6. **Evidence Boundaries**:
-   - Checks are conducted with injected test doubles, synthetic images, and unit/integration harnesses.
-   - Offline tests do not attest to live camera physical attack accuracy or production certificate authority chains.
-
-7. **Release Packaging, Clean Package Extraction & Launcher Retargeting**:
-   - Packaged committed release tree using `scripts/package_release.py`:
-     - Archive: `D:/CodexWork/native-face-pad-20261018/artifacts/face-liveness-source-70f02e7.zip`
-     - SHA-256: `14aa996b47d94c4e7e6baf1c9ea903b7942a4f1d09215326139920e4c1a474f4`
-     - 201 files verified against `RELEASE_MANIFEST.json`.
-   - Extracted to fresh directory `D:/CodexWork/native-face-pad-20261018/source-check-70f02e7` and verified all 201 file hashes against `RELEASE_MANIFEST.json`.
-   - Scoped PowerShell native CLI error action handling in `scripts/check_local.ps1` to prevent non-fatal stderr warnings (e.g. OpenCV libpng sRGB profile warnings) from aborting the pipeline.
-   - Executed full 199-test suite against the freshly extracted source package: all 199 tests passed in 24.87s (`D:/CodexWork/native-face-pad-20261018/extracted-check-suite-verified/20261019T160055551Z-287a7ea0/result.json`).
-   - Retargeted launcher `D:/CodexWork/native-face-pad-20261018/artifacts/START-LAPTOP-PHYSICAL-TRIAL.cmd` to `source-check-70f02e7`, added `PYTHONPYCACHEPREFIX=D:\CodexWork\native-face-pad-20261018\pycache`, preserved strict ONNX mode, and validated via `--check` flag (exit code 0, without opening physical camera).
-
-8. **Native Policy Extension & Release Package 4485441**:
-   - Implemented configurable `actionCount` (1..4), `timeoutSeconds` (5..60), and `maxRetries` (0..5) with fail-closed bounds checking in `NativePadPolicy.java`.
-   - Added test coverage in `NativePadPolicyCheck.java` for defaults, role-based overrides, alternate keys (`mosip.facepad.<role>.action.count`, `timeout_seconds`, `max_retries`), and strict rejection of out-of-bounds/malformed values.
-   - Re-verified landmark/action pipeline (`scripts/check_native_landmarks.py` passed all stages).
-   - Synchronized `NativePadPolicy.java` across prepared checkouts (`desktop`, `android`, `camera-sbi`).
-   - Re-verified all 3 checkouts via `scripts/verify_native_preparation.py`: 0 mismatches, patch present=True.
-   - Updated documentation in `docs/NATIVE_POLICY.md`, `docs/REQUIREMENTS_MATRIX.md`, and `config/native-policy.example.properties`.
-   - Full Python test suite passed: 199 passed in 46.34s on repository checkout (`D:/CodexWork/native-face-pad-20261018/tmp/local-check-policy/20261019T174246758Z-d1f9fbdb/result.json`).
-   - Packaged release archive `D:/CodexWork/native-face-pad-20261018/artifacts/face-liveness-source-4485441.zip` (SHA-256: `641b1713a15708cfbb606bae33c59905a16cd628691fb11a7d2857e9ad64e64f`).
-   - Extracted to fresh directory `D:/CodexWork/native-face-pad-20261018/source-check-4485441` and verified all 201 file hashes against `RELEASE_MANIFEST.json`.
-   - Executed full 199-test suite against the freshly extracted source package: all 199 tests passed in 27.39s (`D:/CodexWork/native-face-pad-20261018/extracted-check-suite-4485441/20261019T174650451Z-dc2fb848/result.json`).
-   - Retargeted launcher `D:/CodexWork/native-face-pad-20261018/artifacts/START-LAPTOP-PHYSICAL-TRIAL.cmd` to `source-check-4485441` and verified via `--check` flag (exit code 0).
-   - Both `origin/new/hackathon-quality` and `origin/main` synchronized at commit `44854414c43cc3dcbfc52c1d2688ab978c5419d5`.
-
-
+The hackathon mandatory scope is not declared complete. Tests and builds do not
+replace the missing physical and live integration evidence. Original supplied
+PDFs and private camera material are excluded from Git.
