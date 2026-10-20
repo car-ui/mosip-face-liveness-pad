@@ -74,7 +74,7 @@ public final class AndroidPadCheckpoint {
             if (!decision.accepted) {
                 if(!"ACTIVE_CHALLENGE_REQUIRED".equals(decision.reason))
                     throw new IOException("PAD rejected face capture: " + decision.reason);
-                AndroidActiveEvidence.verifyAndConsume(context,biometrics.get(0),iso,transactionId);
+                AndroidActiveEvidence.verifyAndConsume(context,biometrics.get(0),iso,transactionId,policy);
             }
         } catch (IOException e) { throw e; }
         catch (Exception | LinkageError e) { throw new IOException("PAD unavailable; face capture rejected", e); }

@@ -1,0 +1,2 @@
+PASS native action control flow: neutral baseline, blink/turn/return, static rejection, face loss, sequence, PAD failure, expiry and one-use exact-frame binding
+Evidence scope: injected landmark geometry; no live action, physical attack or real identity-matching claim

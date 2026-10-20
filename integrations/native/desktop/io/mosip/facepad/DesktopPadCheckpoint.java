@@ -55,7 +55,7 @@ public final class DesktopPadCheckpoint {
                 landmarks = new NativeLandmarkEngine(read(stream));
             }
         }
-        return new NativeFrameChallenge(passive, landmarks, 30000,policy);
+        return new NativeFrameChallenge(passive, landmarks, policy.timeoutSeconds * 1000L,policy);
     }
 
     public static void requireClear(List<BiometricsDto> biometrics, boolean activeRequired,

@@ -1,0 +1,33 @@
+{
+  "upstream_commit": "935306e2fd38bff2803697468e595026b1d18cec",
+  "checks": [
+    {
+      "check": "DesktopControllerRejectionCheck",
+      "status": "PASS",
+      "results": [
+        "PASS actual upstream Streamer: consecutive frames, bounded EOF rejection and disconnect cleanup",
+        "PASS registration checkpoint rejects decoded blank ISO: NO_FACE",
+        "PASS upstream GenericBiometricsController rejects blank ISO before returning candidates for storage",
+        "PASS upstream BaseController operator/supervisor rejection: captures=2, identityMatcherCalls=0",
+        "PASS actual authentication controller selects supervisor/operator cached policies separately; malformed policy blocks before matching",
+        "PASS recorded NASA portrait rejected for operator/supervisor; identityMatcherCalls=0; passiveClear=false; attackRejected=true",
+        "PASS completed action double cannot override PAD attack; identityMatcherCalls=0",
+        "Evidence scope: recorded photo rejection through upstream controllers; positive matcher path not exercised with this rejected fixture; no live UI or physical attack claim."
+      ],
+      "log": "DesktopControllerRejectionCheck.log"
+    },
+    {
+      "check": "DesktopStreamLifecycleCheck",
+      "status": "PASS",
+      "results": [
+        "PASS actual Streamer preview on JavaFX thread and exact JPEG cache with defensive copy",
+        "PASS camera replacement survives delayed EOF from the previous reader",
+        "PASS stop closes camera and clears cached image/bytes",
+        "PASS actual active preview loads both models, guides through bound JavaFX label, and cancels proof on stop",
+        "PASS actual OperatorAuthentication FXML loads with prompt injection; service initialization replaced for layout check",
+        "Evidence scope: actual upstream Streamer and JavaFX ImageView; synthetic JPEG, no physical camera or full client UI"
+      ],
+      "log": "DesktopStreamLifecycleCheck.log"
+    }
+  ]
+}

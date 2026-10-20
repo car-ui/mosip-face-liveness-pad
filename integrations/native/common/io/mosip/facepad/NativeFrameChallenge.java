@@ -30,7 +30,7 @@ public final class NativeFrameChallenge {
             throw new IOException("Active verification policy unavailable");
         this.pad = pad; this.landmarks = landmarks;
         this.policy = policy;
-        session = new NativeActiveSession(timeoutMillis);
+        session = new NativeActiveSession(timeoutMillis, policy);
     }
 
     public synchronized NativeActiveSession.State observe(byte[] jpeg) throws Exception {

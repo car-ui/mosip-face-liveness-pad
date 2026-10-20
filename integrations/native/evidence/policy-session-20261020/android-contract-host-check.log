@@ -1,0 +1,1 @@
+PASS: required counts 1..4, mismatches before persistence, minimum counts accepted, resident1/proof2 accepted, operator2/proof5 rejected, replay and null-policy rejected. Host Context/DTO stubs; not Android execution.

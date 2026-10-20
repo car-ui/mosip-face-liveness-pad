@@ -11,6 +11,8 @@ public final class NativeActiveSession {
     private final LongSupplier clock;
     private final long startedAt, timeoutNanos;
     private final Action[] actions;
+    private final int maxRetries;
+    private int retries;
     private State state = State.VERIFYING;
     private int action, phase, stable;
     private long lastSequence = -1, lastTime = -1, heldSince;
@@ -29,12 +31,30 @@ public final class NativeActiveSession {
 
     // Package-private deterministic clock/randomness is used only by control-flow tests.
     NativeActiveSession(long timeoutMillis, LongSupplier clock, SecureRandom random) {
+        this(timeoutMillis, 2, 2, clock, random);
+    }
+
+    public NativeActiveSession(NativePadPolicy policy) {
+        this(policy.timeoutSeconds * 1000L, policy);
+    }
+
+    public NativeActiveSession(long timeoutMillis, NativePadPolicy policy) {
+        this(Math.min(timeoutMillis, policy.timeoutSeconds * 1000L), policy.actionCount, policy.maxRetries,
+                System::nanoTime, new SecureRandom());
+    }
+
+    NativeActiveSession(long timeoutMillis, int actionCount, int maxRetries, LongSupplier clock, SecureRandom random) {
         if (timeoutMillis < 1000 || timeoutMillis > 60000) throw new IllegalArgumentException("Invalid action timeout");
+        if (actionCount < 1 || actionCount > 4 || maxRetries < 0 || maxRetries > 5)
+            throw new IllegalArgumentException("Invalid action/retry count");
         this.clock = clock;
+        this.maxRetries = maxRetries;
         startedAt = clock.getAsLong();
         timeoutNanos = timeoutMillis * 1_000_000L;
         Action turn = random.nextBoolean() ? Action.TURN_IMAGE_LEFT : Action.TURN_IMAGE_RIGHT;
-        actions = random.nextBoolean() ? new Action[]{Action.BLINK,turn} : new Action[]{turn,Action.BLINK};
+        boolean blinkFirst = random.nextBoolean();
+        actions = new Action[actionCount];
+        for (int i = 0; i < actionCount; i++) actions[i] = ((i % 2 == 0) == blinkFirst) ? Action.BLINK : turn;
     }
 
     public synchronized State state() {
@@ -46,6 +66,7 @@ public final class NativeActiveSession {
     }
 
     public int requiredActions() { return actions.length; }
+    public synchronized int retriesUsed() { return retries; }
 
     public synchronized String prompt() {
         expire();
@@ -65,8 +86,19 @@ public final class NativeActiveSession {
     /** Missing/multiple faces invalidate all actions. Call this for failed frame geometry. */
     public synchronized void invalidateFrame() {
         if (state != State.VERIFYING) return;
+        if (!restartActions()) return;
         padStreak = 0; padClear = false; padStarted = padLast = null;
+    }
+
+    // Charge one retry per interrupted clear-evidence episode, not every missing frame.
+    private boolean restartActions() {
+        if (padClear || action > 0 || phase > 0) {
+            if (retries >= maxRetries) { reject(); return false; }
+            retries++;
+        }
+        padClear = false;
         clearActions();
+        return true;
     }
 
     private void clearActions() {
@@ -83,6 +115,7 @@ public final class NativeActiveSession {
         if (sequence <= lastSequence || (observed && now - lastTime < 0)) return reject();
         lastSequence = sequence;
         if (observed && now - lastTime > 1_000_000_000L) invalidateFrame();
+        if (state != State.VERIFYING) return state;
         lastTime = now;
         observed = true;
         if (!observePad(pad, now)) return state;
@@ -122,10 +155,11 @@ public final class NativeActiveSession {
                 && pad.score > .45;
         if (!attack && !clear) { reject(); return false; }
         if (padLast != null && now - padLast > 750_000_000L) invalidateFrame();
+        if (state != State.VERIFYING) return false;
         padLast = now;
         if (padStarted == null) padStarted = now;
         if (clear && padClear) return true;
-        if (attack) { padClear = false; clearActions(); }
+        if (attack && !restartActions()) return false;
         int direction = attack ? -1 : 1;
         if (Integer.signum(padStreak) != direction) {
             padStreak = direction; padHeldSince = now;

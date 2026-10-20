@@ -19,7 +19,15 @@ public final class AndroidActiveEvidence {
 
     public static synchronized void verifyAndConsume(Context context, BiometricsDto biometric,
                                                      byte[] iso, String expectedTransaction) throws IOException {
+        verifyAndConsume(context,biometric,iso,expectedTransaction,
+            NativePadPolicy.defaults(NativePadPolicy.Workflow.OPERATOR));
+    }
+
+    public static synchronized void verifyAndConsume(Context context, BiometricsDto biometric,
+                                                     byte[] iso, String expectedTransaction,
+                                                     NativePadPolicy policy) throws IOException {
         try {
+            require(policy!=null && policy.enabled && policy.activeEnabled,"active verification unavailable in current policy");
             if(expectedTransaction==null || expectedTransaction.isEmpty() || expectedTransaction.length()>128)
                 throw new IOException("PAD: current capture transaction is required");
             String decoded=biometric.getDecodedBioResponse();
@@ -32,7 +40,8 @@ public final class AndroidActiveEvidence {
             require(integer(proof,"version")==1,"unsupported active proof version");
             require("CAMERA2_JPEG_V1".equals(proof.opt("source")),"unsupported active proof source");
             require("COMPLETE".equals(proof.opt("state")),"active challenge incomplete");
-            require(integer(proof,"actionCount")==2,"active challenge actions missing");
+            long actionCount=integer(proof,"actionCount");
+            require(actionCount>=policy.actionCount && actionCount<=4,"active challenge action count does not satisfy current policy");
             require(expectedTransaction.equals(proof.opt("transactionId")),"active transaction mismatch");
             require(NativePadEngine.MODEL_SHA256.equals(proof.opt("padModelSha256")),"PAD model mismatch");
             require(NativeLandmarkEngine.MODEL_SHA256.equals(proof.opt("landmarkModelSha256")),"landmark model mismatch");

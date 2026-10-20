@@ -76,6 +76,41 @@ public class AndroidActiveEvidenceTest {
         assertEquals(1,new JSONObject(context.getSharedPreferences("facepad-evidence-v1",0).getString("used","{}")).length());
         rejected(value,transaction);
     }
+    @Test public void configuredActionCountMismatchDoesNotConsumeProof() throws Exception {
+        NativePadPolicy policy=NativePadPolicy.read(key ->
+            "mosip.facepad.operator.active.action_count".equals(key)?"3":null,
+            NativePadPolicy.Workflow.OPERATOR);
+        JSONObject value=payload();
+        try {AndroidActiveEvidence.verifyAndConsume(context,dto(value),iso,transaction,policy);fail("Wrong action count accepted");}
+        catch(IOException expected) {assertTrue(expected.getMessage().contains("action count"));}
+        assertEquals("{}",context.getSharedPreferences("facepad-evidence-v1",0).getString("used","{}"));
+        value.getJSONObject("facePad").put("actionCount",3);
+        AndroidActiveEvidence.verifyAndConsume(context,dto(value),iso,transaction,policy);
+        assertEquals(1,new JSONObject(context.getSharedPreferences("facepad-evidence-v1",0).getString("used","{}")).length());
+        try {AndroidActiveEvidence.verifyAndConsume(context,dto(value),iso,transaction,policy);fail("Replayed proof accepted");}
+        catch(IOException expected) {assertTrue(expected.getMessage().contains("already consumed"));}
+    }
+    @Test public void unavailablePolicyCannotConsumeActiveProof() throws Exception {
+        NativePadPolicy disabled=NativePadPolicy.read(key -> "mosip.facepad.enabled".equals(key)?"false":null,
+            NativePadPolicy.Workflow.OPERATOR);
+        for(NativePadPolicy policy:new NativePadPolicy[]{null,disabled}) {
+            JSONObject value=payload();
+            try {AndroidActiveEvidence.verifyAndConsume(context,dto(value),iso,transaction,policy);fail("Unavailable policy accepted");}
+            catch(IOException expected) {assertTrue(expected.getMessage().contains("current policy"));}
+            assertEquals("{}",context.getSharedPreferences("facepad-evidence-v1",0).getString("used","{}"));
+        }
+    }
+    @Test public void extraActionsSatisfyResidentMinimumButUnboundedCountsReject() throws Exception {
+        JSONObject value=payload();
+        value.getJSONObject("facePad").put("actionCount",5);
+        try {AndroidActiveEvidence.verifyAndConsume(context,dto(value),iso,transaction);fail("Unbounded action count accepted");}
+        catch(IOException expected) {assertTrue(expected.getMessage().contains("action count"));}
+        assertEquals("{}",context.getSharedPreferences("facepad-evidence-v1",0).getString("used","{}"));
+        value.getJSONObject("facePad").put("actionCount",2);
+        AndroidActiveEvidence.verifyAndConsume(context,dto(value),iso,transaction,
+            NativePadPolicy.defaults(NativePadPolicy.Workflow.RESIDENT));
+        assertEquals(1,new JSONObject(context.getSharedPreferences("facepad-evidence-v1",0).getString("used","{}")).length());
+    }
     @Test public void mismatchedIncompleteExpiredAndMalformedClaimsReject() throws Exception {
         String[] fields={"isoSha256","transactionId","padModelSha256","landmarkModelSha256","state","source"};
         for(String field:fields) {JSONObject value=payload();value.getJSONObject("facePad").put(field,"wrong");rejected(value,transaction);}

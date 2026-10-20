@@ -12,8 +12,11 @@ public final class NativeActiveSessionCheck {
         final NativeActiveSession session;
         Fixture() { this(0); }
         Fixture(long origin) {
+            this(origin, 10000, 2, 2);
+        }
+        Fixture(long origin, long timeout, int count, int retries) {
             clock = new AtomicLong(origin);
-            session = new NativeActiveSession(10000, clock::get, new SecureRandom() {
+            session = new NativeActiveSession(timeout, count, retries, clock::get, new SecureRandom() {
                 public boolean nextBoolean() { return true; }
             });
         }
@@ -26,13 +29,12 @@ public final class NativeActiveSessionCheck {
         void neutral(int n) throws Exception { for (int i=0;i<n;i++) frame(.3,0); }
         void complete() throws Exception {
             neutral(7);
-            neutral(20);
-            for(int i=0;i<3;i++) frame(.1,0);
-            neutral(2);
-            neutral(3);
-            neutral(20);
-            for(int i=0;i<3;i++) frame(.3,-.4);
-            neutral(2);
+            for (int i=0; i<session.requiredActions(); i++) {
+                if (i>0) neutral(3);
+                neutral(20);
+                for(int j=0;j<3;j++) frame(i%2==0 ? .1 : .3,i%2==0 ? 0 : -.4);
+                neutral(2);
+            }
         }
     }
     private static NativeLandmarkEngine.Observation geometry(double ear, double turn) throws Exception {
@@ -57,6 +59,23 @@ public final class NativeActiveSessionCheck {
         return fixture.session;
     }
     public static void main(String[] args) throws Exception {
+        for (int count : new int[]{1,3,4}) {
+            Fixture configured=new Fixture(0,60000,count,2);
+            require(configured.session.requiredActions()==count,"Configured action count ignored");
+            configured.complete();
+            require(configured.session.completedActions()==count && configured.session.consume(JPEG),
+                    "Configured sequence did not require and complete every action");
+        }
+        Fixture noRetry=new Fixture(0,20000,2,0); noRetry.neutral(7); noRetry.session.invalidateFrame();
+        require(noRetry.session.state()==NativeActiveSession.State.REJECTED,"Zero retry policy allowed recovery");
+        Fixture oneRetry=new Fixture(0,20000,2,1); oneRetry.neutral(7); oneRetry.session.invalidateFrame();
+        oneRetry.session.invalidateFrame(); oneRetry.session.invalidateFrame();
+        require(oneRetry.session.retriesUsed()==1 && oneRetry.session.state()==NativeActiveSession.State.VERIFYING,
+                "Missing frames consumed multiple recovery attempts");
+        oneRetry.neutral(7); oneRetry.session.invalidateFrame();
+        require(oneRetry.session.state()==NativeActiveSession.State.REJECTED,"Configured retry limit ignored");
+        Fixture budget=new Fixture(0,5000,4,2); budget.complete();
+        require(budget.session.state()==NativeActiveSession.State.REJECTED,"Configured timeout ignored");
         Fixture accepted=new Fixture();accepted.complete();
         require(accepted.session.state()==NativeActiveSession.State.COMPLETE,"Action sequence did not complete");
         require(accepted.session.consume(JPEG),"Exact frame was not consumable");

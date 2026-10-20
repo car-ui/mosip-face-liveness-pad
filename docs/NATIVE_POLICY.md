@@ -20,7 +20,7 @@ settings and are not selected from a measured physical error-rate target.
 | `mosip.facepad.<role>.active.required` | Resident `false`; operator/supervisor `true` | Required for both authentication roles and cannot be disabled there. |
 | `mosip.facepad.<role>.active.action_count` | Resident `1`; operator/supervisor `2` | Number of sequential actions required (`1` through `4`). Alternate key `mosip.facepad.<role>.action.count`. |
 | `mosip.facepad.<role>.active.timeout_seconds` | Resident `15`; operator/supervisor `20` | Session timeout in seconds (`5` through `60`). Alternate key `mosip.facepad.<role>.timeout_seconds`. |
-| `mosip.facepad.<role>.active.max_retries` | `2` | Maximum retry attempts (`0` through `5`). Alternate key `mosip.facepad.<role>.max_retries`. |
+| `mosip.facepad.<role>.active.max_retries` | `2` | Maximum recovery episodes inside a native frame session (`0` through `5`). Alternate key `mosip.facepad.<role>.max_retries`. |
 
 Replace `<role>` with `resident`, `operator` or `supervisor`. Booleans are the
 literal strings `true` and `false`. Empty values, surrounding whitespace,
@@ -33,10 +33,37 @@ the proof. Model errors and attack decisions still reject before consumption.
 The final JPEG and proof remain single-use. A policy does not supply identity
 matching or turn an uncertain passive result into a completed action.
 
+The desktop frame session now uses the parsed action count and timeout. The
+timeout covers acquisition, preparation and every action; recovery does not
+extend it. If an adapter supplies a shorter capture timeout, the shorter limit
+wins. Actions alternate between blink and a randomly selected turn, with a
+random starting action. Each action requires its own return to neutral.
+
+A recovery episode starts when clear evidence or action progress is interrupted
+by face loss, a stream gap or suspect PAD evidence. It clears all action credit
+and consumes one retry. Repeated missing frames during that same episode do not
+consume additional retries. Zero retries rejects the first interruption after
+clear evidence. Confirmed attacks, model errors, invalid sequence and expiry
+remain terminal. The limit applies within a session; creating a new capture is
+not account-level rate limiting.
+
 The Android registration/onboarding callback reads the corresponding resident
 or operator policy. Its signed active-evidence extension still requires the
-existing trusted SBI validation and one-use transaction ledger. The reference
-camera app has its own request timeout and two-action implementation. This
+existing trusted SBI validation and one-use transaction ledger. The checkpoint
+requires the signed `actionCount` to be between one and four and at least the
+current policy's required count. Insufficient or out-of-range counts reject
+before the transaction is consumed. The compatibility
+overload uses the default operator policy, which requires two actions.
+
+The reference camera app has its own request timeout and two-action implementation.
+Its two-action proof satisfies a client minimum of one or two actions. It cannot
+currently fulfill a client policy requiring three or four actions. Such a policy
+fails closed at the Android checkpoint. The version 1 evidence
+does not include a session start time, retry count or complete policy snapshot.
+Its completion timestamp supports a freshness check, but does not demonstrate
+that the client's configured timeout or retry limit was enforced by the SBI.
+Those values need an authenticated request and signed response contract before
+they can be described as enforced across the Android/SBI boundary. This
 change does not add a native settings screen, dynamic custom action pool selection,
 localized guidance templates, or cache-update transactions. Android supervisor
 UI integration and live synchronization remain unverified.
