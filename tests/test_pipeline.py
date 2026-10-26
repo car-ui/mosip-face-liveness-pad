@@ -1,7 +1,9 @@
 import pytest
 import numpy as np
 from src.core.pipeline import LivenessPipeline, PipelineState, LivenessDecision
-from src.core.config import WorkflowType, LivenessConfig
+from src.core.config import WorkflowType, LivenessConfig, PADVerdict
+from src.core.passive_pad import PADResult
+from src.core.session_pad import SessionPADGate
 from src.devices.mock_l0_device import MockL0Device
 from src.devices.base import MockScenario, VideoFrame
 
@@ -48,27 +50,34 @@ def test_pipeline_high_confidence_passive_pass(controlled_pipeline, valid_frame)
     assert result.captured_face_image is not None
 
 
-def test_pipeline_passive_escalation_to_active_challenge():
-    device = MockL0Device(scenario=MockScenario.STATIC_PHOTO_ATTACK)
-    device.connect()
-    
-    # Strict threshold requires active challenge
-    config = LivenessConfig()
-    config.resident_policy.passive_threshold = 0.95
-    pipeline = LivenessPipeline(config=config, workflow=WorkflowType.RESIDENT_REGISTRATION)
-    pipeline.reset()
-    
-    active_triggered = False
-    for _ in range(40):
-        success, frame = device.read_frame()
-        res = pipeline.process_frame(frame)
-        if res.state == PipelineState.ACTIVE_CHALLENGE:
-            active_triggered = True
-            assert res.active_challenge is not None
-            break
+def test_pipeline_passive_escalation_to_active_challenge(controlled_pipeline, valid_frame, monkeypatch):
+    # Exercise uncertain-score policy independently of image inference and host speed.
+    pipeline = controlled_pipeline
+    pipeline.policy.passive_threshold = 0.95
+    pipeline.pad_gate = SessionPADGate()
+    monkeypatch.setattr(pipeline.pad_detector, "evaluate_passive_liveness", lambda *a: PADResult(
+        PADVerdict.UNCERTAIN, False, .70, .98, False, None, "TEST_DOUBLE"))
+    clock = [100.0]
+    monkeypatch.setattr("src.core.pipeline.time.monotonic", lambda: clock[0])
 
-    device.disconnect()
-    assert active_triggered is True
+    # Frame count alone cannot bypass the real evidence gate's minimum duration.
+    for _ in range(40):
+        result = pipeline.process_frame(valid_frame)
+        assert result.state == PipelineState.PASSIVE_LIVENESS
+        assert result.active_challenge is None
+        assert result.captured_face_image is None
+
+    # Advance virtual camera time, rather than sleeping or relying on model latency.
+    for _ in range(40):
+        clock[0] += .05
+        result = pipeline.process_frame(valid_frame)
+        assert result.captured_face_image is None
+        if result.state == PipelineState.ACTIVE_CHALLENGE:
+            break
+    assert result.state == PipelineState.ACTIVE_CHALLENGE
+    assert result.decision == LivenessDecision.ACTIVE_CHALLENGE_REQUIRED
+    assert result.active_challenge is not None
+    assert pipeline.challenge_manager.completed_challenges == []
 
 
 def test_pipeline_presentation_attack_rejection_when_active_disabled(controlled_attack_pipeline, valid_frame):
