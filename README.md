@@ -1,124 +1,201 @@
-# Face liveness and presentation attack detection
+# Face Liveness & Presentation Attack Detection
 
-An offline research prototype for MOSIP Decode 2026, Problem 04. It processes camera frames, checks face quality and passive PAD, and asks for randomly selected facial actions when policy requires them. An attack, engine error, or failed challenge prevents the prototype from returning a captured image.
+[![Python and Java CI](https://github.com/car-ui/mosip-face-liveness-pad/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/car-ui/mosip-face-liveness-pad/actions/workflows/ci.yml)
+[![Android Camera SBI](https://github.com/car-ui/mosip-face-liveness-pad/actions/workflows/native-android.yml/badge.svg?branch=main)](https://github.com/car-ui/mosip-face-liveness-pad/actions/workflows/native-android.yml)
 
-The repository includes a local browser console, an OpenCV desktop demo, mock device adapters, workflow policies, ONNX inference, offline signed model updates, evaluation tools, and native client patches. The recorded native build milestone passed 17 Android Registration Client instrumentation tests and eight reference camera-SBI tests on an API 34 emulator with cameras disabled. Desktop controller and preview checks also passed. Later working-source changes add signed evidence version 2, configurable camera action policies, a development-only threshold selector, and a portable device capability-contract check. The pinned Desktop source now builds locally with a JDK compatibility override; the retained APKs predate these changes, so Android and SBI still need a fresh platform build.
+An offline research prototype for **MOSIP Decode 2026 · Problem 04**. It checks camera frames for face quality and presentation attacks, then requests random facial actions when the workflow requires additional verification.
 
-**Native integration remains incomplete.** The source includes operator/supervisor active-action checkpoints, an Android signed-evidence path, and the pinned Android client now serializes cached resident/operator settings into the standard SBI `customOpts` request. Successful human actions, production device-certificate trust, complete live client UI flows, physical Android/L1 hardware, ISO conformance and physical attack accuracy still need validation. The latest client/SBI source changes have not been rebuilt. See the [camera SBI integration](docs/CAMERA_SBI_INTEGRATION.md) and [requirement matrix](docs/REQUIREMENTS_MATRIX.md) for evidence boundaries.
+The project includes a browser console, an OpenCV desktop demo, ONNX inference, workflow policies, signed offline model updates, evaluation tools, and patches for MOSIP clients and a reference camera SBI.
 
-Current submission readiness, completed prototype work, and remaining partial
-acceptance criteria are summarized in the [submission status](docs/SUBMISSION_STATUS.md).
+**[Quick start](#quick-start) · [Features](#features) · [Validation status](#validation-status) · [Native integration](#native-integration) · [Documentation](#documentation)**
 
-## Run locally
+> **Current scope:** A working research prototype with passing software and emulator checks. Live MOSIP workflows, physical device performance, representative PAD accuracy, and participant usability still need acceptance evidence. See the [submission status](docs/SUBMISSION_STATUS.md) and [requirement matrix](docs/REQUIREMENTS_MATRIX.md).
 
-The latest laptop trials exposed apparent live-person rejection and face-count
-instability. The [research and rebuild review](docs/RESEARCH_AND_REBUILD.md)
-compares existing solutions, records reproducible failures and explains the
-YuNet detector change, action preparation phase and optional two-model research
-comparison. Physical reliability is not established by the automated tests.
+## Features
 
-The subsequent [reliability plan and execution record](docs/RELIABILITY_PLAN.md)
-documents the bounded video evidence policy, camera settling period, optional
-MobileNetV3 comparison and remaining accuracy work. Suspect frames block capture
-immediately; terminal PAD rejection now requires sustained evidence. Engine
-failures remain immediate errors. Neither a suspect frame nor an inconclusive
-session can produce a verified image.
+| Area | Included capabilities |
+|---|---|
+| Passive liveness and PAD | Local ONNX inference, face-quality checks, temporal evidence, and rejection on attacks or engine errors |
+| Active verification | Random facial-action prompts, progress feedback, bounded retries, and action invalidation after face loss |
+| Workflow policies | Separate resident, operator, and supervisor settings for thresholds, actions, timeouts, and retries |
+| Demo interfaces | Browser console with preview and diagnostics; separate OpenCV desktop demo |
+| Models and updates | Model provenance, checksum verification, signed offline updates, and downgrade protection |
+| Evaluation and integration | Private dataset evaluation, threshold selection, capability checks, and pinned native client patches |
 
-Use CPython 3.11. The application binds to `127.0.0.1:4501`. Internet access is needed for initial dependency installation; inference and challenge generation run locally afterward.
+## Quick start
+
+### Requirements
+
+- **CPython 3.11** and Git.
+- Internet access for the initial dependency installation. Inference and challenge generation run locally afterward.
+- A webcam for physical-camera trials. The simulator works without one.
+
+### Windows / PowerShell
 
 ```powershell
+git clone https://github.com/car-ui/mosip-face-liveness-pad.git
+cd mosip-face-liveness-pad
 python -m venv .venv
 .\.venv\Scripts\python -m pip install -r requirements.lock.txt
 .\.venv\Scripts\python run_mds_service.py
 ```
 
-On Linux or macOS, use `.venv/bin/python` instead. Linux desktop OpenCV may also need `libgl1` and `libglib2.0-0`.
+<details>
+<summary><strong>Linux and macOS setup</strong></summary>
 
-Open [the local verification console](http://127.0.0.1:4501). The default source is a simulator. Select a scenario and choose **Start verification**. Select **Physical webcam** explicitly for camera use. A disconnected camera produces an error rather than switching silently to simulated success.
+```bash
+git clone https://github.com/car-ui/mosip-face-liveness-pad.git
+cd mosip-face-liveness-pad
+python3.11 -m venv .venv
+.venv/bin/python -m pip install -r requirements.lock.txt
+.venv/bin/python run_mds_service.py
+```
 
-The console provides positioning guidance, progress, active prompts, retry messages, device diagnostics, and policy settings. Diagnostic controls apply to the selected workflow. Settings are in memory by default. Set `MOSIP_PAD_POLICY_FILE` to enable validated offline persistence; see [the policy guide](docs/OFFLINE_POLICY.md).
+Linux desktop OpenCV may also require `libgl1` and `libglib2.0-0`.
 
-To create a hash-verified source archive that includes the current working changes and non-ignored new files, run `python scripts/package_release.py --worktree --output output/local/face-liveness-prototype.zip`. The manifest identifies this as a working-tree package and records each included file's SHA-256. A normal run without `--worktree` continues to package the committed tree.
+</details>
 
-For the separate OpenCV desktop demo:
+Open **[http://127.0.0.1:4501](http://127.0.0.1:4501)** in your browser.
+
+1. Choose a resident, operator, or supervisor workflow.
+2. Select a simulator scenario or explicitly select **Physical webcam**.
+3. Choose **Start verification** and follow the positioning and action prompts.
+4. Inspect the result and local diagnostics.
+
+The default source is a clearly labeled simulator. A disconnected physical camera returns an error. Settings are kept in memory unless offline persistence is configured.
+
+### OpenCV desktop demo
 
 ```powershell
 .\.venv\Scripts\python run_desktop_app.py --mock
 ```
 
-Run without `--mock` to request a physical webcam. This desktop window is a prototype application, not the official MOSIP Registration Client.
+Omit `--mock` to use a physical webcam. This window is the standalone prototype; native MOSIP integration is described below.
 
-## What a successful result means
+## Verification behavior
 
-- Resident policy can accept a high passive score after temporal checks. Uncertain results require an active action.
-- Operator and supervisor policies require active challenges even when passive scores are high.
-- PAD runs during active verification. An action cannot override a PAD attack or processing error.
-- Face loss or poor quality during an action clears action progress and consumes a retry.
-- Preview requests observe the capture output without advancing liveness decisions. Concurrent capture or configuration changes receive HTTP 409.
-- The returned payload is an application JPEG. It is not an ISO/IEC 19794-5 interchange record, signed SBI response, registration packet, or proof of identity matching.
-- A simulator is always identified as simulated. Mock challenges are never automatically marked complete by the capture service.
+| Workflow | Acceptance policy |
+|---|---|
+| Resident registration | A sufficiently high passive score may pass after temporal checks; uncertainty requires active verification |
+| Operator authentication | Active challenges are required, including when the passive score is high |
+| Supervisor authentication | Active challenges are required under the supervisor policy |
 
-## Model contract
+- PAD continues during active verification. An action cannot override an attack or engine error.
+- Suspect frames block capture immediately; a sustained attack verdict produces terminal rejection.
+- Face loss or poor quality invalidates action progress and invokes the retry policy.
+- Preview requests do not advance verification. Concurrent capture or configuration changes return HTTP 409.
+- Simulator challenges require explicit test inputs; the capture service never marks them complete automatically.
 
-The research ONNX adapter supports a declared MiniFASNet V2 profile with checksum verification. The [model card](docs/MODEL_CARD.md) describes preprocessing, provenance, conversion checks, and limitations. The facial landmark model detects actions; it is not itself a trained PAD model.
+A successful result from the Python demo returns an **application JPEG**. Official SBI signatures, ISO face records, registration packets, and identity matching belong to the native integration and require separate validation.
 
-Set `MOSIP_PAD_MODEL` to a compatible ONNX file to select a different model path. Model updates must be validated before restarting the service with the approved model. Do not drop arbitrary ONNX models into this adapter and assume that input normalization or class ordering will match.
+## Validation status
 
-The heuristic backend is a research fallback. Texture, glare, color, and frequency cues do not establish reliable detection of all printed photos, screen replays, masks, or injected video. No independent attack dataset accuracy is claimed.
+The latest verified source is [commit `450f877`](https://github.com/car-ui/mosip-face-liveness-pad/commit/450f877).
 
-## Reproduce checks
+| Area | Available evidence | Remaining work |
+|---|---|---|
+| Python prototype | **227 tests passed locally**; Ubuntu and Windows CI passed | Representative human and attack evaluation |
+| Java / ONNX | Portable gate and actual native inference checks passed in Ubuntu and Windows CI | Complete live client workflows and physical-device behavior |
+| Reference camera SBI | Current source built and camera-disabled emulator instrumentation passed in [CI](https://github.com/car-ui/mosip-face-liveness-pad/actions/runs/40284447283) | Successful physical-camera actions, trusted device setup, and field testing |
+| Android Registration Client | Pinned patch preparation and prior 17-test emulator evidence | Fresh current APK build and live camera-to-storage / identity flows |
+| Desktop Registration Client | Pinned source reactor build and controlled controller / preview evidence | Live resident, operator, and supervisor UI acceptance |
+| Performance and acceleration | Emulator baseline and host CPU/provider comparison | Physical ARM64 latency, memory, power, thermals, and actual GPU/NPU/NNAPI execution |
 
-```powershell
-.\.venv\Scripts\python -m pytest -q --junitxml=output/local/test-results.xml
-.\.venv\Scripts\python scripts/check_device_interoperability.py --output output/local/device-interoperability.json
-javac --release 8 -d output/local/java src/java_integration/*.java tests/java/NativeCaptureGateTest.java
-java -cp output/local/java NativeCaptureGateTest
-```
+Software fixtures and camera-disabled emulator tests establish defined implementation behavior. They do not establish population accuracy, physical attack resistance, ISO certification, or production certificate trust. Earlier APK evidence predates some current source changes; [validation notes](docs/VALIDATION.md) record its scope.
 
-The Java suite checks session binding, challenge counts, rejection, payload binding, and single-use capture acceptance. The interoperability CLI validates capability consistency across the webcam contract, mock device, and two simulated vendor adapters; it does not establish physical vendor support. The Python suite separates control-flow tests with injected scores/actions from detector tests on image fixtures. Neither suite measures real-world attack accuracy. [Validation notes](docs/VALIDATION.md) record the commands and evidence boundaries.
+## Native integration
 
-For private, independently collected data, evaluate the development split and select a threshold first:
+The [native integration directory](integrations/native/README.md) contains shared Java engines, platform adapters, and patches for exact upstream revisions.
 
-```powershell
-.\.venv\Scripts\python scripts/evaluate_dataset.py path/to/pad-master.jsonl --split development --model assets/models/minifasnet_v2.onnx --output output/local/pad-development.json
-.\.venv\Scripts\python scripts/select_pad_threshold.py output/local/pad-development.json --max-apcer 0.05 --minimum-per-class 20 --output output/local/pad-threshold.json
-.\.venv\Scripts\python scripts/evaluate_dataset.py path/to/pad-master.jsonl --split test --model assets/models/minifasnet_v2.onnx --threshold SELECTED_THRESHOLD --output output/local/pad-test.json
-```
+| Target | Upstream revision | Integration point |
+|---|---|---|
+| Desktop Registration Client | `935306e2fd38bff2803697468e595026b1d18cec` | Capture storage and role-specific authentication gates |
+| Android Registration Client | `8f4643a694f3b5e66e0491f077a8630ab5667658` | Signed SBI response validation before capture storage |
+| Reference camera SBI | `d1ec22a542294b798f5b9c5bb97428deabb2064b` | Camera-owned active session and exact-image evidence |
 
-Replace `SELECTED_THRESHOLD` with the value in `pad-threshold.json`. Both commands use the same private master manifest, which includes development and test rows plus pseudonymous subject and attack-source groups; the loader rejects group overlap and out-of-folder paths. Keep the manifest private because it contains split linkage. The [evaluation protocol](docs/EVALUATION_PROTOCOL.md) defines the manifest, denominators, attack groups, nonresponses, and limits. The older `test_photo_spoof_simulation.py` remains a developer-fixture experiment. Its figures must not be presented as human live-versus-spoof accuracy.
-
-## Build the native checkpoints
-
-The [native integration directory](integrations/native/README.md) contains small patches for exact official Android, camera-SBI, and desktop source commits, a shared Java ONNX engine, and platform-specific ISO decoding adapters. Apply them to a clean upstream checkout:
+Prepare a **clean checkout at the corresponding revision**:
 
 ```powershell
 python scripts/prepare_native_clients.py desktop path/to/registration-client
 python scripts/prepare_native_clients.py android path/to/android-registration-client
+python scripts/prepare_native_clients.py camera-sbi path/to/android-camera-mds
 ```
 
-The Desktop and Android checkpoints run before capture storage or identity matching. Operator/supervisor paths require active evidence in the current source. The Android client attaches its cached resident/operator policy to face `CaptureRequest.customOpts`; the reference SBI parses the bounded action count, blink/turn pool, timeout and retry policy and passes them to its camera activity. These current Android/SBI edits apply to the pinned upstream commits, but need fresh APK builds and end-to-end verification. The [native evidence report](integrations/native/validation.json) separates retained build evidence from live UI and physical attack testing.
+The Android client sends its cached face-capture policy through SBI `customOpts`. The reference SBI validates those settings and returns signed session evidence bound to the transaction and final image. The client independently checks that evidence against its current policy before storage. Both patched apps and a correctly provisioned, trusted test certificate are required.
 
-## API and local security
+For toolchains, build commands, trust requirements, and evidence limits, read the [native integration guide](docs/NATIVE_INTEGRATION.md), [camera SBI guide](docs/CAMERA_SBI_INTEGRATION.md), and [native policy guide](docs/NATIVE_POLICY.md).
 
-See [API documentation](docs/API.md) and the running service's [OpenAPI reference](http://127.0.0.1:4501/docs). Mutating endpoints require a bearer token. The same-origin console receives an ephemeral token from the local service. For a Java or command-line client, set the same explicit `MOSIP_MDS_API_TOKEN` in the service and client environments. Never commit it.
+## Configuration and API
 
-The service checks browser origins and hostnames, disables response caching, and binds to loopback. These controls do not protect against another malicious process running as the same user. Do not expose this research service through a public tunnel.
+| Environment variable | Purpose |
+|---|---|
+| `MOSIP_PAD_POLICY_FILE` | Enable validated offline policy persistence |
+| `MOSIP_PAD_MODEL` | Select a compatible ONNX model file |
+| `MOSIP_MDS_API_TOKEN` | Set the bearer token shared by the local service and external clients |
 
-Audit logs omit image buffers and redact nested sensitive fields. Their hash chain detects edits only when a trusted checkpoint is kept separately. It is not an externally anchored, immutable audit system. Model-update verification supports Ed25519 public keys and an explicit shared-key HMAC mode. The development key requires deliberate opt-in.
+The console receives an ephemeral token from the local service. Mutating API endpoints require authentication. The service binds to `127.0.0.1:4501`, checks origins and hostnames, and disables response caching. Keep it local; another process running as the same user remains outside these protections.
 
-## Submission material
+- [API documentation](docs/API.md) and [local OpenAPI reference](http://127.0.0.1:4501/docs)
+- [Offline configuration guide](docs/OFFLINE_POLICY.md)
+- [Model card and preprocessing contract](docs/MODEL_CARD.md)
 
-- [Requirement matrix](docs/REQUIREMENTS_MATRIX.md), covering all mandatory, good-to-have, and bonus task groups.
-- [Evaluation scorecard](docs/EVALUATION_SCORECARD.md), mapping the official weighted rubric to retained evidence and remaining gaps.
-- [Technical design](docs/TECHNICAL_DESIGN.md), [sequence diagrams](docs/SEQUENCE_DIAGRAMS.md), and [native integration contract](docs/NATIVE_INTEGRATION.md).
-- [Pitch deck](pitch/index.html), a self-contained browser presentation with keyboard navigation.
-- [Demo script and submission checklist](docs/DEMO_AND_SUBMISSION.md).
-- [Native usability and accessibility study protocol](docs/USABILITY_STUDY.md); participant results are still required.
-- [Remaining acceptance work and time estimate](docs/REMAINING_WORK_PLAN.md).
-- Official problem statement, evaluation criteria, and submission guidelines PDFs in the repository root.
+Models must match the declared input contract and pass integrity checks. The heuristic backend is a research fallback with no independent attack-accuracy claim. Signed model updates require approved keys; the development key needs deliberate opt-in. Audit logs omit images and redact sensitive fields, while their hash chain requires a separately trusted checkpoint to detect tampering.
 
-The rubric assigns 40% to functionality, 40% to deliverable quality, 10% to user experience, and 10% to presentation. Native source checkpoints and emulator evidence are present; the highest-value remaining work is live client/device validation and representative attack testing. See the [rubric evidence map](docs/EVALUATION_SCORECARD.md). Winning probability cannot be inferred from unit-test counts.
+## Run the checks
+
+Run these commands from the repository root after installing the locked dependencies:
+
+```powershell
+.\.venv\Scripts\python -m pytest -q --junitxml=output/local/test-results.xml
+.\.venv\Scripts\python scripts/verify_native_evidence.py
+.\.venv\Scripts\python scripts/check_device_interoperability.py --output output/local/device-interoperability.json
+```
+
+On Linux or macOS, replace `.\.venv\Scripts\python` with `.venv/bin/python`. The interoperability check covers the webcam interface contract and simulated adapters; physical vendor support needs hardware verification.
+
+<details>
+<summary><strong>Portable Java capture-gate check</strong></summary>
+
+Requires a JDK with support for `javac --release 8`:
+
+```powershell
+javac --release 8 -d output/local/java src/java_integration/*.java tests/java/NativeCaptureGateTest.java
+java -cp output/local/java NativeCaptureGateTest
+```
+
+This checks session binding, challenge counts, rejection, payload binding, and one-use capture acceptance.
+
+</details>
+
+### Evaluate a private dataset
+
+Use consented development and held-out test clips with separate participants and attack sources. The tooling validates the private manifest, selects a threshold using development results, and evaluates the frozen operating point on the test split. Reports include APCER/BPCER, class counts, nonresponses, attack groups, and processing latency.
+
+Follow the [evaluation protocol](docs/EVALUATION_PROTOCOL.md) for the manifest and exact commands. Keep source videos and participant linkage private. The older `test_photo_spoof_simulation.py` contains fixture experiments whose results must not be presented as human liveness accuracy.
+
+## Create a source package
+
+```powershell
+python scripts/package_release.py --worktree --output output/local/face-liveness-prototype.zip
+```
+
+The ZIP includes current source changes and non-ignored new files. Its manifest records the base commit, snapshot type, and every included file's SHA-256; the script verifies the archive and prints its checksum. Omit `--worktree` to package the committed tree.
+
+`output/local/` and `tmp/` are ignored by Git. Keep private evaluation data there or outside the repository, and publish the source ZIP separately when a submission requires an artifact link.
+
+## Documentation
+
+| Topic | Read more |
+|---|---|
+| Completion and acceptance gaps | [Submission status](docs/SUBMISSION_STATUS.md) · [Requirement matrix](docs/REQUIREMENTS_MATRIX.md) · [Delivery status](docs/LOCAL_DELIVERY_STATUS.md) |
+| Evaluation and scoring | [Evaluation protocol](docs/EVALUATION_PROTOCOL.md) · [Rubric scorecard](docs/EVALUATION_SCORECARD.md) |
+| Architecture | [Technical design](docs/TECHNICAL_DESIGN.md) · [Sequence diagrams](docs/SEQUENCE_DIAGRAMS.md) |
+| Native clients | [Integration guide](docs/NATIVE_INTEGRATION.md) · [Camera SBI](docs/CAMERA_SBI_INTEGRATION.md) · [Active challenges](docs/NATIVE_ACTIVE_CHALLENGES.md) |
+| Evidence | [Validation notes](docs/VALIDATION.md) · [Native evidence report](integrations/native/validation.json) · [Android benchmark](docs/ANDROID_BENCHMARK.md) |
+| Reliability and research | [Research review](docs/RESEARCH_AND_REBUILD.md) · [Reliability plan](docs/RELIABILITY_PLAN.md) |
+| User experience | [Usability and accessibility protocol](docs/USABILITY_STUDY.md) |
+| Presentation and submission | [Pitch deck](pitch/index.html) · [Demo and submission checklist](docs/DEMO_AND_SUBMISSION.md) · [Remaining work](docs/REMAINING_WORK_PLAN.md) |
 
 ## Third-party assets
 
-See [third-party notices](THIRD_PARTY_NOTICES.md). Original sample images and the original facial landmark asset were inherited from the starting repository. Their individual provenance needs review before redistributing a public submission package. Model code and exported weights retain their upstream license and attribution.
+See [third-party notices](THIRD_PARTY_NOTICES.md) and the [model card](docs/MODEL_CARD.md) for attribution and licenses. Model code and exported weights retain their upstream terms. Review the provenance of inherited sample images and the original facial landmark asset before redistributing a public submission package.
