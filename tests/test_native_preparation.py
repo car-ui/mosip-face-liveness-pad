@@ -1,5 +1,6 @@
 """Prepared native copies must match the source that will be packaged."""
 from pathlib import Path
+import subprocess
 
 import pytest
 
@@ -83,3 +84,21 @@ def test_empty_required_source_group_fails(tmp_path, platform, group):
 def test_wrong_source_root_does_not_silently_verify_zero_files(tmp_path):
     with pytest.raises(ValueError, match="Native source group is empty: common"):
         verify_copies(tmp_path / "wrong-root", "desktop", tmp_path / "checkout")
+
+
+@pytest.mark.parametrize("autocrlf", ["true", "input"])
+def test_git_preserves_raw_instrumentation_log_bytes(tmp_path, autocrlf):
+    # Check the actual attributes with Git: nested logs must survive a checkout
+    # on another OS without invalidating the captured-byte evidence hashes.
+    attributes = Path(__file__).resolve().parents[1] / ".gitattributes"
+    write(tmp_path / ".gitattributes", attributes.read_bytes())
+    subprocess.run(["git", "init", "--quiet", str(tmp_path)], check=True, capture_output=True)
+    paths = ["integrations/native/evidence/instrumentation.txt",
+             "integrations/native/evidence/session/instrumentation.txt"]
+    raw = b"INSTRUMENTATION_RESULT: stream=\r\nOK (17 tests)\r\n"
+    for path in paths:
+        write(tmp_path / path, raw)
+    git = ["git", "-C", str(tmp_path), "-c", "core.autocrlf=" + autocrlf]
+    subprocess.run(git + ["add", "--", *paths], check=True, capture_output=True)
+    for path in paths:
+        assert subprocess.check_output(git + ["show", ":" + path]) == raw

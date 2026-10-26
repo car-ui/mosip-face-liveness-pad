@@ -1,4 +1,5 @@
 *.patch text eol=lf -whitespace
 integrations/native/assets/*.xml text eol=lf
 *.iso binary
-integrations/native/evidence/*.txt text eol=lf
+# Retained instrumentation logs are checked against hashes of their original bytes.
+integrations/native/evidence/**/*.txt -text -whitespace
