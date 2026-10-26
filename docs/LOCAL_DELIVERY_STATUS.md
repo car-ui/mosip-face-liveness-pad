@@ -1,10 +1,10 @@
 # Local delivery status
 
-Updated 26 October 2026. The implementation milestone is `de68e6f`; later
-evidence/documentation commits advance repository HEAD to `ce65753`. Work
-resumed from the freshly fetched GitHub commit `a4d851c`. The code milestone
-and retained build evidence are present on the main branch; external contest
-submission has not been performed.
+Updated 26 October 2026. The implementation milestone is `de68e6f`; current
+source and documentation are published on public GitHub `main` at
+https://github.com/car-ui/mosip-face-liveness-pad. Commit `450f877` passed
+Ubuntu, Windows, and camera-SBI CI. Later README-only changes also passed the
+Ubuntu and Windows checks. External contest submission has not been performed.
 The current repository still does not include a demo recording, team-specific
 private submission details, physical devices/test participants, or an external
 submission.
@@ -23,8 +23,10 @@ The working source now carries Android evidence version 2: the native session
 attests its start time, timeout, action count, retry allowance and retries used
 only after consuming the exact final JPEG. The Android checkpoint checks the
 measured duration and retries against its current policy. These edits were made
-after the retained October 20 build, so they are source-complete but not yet
-rebuilt or included in the recorded APK checksums.
+after the retained October 20 build. Current camera-SBI source has since built
+and passed camera-disabled instrumentation in CI run 40284447283. The current
+Registration Client source still needs a fresh APK build; its retained APK
+checksums describe the older milestone.
 
 Android PAD rejection now shows a generic retry message to the user. Direct
 checkpoint failures return a sanitized Flutter error, and face-capture SBI
@@ -37,7 +39,8 @@ capability validator and CLI cover the physical-webcam interface, mock device
 and two simulated vendor adapters. Dataset reports now retain per-clip scores;
 the new threshold selector accepts development reports only and enforces a
 minimum class count plus a predeclared APCER ceiling. The full current Python
-suite now passes. Fresh Android builds remain unavailable here.
+suite now passes. The local Android build toolchain remains unavailable; the
+current reference SBI was built and tested on GitHub's runner.
 
 The pinned desktop patch now connects active proof to operator authentication,
 EOD supervisor authentication and face login. Face login passes a role-aware
@@ -53,6 +56,11 @@ CONTINUATION_20261020.md for behavior and limitations.
 
 ## Executed checks
 
+- Current full suite: 227 tests passed locally. Ubuntu and Windows CI passed
+  the Python suite, evidence integrity checks, and actual Java/ONNX checks for
+  commit `450f877`. The same source's camera-SBI build and camera-disabled
+  instrumentation passed CI run 40284447283. These are software/emulator
+  results, not physical or live identity acceptance.
 - Fresh full Python suite on 23 October: 225 passed in 32.23 seconds wall time
   (32.155 seconds pytest time) with the exact locked dependencies under ignored
   `tmp/`; one Starlette/httpx deprecation warning was reported. The sanitized
@@ -146,11 +154,15 @@ list-based DTO, validates the values and passes them to its private camera
 activity. Evidence version 2 lets Android compare completed actions, observed
 duration and retries with its current policy. Java policy checks pass, and both
 native patches plus the preparation workflow apply to their exact upstream
-commits. The modified client and camera SBI still need fresh builds and an
-end-to-end policy-update check. Arbitrary action families, configurable
+commits. The modified Registration Client still needs a fresh APK; the camera
+SBI has current CI build/instrumentation evidence. The end-to-end policy-update
+check remains open. Arbitrary action families, configurable
 guidance, authenticated online synchronization and production device trust
 remain open.
 
 The hackathon mandatory scope is not declared complete. Tests and builds do not
-replace the missing physical and live integration evidence. Original supplied
-PDFs and private camera material are excluded from Git.
+replace the missing physical and live integration evidence. The original
+supplied PDFs are tracked and included in the source package. No private
+participant dataset is included. The required video, student credentials,
+cloud deliverable uploads, and submission email remain missing; see
+[`SUBMISSION_STATUS.md`](SUBMISSION_STATUS.md).

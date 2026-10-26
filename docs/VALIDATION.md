@@ -1,5 +1,13 @@
 # Validation evidence
 
+Latest CI update, 26 October: commit `450f877` passed Ubuntu and Windows Python,
+evidence-integrity, portable Java and actual Java/ONNX checks. The updated full
+Python suite passed 227 tests locally. Current camera-SBI source built and
+passed camera-disabled instrumentation in
+[run 40284447283](https://github.com/car-ui/mosip-face-liveness-pad/actions/runs/40284447283).
+The earlier retained reports below remain historical evidence; the current
+Registration Client APK and live physical acceptance are still outstanding.
+
 This report summarizes the latest retained checks for the implemented code milestone `de68e6f`. The repository HEAD also includes later evidence/documentation commits. Results below are software and emulator checks; they are not measurements of physical attack accuracy or successful real-person action completion.
 
 On 23 October 2026, a fresh run of the full current working-tree Python suite

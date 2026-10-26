@@ -18,7 +18,7 @@ Practice with the exact packaged code and chosen device. Pre-download dependenci
 - Complete, runnable source repository with accessible history and dependency instructions.
 - Stable working prototype/demo.
 - Pitch deck with problem, solution, stack, intended users, impact, and evidence limits.
-- Optional 2-5 minute video demo. The supplied guide does not mark it as mandatory, and no recording is currently included.
+- Required video demo, typically 2-5 minutes. The original guide marks "Video Demo*" as mandatory; no recording is currently included. Earlier notes describing it as optional were incorrect.
 - Usage and installation instructions.
 - API documentation where applicable.
 - Student college/university credentials through the organizer's private process. Never commit them here.
@@ -31,8 +31,8 @@ The submission guide also lists mockups, architecture diagrams, sample test data
 - Run and record a consented, representative attack evaluation with fixed thresholds and separate test participants.
 - Retain the NASA fixture attribution, official landmark/model provenance, runtime notices and upstream client licenses. Review the reference SBI's inherited bundled JAR terms before distributing its APK.
 - Verify a clean extraction/install, model checksums, Python tests, Java checks, and CI results for the submitted commit.
-- If submitting a 2-5 minute demo, play the full export, inspect its start/end, and check that captions and links work. Use a consented subject for live actions; label simulator and fixture footage clearly.
+- Record the required demo, play the full export, inspect its start/end, and check that captions and links work. Use a consented subject for live actions; label simulator and fixture footage clearly. A software/simulator recording must disclose its scope and cannot stand in for physical acceptance evidence.
 - Add the actual team name/members and institution details to the final private submission material.
 - Make the source and artifact URLs accessible to the jury, then verify them in a signed-out session.
 
-The supplied guidelines ask teams to email source/artifact URLs, team name, and problem statement to `decode@mosip.io`. No submission email, cloud upload, student credential upload, or organizer acknowledgement is performed by creating this repository.
+The supplied guidelines ask teams to put the other mandatory artifacts in cloud storage and email source/artifact URLs, team name, and problem statement to `decode@mosip.io`. The source repository is public; cloud deliverable uploads, student credential uploads, the submission email, and organizer acknowledgement remain outstanding. See the [item-by-item submission audit](SUBMISSION_STATUS.md).

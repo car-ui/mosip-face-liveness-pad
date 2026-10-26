@@ -6,8 +6,9 @@ The requirement matrix classifies 16 of 27 items as implemented at their stated
 prototype scope and 11 as partial. The Android/SBI evidence-v2 and configurable
 camera action-pool changes are in the working source, including cached-policy
 serialization into SBI `customOpts` and strict camera-side parsing. The retained
-APKs and emulator reports predate these changes; they need a fresh platform
-build before they can be presented as packaged Android evidence. A
+Registration Client APKs and emulator reports predate these changes; that client
+needs a fresh platform build. Current camera-SBI source has since built and
+passed camera-disabled instrumentation in CI run 40284447283. A
 development-only threshold selector and a portable device capability-contract
 check are also included.
 
@@ -33,7 +34,7 @@ check are also included.
 
 **Evidence available:** [`pitch/index.html`](../pitch/index.html) contains a nine-slide, self-contained presentation with problem framing, solution, architecture, policies, model contract, test evidence and explicit limitations. [`DEMO_AND_SUBMISSION.md`](DEMO_AND_SUBMISSION.md) provides a timed jury-demo script and submission checklist.
 
-**Material limit:** the supplied submission guide treats a 2-5 minute demo video as optional; no recording is included. A concise recording could still strengthen the presentation. The pitch also needs the real team name, member/institution details, rehearsal, and final accessible artifact links. Those details are not in this repository.
+**Material limit:** the original submission guide stars "Video Demo*" as mandatory, despite its permissive "can submit" description. Treat the typical 2-5 minute recording as required unless MOSIP waives it. No recording is included. Earlier notes calling it optional were incorrect. The pitch also needs final team details, an explicit stack/audience/impact review, rehearsal, and accessible cloud artifact links.
 
 ## High-complexity problem statement
 
@@ -41,7 +42,7 @@ The supplied Problem 04 statement is marked **High** complexity. The repository 
 
 ## Final submission items outside the repository
 
-- Optionally record and inspect a 2-5 minute video, using a consented live subject for any human-action footage and labeling simulated scenes.
+- Record and inspect the required video, typically 2-5 minutes, using a consented live subject for any human-action footage and labeling simulated scenes.
 - Add the team's actual name, members and institution details to the private submission materials.
 - Obtain and submit student credentials through the organizer's private process; do not commit them to source control.
 - Place source and supporting artifacts at accessible URLs and verify those URLs while signed out.

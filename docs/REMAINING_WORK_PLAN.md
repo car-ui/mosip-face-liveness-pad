@@ -25,7 +25,7 @@ Gradle distributions do not include an Android SDK.
 | Mandatory 5: resident registration | Patched client and reference SBI source; existing earlier emulator evidence | Current APK build, camera-enabled client-to-SBI-to-storage run, test resident and retained logs. |
 | Mandatory 6: operator authentication | Native checkpoint and policy source; desktop operator and face-login paths freshly compile through the patched five-module reactor | Current client/SBI package, live action flow, test operator, and successful or rejected match result through the real test environment. |
 | Mandatory 7: supervisor authentication | Supervisor policy/checkpoint source; desktop EOD and role-specific face-login paths freshly compile through the patched five-module reactor | Same live environment with a supervisor test identity, including override/audit behavior. |
-| Mandatory 8: configuration | Cached-policy serializer, strict SBI parser, Java handoff checks, exact-revision patch preparation | Build both current Android apps, then change policy and demonstrate the client accepts matching evidence and rejects stale/looser evidence end to end. |
+| Mandatory 8: configuration | Cached-policy serializer, strict SBI parser, Java handoff checks, exact-revision patch preparation | Build the current Registration Client, pair it with the current reference SBI, then change policy and demonstrate the client accepts matching evidence and rejects stale/looser evidence end to end. |
 | Mandatory 10: UI/UX | Responsive console, accessibility behavior and ready-to-run study protocol | Consent and run the protocol with representative participants on the target screens and camera; record outcomes and retest fixes. |
 | Bonus: low-resource Android | Earlier one-CPU emulator benchmark and instrumentation | Rebuild current source and measure full workflow, latency, memory, energy and thermals on a representative physical low-resource Android phone. |
 | Bonus: hardware acceleration | CPU/Azure parity harness and provider placement report | Run CPU and a supported Android GPU/NPU/NNAPI provider on a physical phone and verify actual node placement and numerical parity. |
@@ -44,7 +44,7 @@ dependencies; the absence of L0/L1 hardware does not remove those dependencies.
 | Mandatory 5: Resident registration | Rebuild patched Android and Desktop clients, capture from a live camera, verify the normal registration storage and packet path, and retain logs. | 2-4 working days | Build toolchains, physical Android device, working SBI and registration environment. |
 | Mandatory 6: Operator authentication | Exercise the patched preview and capture path with live actions, trusted SBI result, and successful identity match. | 2-4 working days | Same integration environment plus a valid operator test identity. |
 | Mandatory 7: Supervisor authentication | Verify the live supervisor path, policy, audit and override controls from capture through match. | 1-3 working days | Supervisor account, integrated client and trusted SBI. |
-| Mandatory 8: Configuration | The pinned client's outbound RCAPTURE policy, conversion from standard SBI `customOpts` object to the reference DAO's list DTO, and strict camera-side parsing are implemented and apply to both exact source revisions. Rebuild both apps and verify stricter policy updates and rejection cases end to end. | 0.5-1 working day | Android SDK/build environment and SBI/device test setup. |
+| Mandatory 8: Configuration | The pinned client's outbound RCAPTURE policy, conversion from standard SBI `customOpts` object to the reference DAO's list DTO, and strict camera-side parsing are implemented and apply to both exact source revisions. Rebuild the Registration Client and verify stricter policy updates with the current SBI and rejection cases end to end. | 0.5-1 working day | Android SDK/build environment and SBI/device test setup. |
 | Mandatory 10: UI/UX | The task protocol and review gates are ready. Run task-based accessibility and usability sessions on official Desktop and Android screens; fix and recheck discovered issues. | 3-5 working days | Representative users, screen readers and physical cameras. |
 | Good-to-have: Multiple vendors | Connect and exercise at least two real vendor integrations across the documented format/security matrix. | 5-10 working days after the first adapter | Vendor SDKs and devices; this overlaps with Mandatory 1. |
 | Bonus: Low-resource Android | Rebuild current sources and measure full capture latency, RAM, energy and thermal behavior on representative low-resource phones. | 2-4 working days | Physical ARM64 devices and repeatable measurement setup. |
@@ -65,17 +65,20 @@ independent certification is a separate laboratory project and may take
 substantially longer.
 
 Submission closeout is separate from the 27-item implementation matrix. The
-supplied guide treats a 2-5 minute demo video as optional. Add the real
-team/institution details to private submission materials and verify artifact
-links. If the team chooses to include a video, allow another half to one
-working day to record and review it once the demo setup is ready.
+supplied guide stars "Video Demo*" as mandatory. Earlier notes describing it as
+optional were incorrect. Add the real team/institution details, arrange private
+student credential uploads, publish the other mandatory artifacts to cloud
+storage, and verify the links. Allow another half to one working day to record
+and review the typical 2-5 minute video once the demo setup is ready. Uploads
+and the submission email remain outstanding; the source is now public on GitHub.
 
 The source-only integration and packaging work is complete. The latest pinned
 Desktop patch applies cleanly and the five-module reactor compiles locally with
 Maven tests skipped; a JDK 11 build, current native runtime harness and live
-camera/UI run remain open. Remaining local release work is to build the
-Android targets, resolve any integration failures, and refresh signed or
-reproducible build evidence. Allow **1-2 working days** once the Android
+camera/UI run remain open. Current camera-SBI source has a passing CI build and camera-disabled
+instrumentation run. Remaining local release work is to build the current
+Android Registration Client, resolve integration failures, and retain the
+corresponding package evidence. Allow **1-2 working days** once the Android
 SDK/Gradle toolchain and test setup are available. This workspace has no
 system Gradle, Android SDK or `adb`; the temporary Maven distribution and
 locked Python dependencies used for verification are under ignored `tmp/`.
