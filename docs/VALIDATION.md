@@ -1,61 +1,133 @@
 # Validation evidence
 
-The subsequent reliability pass followed `RELIABILITY_PLAN.md` and passed 151
-tests in 28.06 seconds. It adds explicit-clock video-evidence checks, rejection
-at attempted action completion, sparse-frame and invalid-clock failures, and
-MN3 normalization/probability-contract checks. An eight-frame simulator UI
-startup, settling and exit smoke run completed. This changes the Python session
-decision policy; it does not establish physical accuracy or update native gates.
+This report summarizes the latest retained checks for the implemented code milestone `de68e6f`. The repository HEAD also includes later evidence/documentation commits. Results below are software and emulator checks; they are not measurements of physical attack accuracy or successful real-person action completion.
 
-The 19 October research rebuild passed 141 Python tests in 21.76 seconds.
-This includes a real YuNet two-face fixture check, explicit duplicate-outline
-and missing-detection regressions, preparation deadline checks and V1SE model
-contract checks. The V1SE export passed six PyTorch/ONNX comparisons with maximum
-absolute logit difference `2.0265579223632812e-06`. The fixture-based OpenCV UI was
-rendered and inspected, revealing and fixing overlapping action text/progress
-and header/footer text. See [the research review](RESEARCH_AND_REBUILD.md) for
-the comparisons, rejected model choices and remaining physical evidence gaps.
-These checks do not establish successful live actions or physical attack accuracy.
+On 23 October 2026, a fresh run of the full current working-tree Python suite
+passed **225 tests** (32.23 seconds wall time; 32.155 seconds reported by
+pytest) on the bundled Python 3.12 runtime with the exact packages from
+`requirements.lock.txt` installed under ignored `tmp/`. The run had one
+Starlette/httpx deprecation warning and includes the current evaluation,
+private-manifest integrity, threshold-selection and interoperability tests.
+The sanitized JUnit report is retained at
+[`integrations/native/evidence/python-suite-20261023.xml`](../integrations/native/evidence/python-suite-20261023.xml).
+The 199-pass results below are retained earlier runs and clean-package checks.
 
-Local checks were run on Windows on 18 October 2026 with CPython 3.11.15 and the declared runtime dependencies. The source initially contained 64 tests; the revised suite contains 120. The latest Windows run on 19 October passed all 120 tests in 21.34 seconds. The earlier fresh dependency environment run passed in 17.54 seconds. An earlier source ZIP extraction passed all 119 tests before the final timeout regression was added. A Starlette warning notes its future TestClient preference for `httpx2`; the currently pinned `httpx` TestClient checks pass.
+## Recorded checks
 
-## Commands and scope
-
-| Check | Observed result | What it establishes |
+| Area | Result | What it establishes |
 |---|---|---|
-| `python -m pytest -q --junitxml=tmp/test-results.xml` | 120 passed | Python regression properties, detector fixtures, API contracts, model contract, update verification. Injected-score tests are labelled explicitly. |
-| `javac --release 8 ...` followed by `java NativeCaptureGateTest` | 20 checks passed | Portable policy/transport checks, including session binding, required action counts, replayed sequence rejection, exact-payload and single-use acceptance. |
-| `scripts/export_minifasnet.py` | Six conversion comparisons passed; maximum absolute logit difference `2.6226043701171875e-06` | ONNX/PyTorch conversion parity on deterministic tensors. Not attack accuracy. |
-| Packaged ONNX tests | Model loads, BGR 0..255 input verified, class index 1 verified, altered manifest checksum rejected | Packaged inference contract and basic runtime execution. |
-| Browser console | Simulator screen-replay fixture rejected with safe user guidance and restart control | Local browser-to-service rejection using a fixture. Not a real physical screen attack. |
-| Console diagnostics | Model mode shown after service restart; simulated device and `NOT_CERTIFIED` shown | Runtime mode visibility and source transparency. |
-| Narrow console rendering | Stacked layout rendered without horizontal overflow at the tool-reported viewport | Responsive layout inspection. A requested 390-pixel override was not honored by the embedded browser, which reported 834 pixels, so a 390-pixel device test is not claimed. |
-| Pitch | All nine slides inspected in browser; no content outside slide bounds | Rendered deck readability and layout. |
+| Python regression suite | 225 passed in 32.23 seconds wall time (32.155 seconds pytest time) on the current working tree. JUnit report: [`python-suite-20261023.xml`](../integrations/native/evidence/python-suite-20261023.xml). Earlier, a clean source-package extraction verified 205 file hashes and passed 199 tests in 16.68 seconds. | Regression coverage for prototype policy, API, model contracts, device abstractions, security properties and packaging checks. Injected inputs and fixtures do not establish human or attack accuracy. |
+| Native Desktop build | Five-module Java 11 reactor build passed. Actual patched controller rejection and JavaFX preview/lifecycle checks passed. | The pinned Desktop source compiles and its acceptance checkpoints reject controlled synthetic inputs before storage/matching. It does not establish a full live camera-to-client workflow. |
+| Android Registration Client | Split app and test APK build passed; 17 instrumentation tests passed on the API 34 `NATIVE_PAD_API34` emulator. | Native model execution, signed fixture parsing, one-use storage acceptance, and policy-bound evidence checks on an emulator with cameras disabled. |
+| Reference camera SBI | App and test APK build passed; eight instrumentation tests passed on the same camera-disabled API 34 emulator. | Native model behavior, static-frame rejection, ISO/image binding, metadata handling, and no-camera failure. No successful human action is represented. |
+| Native package and source evidence | All five APK signatures, ZIP integrity, ABI/model/license checks passed. All three prepared client checkouts matched their expected files and patches; the evidence validator passed 26 checksum checks. | Reproducibility and artifact integrity for the recorded package set. It does not establish production signing trust or physical-device compatibility. |
 
-## Security regressions
+Raw native logs, package checksums, and source fingerprints are retained in [`integrations/native/evidence/policy-session-20261020`](../integrations/native/evidence/policy-session-20261020). The consolidated native report is [`integrations/native/validation.json`](../integrations/native/validation.json). The exact scope and remaining requirements are in the [requirement matrix](REQUIREMENTS_MATRIX.md) and [evaluation protocol](EVALUATION_PROTOCOL.md).
 
-The suite checks that an active action cannot override PAD attack or processing failure, mandatory operator/supervisor actions cannot be skipped by high passive scores, face loss clears partial evidence, terminal attack rejection cannot restart automatically, invalid pixel layouts and detector exceptions fail closed, strict ONNX errors cannot silently invoke heuristics, and invalid/nonfinite scores cannot pass.
+## Focused current-source checks
 
-API checks cover bearer/origin/hostname rejection, one capture owner, nonmutating preview, exact JPEG digest, post-capture image-reference clearing, invalid configuration atomicity, explicit simulated L1 disclosure, and the absence of automatic mock action completion. Model update checks cover metadata tampering, invalid versions, path traversal, persisted downgrade protection, explicit key requirements, and Ed25519 verification. Audit checks exercise nested redaction and hash linkage. Metric tests verify denominators and empty-data behavior.
+On 22 October, the Java 8 policy/session sources compiled with `javac --release 8`;
+`NativePadPolicyCheck` and `NativeActiveSessionCheck` passed. A synthetic
+camera-evidence fixture also completed a configured three-blink session and
+checked the resulting count, timeout and retry claims. Stub PAD/landmark types
+were used for this control-flow check, so it does not validate ONNX, OpenCV or a
+real camera.
 
-## Limits
+The updated cached-policy to SBI `customOpts` serializer and camera request
+reader also compiled with Java 8. `NativePadPolicyCheck` and
+`CameraSbiRequestPolicyCheck` passed the complete policy round-trip, typed
+intent mapping, defaults, partial/malformed-policy rejection and disabled
+policy checks using an in-memory request DTO. The test does not execute the
+patched official Registration Client or a built camera SBI.
 
-No physical L1 device, native MOSIP client E2E, human active-challenge completion, independent PAD dataset, ISO conformance evaluation, or Android performance/energy measurement is established by these checks. No camera subject or attack session is manufactured from a simulator label. The dataset evaluation tool has denominator tests, but it has not been run on a consented representative physical attack dataset.
+These two Java checks were rerun against the current working-tree sources on
+23 October; both passed with `javac --release 8`.
 
-## Native checkpoint follow-up
+The PAD evaluator now consumes a private master manifest with development and
+test rows. `scripts/pad_manifest.py` requires both classes in both splits and
+checks that participant and physical attack-source pseudonyms do not cross the
+split boundary. It also rejects duplicate clips and path traversal. Evaluation
+reports contain neither video paths nor group pseudonyms, and the threshold
+selector requires the passed split-audit marker. The manifest-integrity and
+threshold-provenance regressions are included in the 225-test suite. No clip
+data was available to calculate real APCER or BPCER.
 
-The additional [native validation report](../integrations/native/validation.json) records compilation of the patched official desktop reactor and execution of its actual resident and authentication controllers with synthetic ISO input. The identity matcher is an explicit test double, and the rejected inputs never reach it. The current attributed NASA portrait also rejects for missing active evidence; it does not clear the passive threshold after native image conversion. The earlier high-scoring portrait check is retained as historical evidence and used a fixture since removed for undocumented provenance. The Java inference check executes the packaged ONNX graph and compares its output with Python. The Android app and test APKs build, and 12 API 34 emulator tests pass in 63.239 seconds. The added tests execute the actual SBI response parser with real RSA verification through a fixture crypto provider, then exercise the actual onboarding API with native PAD and one-use storage acceptance. Tampering, untrusted fixture keys, transaction mismatch, replay, expiry, no-face inputs and failed persistence reject. Completed action metadata and certificate-chain trust are fixtures, and repositories are doubles. The separate reference camera SBI passes six emulator tests for actual models, static frames, ISO binding, orientation, metadata and no-camera failure. These are stronger integration checks than the standalone Java policy component, but do not establish complete native camera/UI workflows or physical attack accuracy. See the [native build notes](../integrations/native/README.md) for pins, reproducible preparation, and incomplete behavior.
+The Android Registration Client patch was prepared from a clean checkout at
+upstream commit `8f4643a694f3b5e66e0491f077a8630ab5667658`; the retained
+[preparation report](../integrations/native/evidence/android-prepared-20261023.json)
+verifies the exact patch and copied source/assets. The pinned patch sets the
+cached resident/operator policy on the outgoing face `CaptureRequest.customOpts`.
+Direct PAD checkpoint rejections display a generic retry message and return a
+sanitized Flutter error; face-capture SBI failures also use generic retry
+guidance. Detailed exceptions remain in internal logs. The reference SBI patch was checked against
+`d1ec22a542294b798f5b9c5bb97428deabb2064b`; preparation applied the parser
+normalization from standard JSON object to the pinned DAO's list-of-maps field
+and copied the current sources and tests. This confirms patch applicability and
+source preparation only; neither APK was rebuilt.
 
-The current desktop stream patch also passes 14 framing checks and checks against the actual upstream `Streamer`, including EOF rejection and disconnect cleanup. The reactor compiles after these changes. The Python suite passes all 120 tests after replacing inherited images with an attributed NASA fixture. Three rejection-handling tests now inject explicit attack verdicts; they test control flow, not the new photograph's attack detection accuracy. No model threshold was changed to force the new fixture to pass or fail.
+An earlier pinned Desktop client source build installed through the five
+reactor modules required by `registration-client`, with Maven tests skipped.
+On 23 October, the updated patch was applied to a clean checkout at the exact
+upstream commit and the five-module reactor compiled through `registration-client`.
+The builds used JDK 21 and a command-line Lombok 1.18.30 override because the
+workspace does not have JDK 11 and pinned Lombok 1.18.16 is not a reliable JDK
+21 compiler dependency. No pinned source or POM was changed for this override.
+The latest compile skipped the Git metadata plugin because its inherited
+`.git` path points inside child modules. The Desktop controller harness from
+the earlier build compiled, then the JVM crashed inside `onnxruntime.dll` while
+creating `OrtEnvironment` on this Windows/JDK 21 host. The earlier Java 11
+controller and preview results remain the only passing runtime-harness
+evidence; the latest compile does not establish current native PAD runtime
+behavior or live camera/UI acceptance.
 
-The pitch's evidence row now reflects the native checks. Its layout is unchanged. A fresh browser rendering check for that text revision was unavailable because local browser access was disabled in Work settings; the earlier deck revision had been visually reviewed.
+Python 3.12 syntax compilation passed for the changed evaluator, threshold
+selector, provider benchmark and device-contract files. An earlier focused
+device-capability import check used a minimal OpenCV shim; the later full pytest
+run passed with the locked dependencies, and the separate interoperability CLI
+ran with OpenCV installed. Neither validates physical vendor devices. `git diff --check` and
+`git apply --stat integrations/native/camera-sbi.patch` and `git apply --check`
+against the exact camera-SBI checkout also passed.
 
-GitHub Actions run [39144395667](https://github.com/car-ui/mosip-face-liveness-pad/actions/runs/39144395667) completed successfully for code commit `ad9be3392396fc2d02a122b16df6a4e0eb8f4cb7`. Both `test (ubuntu-latest)` and `test (windows-latest)` succeeded. The status was read from GitHub's authenticated API. The source ZIP for that commit contained 80 tracked files plus its release manifest, passed ZIP integrity and all 80 per-file SHA-256 checks, and passed all 119 Python tests after fresh extraction. Final evidence-only commits can change document/archive hashes without changing the tested implementation.
+The provider benchmark ran on 23 October with ONNX Runtime 1.31.0. CPU and
+Azure providers returned identical outputs (maximum absolute difference 0.0).
+The profile assigned all 14,300 nodes to CPU and none to Azure, so no
+accelerated execution was observed. CPU p50/p95 were 1.5871/2.1148 ms; Azure
+provider-request p50/p95 were 6.9766/23.8105 ms, including CPU fallback. The
+raw report and profile are retained under
+[`integrations/native/evidence/provider-benchmark-20261023`](../integrations/native/evidence/provider-benchmark-20261023).
+This desktop result does not measure Android GPU/NPU/NNAPI or prove hardware
+acceleration.
 
-## CPU model timing
+The focused evaluation, interoperability and usability-protocol selection
+passed 14 tests on 23 October. The capability CLI report is retained at
+[`integrations/native/evidence/interoperability-20261023.json`](../integrations/native/evidence/interoperability-20261023.json).
+It validates the webcam interface contract, mock adapter and two simulated
+vendor adapters; it does not open the physical webcam or establish real vendor
+support.
 
-A separate warm benchmark ran 100 evaluations after ten warmups using one synthetic 80x80 crop, ONNX Runtime CPU, and two inference threads. Median evaluation time was 2.63 ms and p95 was 3.70 ms. This includes model preprocessing but excludes camera IO, face detection, full-workflow latency, Android performance, and attack accuracy. Exact measurements are in `model-runtime-benchmark.json`.
+The current working-tree source archive was generated and independently
+verified by `scripts/package_release.py --worktree`; its manifest covers the
+included files and the ZIP checksum is reported by the script. This does not
+package or validate native application binaries.
 
-## Browser verification expiry
+This working folder has no system Gradle, Android SDK or `adb`. A temporary
+Maven 3.9.9 distribution was used for the successful Desktop source build. The
+updated Android patches could not be rebuilt here, and retained APK evidence is
+for the earlier source milestone.
 
-The packaged model scored the synthetic replay fixture highly, so it is not a demonstrated passive replay detector. Motion/action checks prevented acceptance. Browser testing also exposed transparent retries of HTTP 408. Verification expiry now returns HTTP 200 with `responseStatus: TIMEOUT` and empty biometrics. After the fix, one 30-second browser attempt completed, the Start verification button became available, metrics showed exactly one TIMEOUT session, and `captureBusy` was false. No automatic second capture started.
+## Automated coverage
+
+The Python suite includes regressions for PAD attack/error veto during active verification, mandatory operator/supervisor actions, face loss, terminal rejection, invalid frame data, detector/model failures, concurrency, preview non-mutation, policy validation, secure model updates, audit redaction, retry/timeout behavior, and explicit simulator labeling. Java and native tests additionally exercise session/role binding, replay rejection, exact-image digest binding, one-use acceptance, signed transaction evidence, malformed policy rejection, and bounded image/frame parsing.
+
+Model conversion and runtime checks compare packaged ONNX behavior with declared reference outputs. These are model/runtime compatibility checks, not bona fide-versus-attack accuracy measurements. Historical figures are retained in the model benchmark and research notes with their narrower scope.
+
+## Not established by these checks
+
+- Physical L0/L1 device integration, multiple real vendors, or signed hardware attestation.
+- Representative, consented print, display, mask, or injection evaluation with frozen thresholds and held-out subjects.
+- Successful live action detection in the Desktop or Android client, full camera-to-storage UI flows, or real identity matching.
+- Production certificate-chain provisioning/trust, formal SBI conformance, ISO image conformance, or authenticated online policy synchronization.
+- Human accessibility/usability, sustained physical Android latency, RAM, power or thermal behavior.
+- A recorded demo video or final external submission artifacts.
+
+See [`LOCAL_DELIVERY_STATUS.md`](LOCAL_DELIVERY_STATUS.md) for the latest delivery summary and [`DEMO_AND_SUBMISSION.md`](DEMO_AND_SUBMISSION.md) for the outstanding submission work.

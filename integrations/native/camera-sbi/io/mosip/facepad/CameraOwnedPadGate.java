@@ -12,13 +12,19 @@ public final class CameraOwnedPadGate implements AutoCloseable {
     private boolean closed;
 
     public CameraOwnedPadGate(Context context, long timeoutMillis) throws Exception {
+        this(context, timeoutMillis, NativePadPolicy.defaults(NativePadPolicy.Workflow.OPERATOR));
+    }
+
+    public CameraOwnedPadGate(Context context, long timeoutMillis, NativePadPolicy policy) throws Exception {
         if (!OpenCVLoader.initLocal()) throw new IOException("OpenCV unavailable");
+        if (policy == null || !policy.enabled || !policy.activeEnabled || !policy.activeRequired)
+            throw new IOException("Mandatory camera PAD policy unavailable");
         NativePadEngine loadedPad = null;
         NativeLandmarkEngine loadedLandmarks = null;
         try {
             loadedPad = new NativePadEngine(asset(context,"minifasnet_v2.onnx"),asset(context,"face_detection_yunet_2023mar.onnx"));
             loadedLandmarks = new NativeLandmarkEngine(asset(context,"facemesh_v2.onnx"));
-            active = new NativeFrameChallenge(loadedPad,loadedLandmarks,timeoutMillis);
+            active = new NativeFrameChallenge(loadedPad,loadedLandmarks,timeoutMillis,policy);
             pad = loadedPad; landmarks = loadedLandmarks;
         } catch (Exception | LinkageError failure) {
             if (loadedLandmarks != null) loadedLandmarks.close();
@@ -44,6 +50,9 @@ public final class CameraOwnedPadGate implements AutoCloseable {
     public synchronized String prompt() { return closed?"Camera stopped":active.prompt(); }
     public synchronized boolean consume(byte[] exactCameraJpeg) throws Exception {
         return !closed && active.consume(exactCameraJpeg);
+    }
+    public synchronized NativeActiveSession.Attestation consumeAndAttest(byte[] exactCameraJpeg) throws Exception {
+        return closed ? null : active.consumeAndAttest(exactCameraJpeg);
     }
     @Override public synchronized void close() throws Exception {
         if(closed)return;

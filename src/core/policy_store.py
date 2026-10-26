@@ -7,7 +7,8 @@ import tempfile
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from .config import LivenessConfig, WorkflowType, PADMode, ChallengeType
+from .config import (LivenessConfig, WorkflowType, PADMode, ChallengeType,
+                     MIN_PASSIVE_THRESHOLD, MAX_PASSIVE_THRESHOLD)
 
 
 class PolicyUpdate(BaseModel):
@@ -15,7 +16,8 @@ class PolicyUpdate(BaseModel):
     liveness_enabled: bool | None = None
     guidance_messages: dict[str, str] | None = Field(default=None, max_length=16)
     workflow: WorkflowType = WorkflowType.RESIDENT_REGISTRATION
-    passive_threshold: float | None = Field(default=None, ge=.46, le=.99)
+    passive_threshold: float | None = Field(default=None, ge=MIN_PASSIVE_THRESHOLD,
+                                            le=MAX_PASSIVE_THRESHOLD)
     min_challenges: int | None = Field(default=None, ge=1, le=5)
     challenge_timeout: float | None = Field(default=None, ge=2, le=30)
     max_retries: int | None = Field(default=None, ge=0, le=5)

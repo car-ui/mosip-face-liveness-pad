@@ -1,5 +1,5 @@
 diff --git a/registration/registration-client/pom.xml b/registration/registration-client/pom.xml
-index a039aeb1b6..8b5a5d28b5 100644
+index a039aeb..8b5a5d2 100644
 --- a/registration/registration-client/pom.xml
 +++ b/registration/registration-client/pom.xml
 @@ -19,6 +19,8 @@
@@ -12,7 +12,7 @@ index a039aeb1b6..8b5a5d28b5 100644
  			<groupId>io.mosip.registration</groupId>
  			<artifactId>registration-services</artifactId>
 diff --git a/registration/registration-client/src/main/java/io/mosip/registration/controller/BaseController.java b/registration/registration-client/src/main/java/io/mosip/registration/controller/BaseController.java
-index 45403104ff..51242f4f5c 100644
+index 4540310..51242f4 100644
 --- a/registration/registration-client/src/main/java/io/mosip/registration/controller/BaseController.java
 +++ b/registration/registration-client/src/main/java/io/mosip/registration/controller/BaseController.java
 @@ -1682,6 +1682,11 @@ public class BaseController {
@@ -36,7 +36,7 @@ index 45403104ff..51242f4f5c 100644
  		if (match && isPacketAuth) {
  			addOperatorBiometrics(biometrics, isReviewer);
 diff --git a/registration/registration-client/src/main/java/io/mosip/registration/controller/auth/AuthenticationController.java b/registration/registration-client/src/main/java/io/mosip/registration/controller/auth/AuthenticationController.java
-index 29401ee938..9a223a6345 100644
+index 29401ee..9a223a6 100644
 --- a/registration/registration-client/src/main/java/io/mosip/registration/controller/auth/AuthenticationController.java
 +++ b/registration/registration-client/src/main/java/io/mosip/registration/controller/auth/AuthenticationController.java
 @@ -166,6 +166,7 @@ public class AuthenticationController extends BaseController implements Initiali
@@ -88,8 +88,182 @@ index 29401ee938..9a223a6345 100644
  				break;
  			default:
  		}
+diff --git a/registration/registration-client/src/main/java/io/mosip/registration/controller/auth/LoginController.java b/registration/registration-client/src/main/java/io/mosip/registration/controller/auth/LoginController.java
+index bc67587..071da53 100644
+--- a/registration/registration-client/src/main/java/io/mosip/registration/controller/auth/LoginController.java
++++ b/registration/registration-client/src/main/java/io/mosip/registration/controller/auth/LoginController.java
+@@ -10,6 +10,7 @@ import java.net.URISyntaxException;
+ import java.net.URL;
+ import java.sql.Timestamp;
+ import java.util.ArrayList;
++import java.util.HashSet;
+ import java.util.List;
+ import java.util.Optional;
+ import java.util.ResourceBundle;
+@@ -43,6 +44,7 @@ import io.mosip.registration.dto.ErrorResponseDTO;
+ import io.mosip.registration.dto.LoginUserDTO;
+ import io.mosip.registration.dto.ResponseDTO;
+ import io.mosip.registration.dto.UserDTO;
++import io.mosip.registration.dto.UserRoleDTO;
+ import io.mosip.registration.dto.mastersync.GenericDto;
+ import io.mosip.registration.enums.Role;
+ import io.mosip.registration.exception.RegBaseCheckedException;
+@@ -172,6 +174,12 @@ public class LoginController extends BaseController implements Initializable {
+ 	@FXML
+ 	private ImageView faceImage;
+ 
++	@FXML
++	private Label faceLivenessPrompt;
++
++	@FXML
++	private Button faceScanButton;
++
+ 	@FXML
+ 	private ImageView mosipLogoImageView;
+ 
+@@ -230,6 +238,10 @@ public class LoginController extends BaseController implements Initializable {
+ 		setImage(fingerprintImageView	, RegistrationConstants.FINGERPRINT_SCAN_IMG);
+ 		setImage(faceImage	, RegistrationConstants.FACE_SCAN_IMG);
+ 		setImage(irisImageView	, RegistrationConstants.EYE_SCAN_IMG);
++		faceLivenessPrompt.textProperty().bind(streamer.challengePromptProperty());
++		faceScanButton.setDisable(true);
++		streamer.challengePromptProperty().addListener((property, before, after) ->
++				faceScanButton.setDisable(!"Actions complete. Capturing face...".equals(after)));
+ 		
+ 
+ 		new Thread(() -> {
+@@ -597,15 +609,42 @@ public class LoginController extends BaseController implements Initializable {
+ 	}
+ 
+ 	public void streamFace() {
+-
++		if (userId.getText() == null || userId.getText().trim().isEmpty()) {
++			generateAlert(RegistrationConstants.ERROR, RegistrationUIConstants
++					.getMessageLanguageSpecific(RegistrationUIConstants.USERNAME_FIELD_EMPTY));
++			return;
++		}
+ 		try {
+-			streamer.startStream(bioService.getStream(RegistrationConstants.FACE_FULLFACE), faceImage, null);
+-		} catch (RegBaseCheckedException regBaseCheckedException) {
++			UserDTO userDTO = loginService.getUserDetail(userId.getText());
++			io.mosip.facepad.NativePadPolicy.Workflow workflow = faceCaptureWorkflow(userDTO);
++			faceImage.setImage(null);
++			faceScanButton.setDisable(true);
++			streamer.startActiveStream(bioService.getStream(RegistrationConstants.FACE_FULLFACE), faceImage, workflow);
++		} catch (RegBaseCheckedException | IOException regBaseCheckedException) {
+ 			LOGGER.error(LoggerConstants.LOG_REG_LOGIN, APPLICATION_NAME, APPLICATION_ID,
+ 					ExceptionUtils.getStackTrace(regBaseCheckedException));
++			generateAlert(RegistrationConstants.ERROR, RegistrationUIConstants
++					.getMessageLanguageSpecific(RegistrationUIConstants.BIOMETRIC_SCANNING_ERROR));
++		} catch (RuntimeException runtimeException) {
++			LOGGER.error(LoggerConstants.LOG_REG_LOGIN, APPLICATION_NAME, APPLICATION_ID,
++					ExceptionUtils.getStackTrace(runtimeException));
++			generateAlert(RegistrationConstants.ERROR, RegistrationUIConstants
++					.getMessageLanguageSpecific(RegistrationUIConstants.BIOMETRIC_SCANNING_ERROR));
+ 		}
+ 	}
+ 
++	private io.mosip.facepad.NativePadPolicy.Workflow faceCaptureWorkflow(UserDTO userDTO) throws IOException {
++		if (userDTO != null && userDTO.getUserRole() != null) {
++			Set<String> roles = new HashSet<>();
++			for (UserRoleDTO role : userDTO.getUserRole()) {
++				if (role != null && role.isActive()) roles.add(String.valueOf(role.getRoleCode()));
++			}
++			if (Role.hasSupervisorRole(roles)) return io.mosip.facepad.NativePadPolicy.Workflow.SUPERVISOR;
++			if (Role.hasOperatorRole(roles)) return io.mosip.facepad.NativePadPolicy.Workflow.OPERATOR;
++		}
++		throw new IOException("PAD: face login requires an active operator or supervisor role");
++	}
++
+ 	/**
+ 	 * Validate User through username and fingerprint
+ 	 * 
+@@ -658,6 +697,13 @@ public class LoginController extends BaseController implements Initializable {
+ 	 * @param event event to capture face
+ 	 */
+ 	public void captureFace(ActionEvent event) {
++		io.mosip.facepad.NativeFrameChallenge challenge = streamer.getFrameChallenge();
++		if (challenge == null || challenge.state() != io.mosip.facepad.NativeActiveSession.State.COMPLETE) {
++			faceScanButton.setDisable(true);
++			generateAlert(RegistrationConstants.ERROR, RegistrationUIConstants
++					.getMessageLanguageSpecific(RegistrationUIConstants.BIOMETRIC_SCANNING_ERROR));
++			return;
++		}
+ 
+ 		auditFactory.audit(AuditEvent.LOGIN_WITH_FACE, Components.LOGIN, userId.getText(),
+ 				AuditReferenceIdTypes.USER_ID.getReferenceTypeId());
+@@ -665,17 +711,41 @@ public class LoginController extends BaseController implements Initializable {
+ 		LOGGER.info(LoggerConstants.LOG_REG_LOGIN, APPLICATION_NAME, APPLICATION_ID, "Capturing face for validation");
+ 
+ 		UserDTO userDTO = loginService.getUserDetail(userId.getText());
++		final io.mosip.facepad.NativePadPolicy.Workflow workflow;
++		try {
++			workflow = faceCaptureWorkflow(userDTO);
++		} catch (IOException exception) {
++			faceScanButton.setDisable(true);
++			generateAlert(RegistrationConstants.ERROR, RegistrationUIConstants
++					.getMessageLanguageSpecific(RegistrationUIConstants.BIOMETRIC_SCANNING_ERROR));
++			return;
++		}
++		faceScanButton.setDisable(true);
+ 
+ 		AuthenticationValidatorDTO authenticationValidatorDTO = new AuthenticationValidatorDTO();
+ 		authenticationValidatorDTO.setUserId(userId.getText());
+ 
++		SessionContext.FaceCaptureGate faceCaptureGate = (candidates, authenticatedUser) -> {
++			io.mosip.facepad.NativePadPolicy.Workflow currentWorkflow = faceCaptureWorkflow(authenticatedUser);
++			if (workflow != currentWorkflow) throw new IOException("PAD: user role changed during face authentication");
++			io.mosip.facepad.DesktopPadCheckpoint.requireClear(candidates, currentWorkflow, challenge);
++		};
+ 		executeValidationTask(userDTO, RegistrationConstants.FACE, false, false, authenticationValidatorDTO, facePane,
+-				faceProgressIndicator, RegistrationUIConstants.getMessageLanguageSpecific(RegistrationUIConstants.FACE_MATCH), RegistrationConstants.FACE);
++				faceProgressIndicator, RegistrationUIConstants.getMessageLanguageSpecific(RegistrationUIConstants.FACE_MATCH),
++				RegistrationConstants.FACE, faceCaptureGate);
+ 	}
+ 
+ 	private void executeValidationTask(UserDTO userDTO, String loginMethod, boolean isInitialSetUp,
+ 			boolean isUserNewToMachine, AuthenticationValidatorDTO authenticationValidatorDTO, AnchorPane pane,
+ 			ProgressIndicator progressIndicator, String errorMessage, String loginMode) {
++		executeValidationTask(userDTO, loginMethod, isInitialSetUp, isUserNewToMachine,
++				authenticationValidatorDTO, pane, progressIndicator, errorMessage, loginMode, null);
++	}
++
++	private void executeValidationTask(UserDTO userDTO, String loginMethod, boolean isInitialSetUp,
++			boolean isUserNewToMachine, AuthenticationValidatorDTO authenticationValidatorDTO, AnchorPane pane,
++			ProgressIndicator progressIndicator, String errorMessage, String loginMode,
++			SessionContext.FaceCaptureGate faceCaptureGate) {
+ 		pane.setDisable(true);
+ 		progressIndicator.setVisible(true);
+ 
+@@ -692,7 +762,7 @@ public class LoginController extends BaseController implements Initializable {
+ 					protected Boolean call() {
+ 						try {
+ 							return SessionContext.create(userDTO, loginMethod, isInitialSetUp, isUserNewToMachine,
+-									authenticationValidatorDTO);
++									authenticationValidatorDTO, faceCaptureGate);
+ 						} catch (RegBaseCheckedException | IOException exception) {
+ 							LOGGER.error(LoggerConstants.LOG_REG_LOGIN, APPLICATION_NAME, APPLICATION_ID,
+ 									"Exception while getting the scanned biometrics for user login: caused by "
+@@ -711,6 +781,10 @@ public class LoginController extends BaseController implements Initializable {
+ 		taskService.setOnSucceeded(new EventHandler<WorkerStateEvent>() {
+ 			@Override
+ 			public void handle(WorkerStateEvent workerStateEvent) {
++				if (faceCaptureGate != null) {
++					streamer.setUrlStream(null);
++					faceScanButton.setDisable(true);
++				}
+ 				boolean bioLoginStatus = false;
+ 				if (taskService.getValue()) {
+ 					bioLoginStatus = validateInvalidLogin(userDTO, "");
+@@ -1025,4 +1099,4 @@ public class LoginController extends BaseController implements Initializable {
+ 		}
+ 
+ 	}
+-}
+\ No newline at end of file
++}
 diff --git a/registration/registration-client/src/main/java/io/mosip/registration/controller/device/BiometricsController.java b/registration/registration-client/src/main/java/io/mosip/registration/controller/device/BiometricsController.java
-index 6e8fae980b..2b9e96790c 100644
+index 6e8fae9..2b9e967 100644
 --- a/registration/registration-client/src/main/java/io/mosip/registration/controller/device/BiometricsController.java
 +++ b/registration/registration-client/src/main/java/io/mosip/registration/controller/device/BiometricsController.java
 @@ -951,7 +951,12 @@ public class BiometricsController extends BaseController /* implements Initializ
@@ -120,7 +294,7 @@ index 6e8fae980b..2b9e96790c 100644
  	}
  
 diff --git a/registration/registration-client/src/main/java/io/mosip/registration/controller/device/GenericBiometricsController.java b/registration/registration-client/src/main/java/io/mosip/registration/controller/device/GenericBiometricsController.java
-index e3e0bf37d1..84a7d93960 100644
+index e3e0bf3..84a7d93 100644
 --- a/registration/registration-client/src/main/java/io/mosip/registration/controller/device/GenericBiometricsController.java
 +++ b/registration/registration-client/src/main/java/io/mosip/registration/controller/device/GenericBiometricsController.java
 @@ -506,7 +506,12 @@ public class GenericBiometricsController extends BaseController {
@@ -160,7 +334,7 @@ index e3e0bf37d1..84a7d93960 100644
  	}
  
 diff --git a/registration/registration-client/src/main/java/io/mosip/registration/controller/device/Streamer.java b/registration/registration-client/src/main/java/io/mosip/registration/controller/device/Streamer.java
-index 105567a999..ec25b71ea8 100644
+index 105567a..ec25b71 100644
 --- a/registration/registration-client/src/main/java/io/mosip/registration/controller/device/Streamer.java
 +++ b/registration/registration-client/src/main/java/io/mosip/registration/controller/device/Streamer.java
 @@ -3,197 +3,163 @@ package io.mosip.registration.controller.device;
@@ -511,8 +685,116 @@ index 105567a999..ec25b71ea8 100644
 +        streamer_thread = null;
 +    }
  }
+diff --git a/registration/registration-client/src/main/java/io/mosip/registration/controller/eodapproval/EODAuthenticationController.java b/registration/registration-client/src/main/java/io/mosip/registration/controller/eodapproval/EODAuthenticationController.java
+index 232c791..c4ab9b7 100644
+--- a/registration/registration-client/src/main/java/io/mosip/registration/controller/eodapproval/EODAuthenticationController.java
++++ b/registration/registration-client/src/main/java/io/mosip/registration/controller/eodapproval/EODAuthenticationController.java
+@@ -128,6 +128,8 @@ public class EODAuthenticationController extends BaseController implements Initi
+ 	@FXML
+ 	private ImageView faceScanImageView;
+ 	@FXML
++	private Button faceScanBtn;
++	@FXML
+ 	private ImageView exitWindowImgVwAuthPageTitle;
+ 	@FXML
+ 	private GridPane progressIndicatorPane;
+@@ -136,6 +138,8 @@ public class EODAuthenticationController extends BaseController implements Initi
+ 	@FXML
+ 	private ImageView faceImage;
+ 	@FXML
++	private Label faceLivenessPrompt;
++	@FXML
+ 	private GridPane authenticaion;
+ 
+ 	@Autowired
+@@ -180,6 +184,12 @@ public class EODAuthenticationController extends BaseController implements Initi
+ 		setImage(faceStreamImageView, RegistrationConstants.SCAN_IMG);
+ 		setImage(faceScanImageView, RegistrationConstants.SCAN_IMG);
+ 		setImage(exitWindowImgVwAuthPageTitle, RegistrationConstants.CLOSE_IMG);
++		faceScanBtn.setDisable(true);
++		streamer.challengePromptProperty().addListener((property, before, after) -> {
++			boolean ready = "Actions complete. Capturing face...".equals(after);
++			faceScanBtn.setDisable(!ready);
++		});
++		faceLivenessPrompt.textProperty().bind(streamer.challengePromptProperty());
+ 
+ 		int otpExpirySeconds = Integer
+ 				.parseInt((getValueFromApplicationContext(RegistrationConstants.OTP_EXPIRY_TIME)).trim());
+@@ -596,9 +606,12 @@ public class EODAuthenticationController extends BaseController implements Initi
+ 
+ 	@FXML
+ 	private void startStream() {
++		if (!validateInput(faceUserId, null)) return;
+ 		faceImage.setImage(null);
++		faceScanBtn.setDisable(true);
+ 		try {
+-			streamer.startStream(bioService.getStream(RegistrationConstants.FACE_FULLFACE), faceImage, null);
++			streamer.startActiveStream(bioService.getStream(RegistrationConstants.FACE_FULLFACE), faceImage,
++					io.mosip.facepad.NativePadPolicy.Workflow.SUPERVISOR);
+ 		} catch (RegBaseCheckedException regBaseCheckedException) {
+ 			LOGGER.error(LoggerConstants.LOG_REG_LOGIN, APPLICATION_NAME, APPLICATION_ID,
+ 					ExceptionUtils.getStackTrace(regBaseCheckedException));
+@@ -620,11 +633,19 @@ public class EODAuthenticationController extends BaseController implements Initi
+ 		LOGGER.info("Validating Face for Face based Authentication");
+ 
+ 		if (validateInput(faceUserId, null)) {
+-			executeFaceValidationTask(faceUserId.getText(), faceBasedLogin);
++			io.mosip.facepad.NativeFrameChallenge challenge = streamer.getFrameChallenge();
++			if (challenge == null || challenge.state() != io.mosip.facepad.NativeActiveSession.State.COMPLETE) {
++				generateAlert(RegistrationConstants.ERROR, RegistrationUIConstants
++						.getMessageLanguageSpecific(RegistrationUIConstants.BIOMETRIC_SCANNING_ERROR));
++				return;
++			}
++			faceScanBtn.setDisable(true);
++			executeFaceValidationTask(faceUserId.getText(), faceBasedLogin, challenge);
+ 		}
+ 	}
+ 
+-	private void executeFaceValidationTask(String userId, GridPane pane) {
++	private void executeFaceValidationTask(String userId, GridPane pane,
++			io.mosip.facepad.NativeFrameChallenge challenge) {
+ 		pane.setDisable(true);
+ 		progressIndicatorPane.setVisible(true);
+ 		progressIndicator.setVisible(true);
+@@ -641,7 +662,7 @@ public class EODAuthenticationController extends BaseController implements Initi
+ 					@Override
+ 					protected Boolean call() {
+ 						try {
+-							return captureAndValidateFace(userId, false, false);
++							return captureAndValidateFace(userId, false, true, challenge);
+ 						} catch (RegBaseCheckedException | IOException exception) {
+ 							LOGGER.error("AuthenticationController", APPLICATION_NAME, APPLICATION_ID,
+ 									"Exception while getting the scanned biometrics for user authentication: caused by "
+@@ -723,4 +744,4 @@ public class EODAuthenticationController extends BaseController implements Initi
+ 		userNameField = userId.getText();
+ 		return true;
+ 	}
+-}
+\ No newline at end of file
++}
+diff --git a/registration/registration-client/src/main/resources/fxml/Authentication.fxml b/registration/registration-client/src/main/resources/fxml/Authentication.fxml
+index d6c516f..9237c92 100644
+--- a/registration/registration-client/src/main/resources/fxml/Authentication.fxml
++++ b/registration/registration-client/src/main/resources/fxml/Authentication.fxml
+@@ -648,6 +648,7 @@
+                                              </children>
+                                           </GridPane>
+                                           <TextField fx:id="faceUserId" promptText="%username" styleClass="authenticationStyle" />
++                                          <Label fx:id="faceLivenessPrompt" maxWidth="380.0" styleClass="operatorAuthenticationStyleTextTypeOne" text="%faceinstruction" wrapText="true" GridPane.rowIndex="3" />
+                                           <HBox alignment="TOP_CENTER" prefHeight="100.0" prefWidth="200.0" spacing="10.0" GridPane.rowIndex="4">
+                                              <children>
+                                                 <Button fx:id="faceStreamButton" mnemonicParsing="false" onAction="#startStream" styleClass="scanButton" text="%stream">
+@@ -659,7 +660,7 @@
+                                                       </ImageView>
+                                                    </graphic>
+                                                 </Button>
+-                                                <Button fx:id="faceScanBtn" mnemonicParsing="false" onAction="#validateFace" styleClass="scanButton" text="%scan">
++                                                <Button fx:id="faceScanBtn" disable="true" mnemonicParsing="false" onAction="#validateFace" styleClass="scanButton" text="%scan">
+                                                    <graphic>
+                                                       <ImageView fx:id="faceScanImageView" fitHeight="15.0" fitWidth="15.0" layoutY="25.0" pickOnBounds="true" preserveRatio="true">
+                                                          <image>
 diff --git a/registration/registration-client/src/main/resources/fxml/OperatorAuthentication.fxml b/registration/registration-client/src/main/resources/fxml/OperatorAuthentication.fxml
-index eafc0011b9..59bc116ca9 100644
+index eafc001..59bc116 100644
 --- a/registration/registration-client/src/main/resources/fxml/OperatorAuthentication.fxml
 +++ b/registration/registration-client/src/main/resources/fxml/OperatorAuthentication.fxml
 @@ -852,7 +852,7 @@
@@ -524,3 +806,101 @@ index eafc0011b9..59bc116ca9 100644
  																	</children>
  																	<columnConstraints>
  																		<ColumnConstraints hgrow="SOMETIMES" minWidth="10.0" prefWidth="100.0" />
+diff --git a/registration/registration-client/src/main/resources/fxml/RegistrationLogin.fxml b/registration/registration-client/src/main/resources/fxml/RegistrationLogin.fxml
+index 54c85f0..cdf51e0 100644
+--- a/registration/registration-client/src/main/resources/fxml/RegistrationLogin.fxml
++++ b/registration/registration-client/src/main/resources/fxml/RegistrationLogin.fxml
+@@ -93,8 +93,9 @@
+           <children>
+             <Label styleClass="higlightedLoginLable" text="%registrationlogin" AnchorPane.leftAnchor="35.0" AnchorPane.topAnchor="14.0" />
+             <Label layoutX="35.0" layoutY="71.0" text="%withface" />
+-            <Button layoutX="134.0" layoutY="474.0" mnemonicParsing="false" onAction="#captureFace" styleClass="loginSubmitStyle1" text="%submit" />
++            <Button fx:id="faceScanButton" disable="true" layoutX="134.0" layoutY="474.0" mnemonicParsing="false" onAction="#captureFace" styleClass="loginSubmitStyle1" text="%submit" />
+             <Button layoutX="217.0" layoutY="474.0" mnemonicParsing="false" onAction="#streamFace" styleClass="loginSubmitStyle1" text="Stream" />
++            <Label fx:id="faceLivenessPrompt" layoutX="38.0" layoutY="92.0" prefWidth="378.0" text="%faceinstruction" wrapText="true" />
+             <ImageView fx:id="faceImage" fitHeight="353.0" fitWidth="378.0" layoutX="38.0" layoutY="113.0" pickOnBounds="true" preserveRatio="true">
+               <image>
+                 <Image url="@../images/FaceScan.png" />
+diff --git a/registration/registration-services/src/main/java/io/mosip/registration/context/SessionContext.java b/registration/registration-services/src/main/java/io/mosip/registration/context/SessionContext.java
+index e61bfd0..045af75 100644
+--- a/registration/registration-services/src/main/java/io/mosip/registration/context/SessionContext.java
++++ b/registration/registration-services/src/main/java/io/mosip/registration/context/SessionContext.java
+@@ -45,6 +45,10 @@ import javax.validation.constraints.NotNull;
+  *
+  */
+ public class SessionContext {
++	/** Client supplied PAD checkpoint for face authentication captures. */
++	public interface FaceCaptureGate {
++		void validate(List<BiometricsDto> candidates, UserDTO authenticatedUser) throws IOException;
++	}
+ 
+ 	/**
+ 	 * Instance of {@link Logger}
+@@ -138,6 +142,13 @@ public class SessionContext {
+ 	public static boolean create(UserDTO userDTO, String loginMethod, boolean isInitialSetUp,
+ 								 boolean isUserNewToMachine, AuthenticationValidatorDTO authenticationValidatorDTO)
+ 			throws RegBaseCheckedException, IOException {
++		return create(userDTO, loginMethod, isInitialSetUp, isUserNewToMachine, authenticationValidatorDTO, null);
++	}
++
++	public static boolean create(UserDTO userDTO, String loginMethod, boolean isInitialSetUp,
++								 boolean isUserNewToMachine, AuthenticationValidatorDTO authenticationValidatorDTO,
++								 FaceCaptureGate faceCaptureGate)
++			throws RegBaseCheckedException, IOException {
+ 		LOGGER.debug("Entering into creating Session Context");
+ 
+ 		Set<String> roleList = new LinkedHashSet<>();
+@@ -167,11 +178,11 @@ public class SessionContext {
+ 				return validateInitialLogin(userDTO, loginMethod);
+ 			} else {
+ 				return validateAuthMethods(userDTO, loginMethod, authenticationValidatorDTO,
+-						isUserNewToMachine);
++						isUserNewToMachine, faceCaptureGate);
+ 			}
+ 		} else {
+ 			return validateAuthMethods(userDTO, loginMethod, authenticationValidatorDTO,
+-					isInitialSetUp || isUserNewToMachine);
++					isInitialSetUp || isUserNewToMachine, faceCaptureGate);
+ 		}
+ 	}
+ 
+@@ -227,7 +238,8 @@ public class SessionContext {
+ 	 * @throws RegBaseCheckedException
+ 	 */
+ 	private static boolean validateAuthMethods(UserDTO userDTO, String loginMethod,
+-			AuthenticationValidatorDTO authenticationValidatorDTO, boolean skipAuthModes)
++			AuthenticationValidatorDTO authenticationValidatorDTO, boolean skipAuthModes,
++			FaceCaptureGate faceCaptureGate)
+ 			throws RegBaseCheckedException, IOException {
+ 		switch (loginMethod) {
+ 		case RegistrationConstants.PWORD:
+@@ -239,7 +251,7 @@ public class SessionContext {
+ 		case RegistrationConstants.IRIS:
+ 			return validateIris(loginMethod, userDTO, authenticationValidatorDTO);
+ 		case RegistrationConstants.FACE:
+-			return validateFace(loginMethod, userDTO, authenticationValidatorDTO);
++			return validateFace(loginMethod, userDTO, authenticationValidatorDTO, faceCaptureGate);
+ 		default:
+ 		}
+ 		return false;
+@@ -417,7 +429,11 @@ public class SessionContext {
+ 	 */
+ 	//TODO fetch environment for MDM request from applicationContext
+ 	private static boolean validateFace(String loginMethod, UserDTO userDTO,
+-			AuthenticationValidatorDTO authenticationValidatorDTO) throws RegBaseCheckedException, IOException {
++			AuthenticationValidatorDTO authenticationValidatorDTO, FaceCaptureGate faceCaptureGate)
++			throws RegBaseCheckedException, IOException {
++		if (faceCaptureGate == null) {
++			throw new IOException("PAD: face login requires a client capture gate");
++		}
+ 		BioService bioService = applicationContext.getBean(BioService.class);
+ 		AuthenticationService authService = applicationContext.getBean(AuthenticationService.class);
+ 		
+@@ -427,6 +443,7 @@ public class SessionContext {
+ 				.getIntValueFromApplicationMap(RegistrationConstants.FACE_THRESHOLD));
+ 		
+ 		List<BiometricsDto> biometrics = bioService.captureModalityForAuth(mdmRequestDto);
++		faceCaptureGate.validate(biometrics, userDTO);
+ 		if(authService.authValidator(authenticationValidatorDTO.getUserId(), BiometricType.FACE.value(), biometrics)) {
+ 			createSessionContext();
+ 			SessionContext.authTokenDTO().setLoginMode(loginMethod);

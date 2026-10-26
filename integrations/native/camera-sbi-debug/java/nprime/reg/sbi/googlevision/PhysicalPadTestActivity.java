@@ -80,13 +80,24 @@ public final class PhysicalPadTestActivity extends AppCompatActivity {
             byte[] iso=data.getByteArrayExtra("IsoFaceRecord");String raw=data.getStringExtra("FacePadEvidence");
             if(iso!=null && iso.length>0 && iso.length<=8*1024*1024 && raw!=null && raw.length()<4096) {
                 JSONObject proof=new JSONObject(raw);long now=System.currentTimeMillis();
-                accepted="COMPLETE".equals(proof.opt("state")) && "CAMERA2_JPEG_V1".equals(proof.opt("source"))
-                    && proof.optInt("version")==1 && proof.optInt("actionCount")==2
+                long started=proof.optLong("sessionStartedAtMillis",0),completed=proof.optLong("completedAtMillis",0);
+                long duration=completed-started,timeout=proof.optLong("sessionTimeoutMillis",0);
+                int retryLimit=proof.optInt("retryLimit",-1),retries=proof.optInt("retriesUsed",-1);
+                JSONArray actions=proof.optJSONArray("actionTypes");
+                boolean actionList=actions!=null && actions.length()==2;
+                if(actionList) for(int i=0;i<actions.length();i++) {
+                    String action=actions.optString(i);
+                    if(!"BLINK".equals(action) && !"TURN_LEFT".equals(action) && !"TURN_RIGHT".equals(action))actionList=false;
+                }
+                accepted="COMPLETE".equals(proof.opt("state")) && "CAMERA2_JPEG_V2".equals(proof.opt("source"))
+                    && proof.optInt("version")==2 && proof.optInt("actionCount")==2 && actionList
                     && transaction.equals(proof.opt("transactionId"))
                     && NativePadEngine.MODEL_SHA256.equals(proof.opt("padModelSha256"))
                     && NativeLandmarkEngine.MODEL_SHA256.equals(proof.opt("landmarkModelSha256"))
                     && digest(iso).equals(proof.opt("isoSha256"))
-                    && proof.optLong("completedAtMillis")>=now-30000 && proof.optLong("completedAtMillis")<=now+2000;
+                    && started>0 && duration>=0 && timeout>=1000 && timeout<=60000 && duration<=timeout && duration<=20000
+                    && retryLimit>=0 && retryLimit<=2 && retries>=0 && retries<=retryLimit
+                    && completed>=now-30000 && completed<=now+2000;
             }
             reason=accepted?"NATIVE_CAMERA_ACCEPTED":"INVALID_COMPLETED_EVIDENCE";
         }

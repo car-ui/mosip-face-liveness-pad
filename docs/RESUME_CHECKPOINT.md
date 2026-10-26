@@ -1,4 +1,6 @@
-# Resume checkpoint
+# Historical resume checkpoints
+
+**Current-state notice (22 October 2026):** this file is a chronological record of earlier sessions. Its branch names, temporary restrictions, counts, and next-step notes are historical and must not be treated as current instructions. Use [`LOCAL_DELIVERY_STATUS.md`](LOCAL_DELIVERY_STATUS.md), [`REQUIREMENTS_MATRIX.md`](REQUIREMENTS_MATRIX.md), and the retained `integrations/native/evidence/policy-session-20261020/` reports for the current repository state. External submission, team credentials, a recorded video, physical attack trials, and production device trust are not completed by the repository changes.
 
 The current branch is `new/hackathon-quality`. Resolve its exact commit with
 `git rev-parse HEAD`; the predecessor was `30686fb13db650fb4a58dbfcc90dc2a8a3c8e38d`.

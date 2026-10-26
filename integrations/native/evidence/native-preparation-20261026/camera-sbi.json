@@ -1,0 +1,140 @@
+{
+  "status": "PASS",
+  "platform": "camera-sbi",
+  "upstreamCommit": "d1ec22a542294b798f5b9c5bb97428deabb2064b",
+  "patchPresent": true,
+  "filesChecked": 32,
+  "mismatches": [],
+  "fingerprints": [
+    {
+      "path": "app/src/main/java/io/mosip/facepad/BoundedImage.java",
+      "sha256": "5fc9fa3aaaccf83b4803ffff3be590c7ba56c395c787f6eed70f635885383c31"
+    },
+    {
+      "path": "app/src/main/java/io/mosip/facepad/BoundedMjpegReader.java",
+      "sha256": "de9bb3189a4b9baa187920e25a9647c1c9065d14361480f0701a74a0a798e5d0"
+    },
+    {
+      "path": "app/src/main/java/io/mosip/facepad/NativeActiveSession.java",
+      "sha256": "1620ec35d52b41892cffded49f29e19b0fdc72201739c8e16bbcc4d5f083a937"
+    },
+    {
+      "path": "app/src/main/java/io/mosip/facepad/NativeFrameChallenge.java",
+      "sha256": "c873da1fa0dd71dd8e9f45c956a9c7f76dd2336bf28491e2c4126d65ae63b293"
+    },
+    {
+      "path": "app/src/main/java/io/mosip/facepad/NativeLandmarkEngine.java",
+      "sha256": "928b394f9506946b0dd644914f236d005045f6ec7b7e06314b769df4166d599d"
+    },
+    {
+      "path": "app/src/main/java/io/mosip/facepad/NativePadEngine.java",
+      "sha256": "a9af7387b058a552d2e61aaff628aa5bda0358696ff4b0015cc55f241f3f0905"
+    },
+    {
+      "path": "app/src/main/java/io/mosip/facepad/NativePadPolicy.java",
+      "sha256": "bcc98f49d8c237c4ab6cfde71d32eebfd18aebc1aece8fe7517ef69f64d9d560"
+    },
+    {
+      "path": "app/src/main/java/io/mosip/facepad/NativeYuNet.java",
+      "sha256": "64d7c646530ec8e500a1f6dff9be73bb82400ff0026152fbbdc78be7d635dc06"
+    },
+    {
+      "path": "app/src/main/java/io/mosip/facepad/CameraActiveEvidence.java",
+      "sha256": "b0f4f28687abd8f775b147693d75b642db62592129545ab2ee23419c56a82e31"
+    },
+    {
+      "path": "app/src/main/java/io/mosip/facepad/CameraOwnedPadGate.java",
+      "sha256": "41f6fac63231b83b2d6683bff3cd7cda68a0fbd73f63fa6d761d3f06c5b09c8b"
+    },
+    {
+      "path": "app/src/main/java/io/mosip/facepad/CameraSbiRequestPolicy.java",
+      "sha256": "8113da8d9e8c0e1e73b26692d311da351e1dbe8c2b7ada287ab735ed14b92b36"
+    },
+    {
+      "path": "app/src/main/java/nprime/reg/sbi/googlevision/NativePadCameraActivity.java",
+      "sha256": "f2be69a928570bfd61ebce1280e3075bcd16d4c2a4b4acd03b077b8281bacc22"
+    },
+    {
+      "path": "app/src/main/assets/facepad/minifasnet_v2.onnx",
+      "sha256": "5281b4a621b1a2a7570d88bc3a37ac5273ab3082b61d1e284b9847660909cbef"
+    },
+    {
+      "path": "app/src/main/assets/facepad/minifasnet_v2.onnx.json",
+      "sha256": "44eb32abc96706f2996838995417832f3c3ca62558c782b628bc2ec52021cd81"
+    },
+    {
+      "path": "app/src/main/assets/facepad/facemesh_v2.onnx",
+      "sha256": "09c96e67163c660431d37eccc24d40172e514fe4f5768ebf507941e3cb9e3bfb"
+    },
+    {
+      "path": "app/src/main/assets/facepad/facemesh_v2.onnx.json",
+      "sha256": "8039df9c70d5df9ffe35d629e82784d775c536872943856608a23d61027ede14"
+    },
+    {
+      "path": "app/src/main/assets/facepad/face_detection_yunet_2023mar.onnx",
+      "sha256": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4"
+    },
+    {
+      "path": "app/src/main/assets/facepad/face_detection_yunet_2023mar.onnx.json",
+      "sha256": "65e59b154ca6d20a9614bc46c37cff7caa54dfd12e40ae87d56558cec7d28873"
+    },
+    {
+      "path": "app/src/main/assets/facepad/MODEL-LICENSE.txt",
+      "sha256": "daf94bf1dc9cc5700fe5af2c7c0cbd1836e70d509ed78fd0bebef7432edee6fb"
+    },
+    {
+      "path": "app/src/main/assets/facepad/LANDMARK-MODEL-LICENSE.txt",
+      "sha256": "8707eef0533987efc5b155d64761eeb6e20793f50b9bd1a68dad1cf4719d0ed8"
+    },
+    {
+      "path": "app/src/main/assets/facepad/FACE-DETECTOR-LICENSE.txt",
+      "sha256": "c83b8120c50ccbd4c4f96edf53141bdd566ebb8f8e9227e415326aa1b1aba958"
+    },
+    {
+      "path": "app/src/main/assets/facepad/ONNX-Runtime-LICENSE.txt",
+      "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+    },
+    {
+      "path": "app/src/main/assets/facepad/OpenCV-LICENSE.txt",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "app/src/main/assets/facepad/CAMERA-SBI-LICENSE.txt",
+      "sha256": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5"
+    },
+    {
+      "path": "app/src/main/assets/facepad/haarcascade_frontalface_default.xml",
+      "sha256": "0f7d4527844eb514d4a4948e822da90fbb16a34a0bbbbc6adc6498747a5aafb0"
+    },
+    {
+      "path": "app/src/androidTest/java/io/mosip/facepad/CameraEvidenceFixture.java",
+      "sha256": "f01db5df899e0b76d031ff8acabdf633ab8376527850ec32239e4c7c7311fa84"
+    },
+    {
+      "path": "app/src/androidTest/java/nprime/reg/sbi/googlevision/CameraOwnerPadTest.java",
+      "sha256": "4b0b7c2dc4118bcb6a44ede7672064fa49bc263e8b0f4e99cfe69398cb687da0"
+    },
+    {
+      "path": "app/src/androidTest/java/nprime/reg/sbi/googlevision/PhysicalPadHarnessTest.java",
+      "sha256": "5b9acafba05bf53a118f74c2082d573c5bd8c1bfa85bc49ec779c46392dc765a"
+    },
+    {
+      "path": "app/src/androidTest/assets/astronaut.png",
+      "sha256": "88431cd9653ccd539741b555fb0a46b61558b301d4110412b5bc28b5e3ea6cb5"
+    },
+    {
+      "path": "app/src/androidTest/assets/blank-face.iso",
+      "sha256": "94d916ccc2bd18227d432c79a8b8da100ed606e1d27d6ce40e13393d3cafa37e"
+    },
+    {
+      "path": "app/src/debug/AndroidManifest.xml",
+      "sha256": "d8a665b8e3b91a07111d4394fb067527f22069670a9fd756c20962ad08d74e4c"
+    },
+    {
+      "path": "app/src/debug/java/nprime/reg/sbi/googlevision/PhysicalPadTestActivity.java",
+      "sha256": "7fc6b7c0ec005a7cc3ba1fd9257805077114d7c74d0557554e67fdc1a713eb6e"
+    }
+  ],
+  "textLineEndings": "LF",
+  "scope": "Prepared generated source/assets and patch hunks. Not a build, full upstream-content attestation or physical validation."
+}

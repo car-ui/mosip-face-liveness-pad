@@ -1,0 +1,59 @@
+{
+  "scope": "Same-input provider latency and numerical parity only; no camera, PAD accuracy, hardware attestation, or energy claim.",
+  "model": "minifasnet_v2.onnx",
+  "modelSha256": "5281b4a621b1a2a7570d88bc3a37ac5273ab3082b61d1e284b9847660909cbef",
+  "inputShape": [
+    1,
+    3,
+    80,
+    80
+  ],
+  "availableProviders": [
+    "AzureExecutionProvider",
+    "CPUExecutionProvider"
+  ],
+  "warmups": 10,
+  "iterations": 100,
+  "absoluteParityTolerance": 0.0001,
+  "results": [
+    {
+      "provider": "CPUExecutionProvider",
+      "activeProviders": [
+        "CPUExecutionProvider"
+      ],
+      "timing": {
+        "p50Ms": 1.5871,
+        "p95Ms": 2.1148,
+        "minMs": 1.4238,
+        "maxMs": 3.4026
+      },
+      "maxAbsErrorVsCpu": 0.0,
+      "providerAssignments": {},
+      "acceleratedNodeAssignmentsObserved": null,
+      "executionObserved": false
+    },
+    {
+      "provider": "AzureExecutionProvider",
+      "activeProviders": [
+        "AzureExecutionProvider",
+        "CPUExecutionProvider"
+      ],
+      "timing": {
+        "p50Ms": 6.9766,
+        "p95Ms": 23.8105,
+        "minMs": 5.4692,
+        "maxMs": 68.991
+      },
+      "maxAbsErrorVsCpu": 0.0,
+      "withinTolerance": true,
+      "providerAssignments": {
+        "CPUExecutionProvider": 14300
+      },
+      "acceleratedNodeAssignmentsObserved": 0,
+      "executionObserved": true,
+      "profile": "C:\\Users\\Kartheek\\Downloads\\livliness\\mosip-face-liveness-pad\\integrations\\native\\evidence\\provider-benchmark-20261023\\provider-comparison-Azure_2026-10-23_00-02-27_358.json"
+    }
+  ],
+  "parityPassed": true,
+  "accelerationObserved": false
+}

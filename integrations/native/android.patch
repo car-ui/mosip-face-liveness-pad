@@ -1,5 +1,5 @@
 diff --git a/android/app/build.gradle b/android/app/build.gradle
-index 8e17558..f793095 100644
+index 8e17558..4b49b72 100644
 --- a/android/app/build.gradle
 +++ b/android/app/build.gradle
 @@ -103,7 +103,10 @@ android {
@@ -24,10 +24,27 @@ index 8e17558..f793095 100644
  
      implementation "javax.inject:javax.inject:${rootProject.ext.javaxInjectVersion}"
 diff --git a/android/app/src/main/java/io/mosip/registration_client/api_services/BiometricsDetailsApi.java b/android/app/src/main/java/io/mosip/registration_client/api_services/BiometricsDetailsApi.java
-index 640ac66..68b6502 100644
+index 640ac66..62ee9c5 100644
 --- a/android/app/src/main/java/io/mosip/registration_client/api_services/BiometricsDetailsApi.java
 +++ b/android/app/src/main/java/io/mosip/registration_client/api_services/BiometricsDetailsApi.java
-@@ -1075,6 +1075,11 @@ public class BiometricsDetailsApi implements BiometricsPigeon.BiometricsApi {
+@@ -962,6 +962,16 @@ public class BiometricsDetailsApi implements BiometricsPigeon.BiometricsApi {
+             Log.e(TAG, "Initiating capture request : ");
+             CaptureRequest captureRequest = biometricsService.getRCaptureRequest(currentModality, deviceId,
+                     getExceptionAttributes());
++            if (currentModality == Modality.FACE || currentModality == Modality.EXCEPTION_PHOTO) {
++                io.mosip.facepad.NativePadPolicy.Workflow workflow = fieldId.equals(OPERATOR_BIOMETRICS)
++                        ? io.mosip.facepad.NativePadPolicy.Workflow.OPERATOR
++                        : io.mosip.facepad.NativePadPolicy.Workflow.RESIDENT;
++                io.mosip.facepad.NativePadPolicy facePadPolicy = io.mosip.facepad.NativePadPolicy.read(
++                        globalParamRepository::getCachedStringGlobalParam, workflow);
++                if (!facePadPolicy.enabled || !facePadPolicy.activeEnabled)
++                    throw new java.io.IOException("Face liveness capture policy is disabled");
++                captureRequest.setCustomOpts(facePadPolicy.toSbiCustomOptions());
++            }
+             if (fieldId.equals(OPERATOR_BIOMETRICS)) {
+                 userOnboardService.setCaptureTransactionId(captureRequest.getTransactionId());
+             } else {
+@@ -1075,6 +1085,11 @@ public class BiometricsDetailsApi implements BiometricsPigeon.BiometricsApi {
                      : registrationService.getRegistrationDto().getCaptureTransactionId();
              List<BiometricsDto> biometricsDtoList = biometricsService.handleRCaptureResponse(currentModality, respData,
                      getExceptionAttributes(), transactionId, isOperatorOnboarding);
@@ -39,17 +56,26 @@ index 640ac66..68b6502 100644
              // if attempts is zero, there is no need to maintain the counter
              if (fieldId.equals(OPERATOR_BIOMETRICS)) {
                  removeDuplicatesFromOperatorBiometricList(currentModality);
-@@ -1127,6 +1132,10 @@ public class BiometricsDetailsApi implements BiometricsPigeon.BiometricsApi {
+@@ -1127,10 +1142,18 @@ public class BiometricsDetailsApi implements BiometricsPigeon.BiometricsApi {
                  biometricResult.success("Ok");
              }
  
 +        } catch (java.io.IOException e) {
 +            auditManagerService.audit(AuditEvent.R_CAPTURE_PARSE_FAILED, Components.REGISTRATION, "PAD_REJECTED");
-+            Toast.makeText(activity.getApplicationContext(), e.getMessage(), Toast.LENGTH_LONG).show();
-+            if (biometricResult != null) biometricResult.error(e);
++            Log.w(TAG, "Face verification failed; capture blocked", e);
++            String message = "Face verification could not be completed. Please try again.";
++            Toast.makeText(activity.getApplicationContext(), message, Toast.LENGTH_LONG).show();
++            if (biometricResult != null) biometricResult.error(new java.io.IOException(message));
          } catch (BiometricsServiceException e) {
              auditManagerService.audit(AuditEvent.R_CAPTURE_PARSE_FAILED, Components.REGISTRATION, e.getMessage());
              Log.e(TAG, "R-Capture failed: " + e.getErrorCode(), e);
+-            String message = e.getMessage() != null ? e.getMessage() : "Biometric capture failed";
++            String message = currentModality == Modality.FACE || currentModality == Modality.EXCEPTION_PHOTO
++                    ? "Face verification could not be completed. Please try again."
++                    : e.getMessage() != null ? e.getMessage() : "Biometric capture failed";
+             Toast.makeText(activity.getApplicationContext(), message, Toast.LENGTH_SHORT).show();
+         } catch (Exception e) {
+             auditManagerService.audit(AuditEvent.R_CAPTURE_PARSE_FAILED, Components.REGISTRATION, e.getMessage());
 diff --git a/android/clientmanager/src/main/java/io/mosip/registration/clientmanager/dto/sbi/CaptureDto.java b/android/clientmanager/src/main/java/io/mosip/registration/clientmanager/dto/sbi/CaptureDto.java
 index e8b36ff..99e1d4a 100644
 --- a/android/clientmanager/src/main/java/io/mosip/registration/clientmanager/dto/sbi/CaptureDto.java
@@ -62,3 +88,15 @@ index e8b36ff..99e1d4a 100644
      private String digitalId;
      private String bioType;
      private String deviceCode;
+diff --git a/android/clientmanager/src/main/java/io/mosip/registration/clientmanager/dto/sbi/CaptureRequest.java b/android/clientmanager/src/main/java/io/mosip/registration/clientmanager/dto/sbi/CaptureRequest.java
+index 7b0f934..ea870ed 100644
+--- a/android/clientmanager/src/main/java/io/mosip/registration/clientmanager/dto/sbi/CaptureRequest.java
++++ b/android/clientmanager/src/main/java/io/mosip/registration/clientmanager/dto/sbi/CaptureRequest.java
+@@ -6,6 +6,7 @@ import java.util.List;
+ @Data
+ public class CaptureRequest {
+ 
++    private java.util.Map<String, Object> customOpts;
+     private String env;
+     private String purpose;
+     private String specVersion;

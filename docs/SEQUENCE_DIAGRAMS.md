@@ -1,6 +1,6 @@
 # Capture sequences
 
-These diagrams describe the implemented prototype. The native client's identity matcher and final registration acceptance remain outside this repository's verified integration.
+The first diagram describes the local Python prototype. The following diagrams describe the current patched native checkpoints and their limits. They show software acceptance paths; they do not claim successful live camera workflows or physical attack accuracy.
 
 ```mermaid
 sequenceDiagram
@@ -36,19 +36,51 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant Client as Future native client adapter
-    participant Gate as Portable capture gate
-    participant Inference as Trusted native PAD and action engine
-    participant Matcher as Identity matcher
-    Client->>Gate: Create session with challenge policy and deadline
-    loop Each trusted frame
-        Client->>Inference: Frame and current challenge
-        Inference-->>Client: Quality, PAD, action result
-        Client->>Gate: Assessment bound to session and frame sequence
-        Gate-->>Client: Continue, reject, or accept candidate digest
+    participant Desktop as Patched Desktop client
+    participant Preview as Native preview session
+    participant Engine as Native PAD and action engine
+    participant Gate as Capture acceptance checkpoint
+    participant Matcher as Existing identity matcher
+    Desktop->>Preview: Start operator/supervisor verification
+    loop Preview frames
+        Preview->>Engine: Frame, current action, policy
+        Engine-->>Preview: PAD verdict, action progress, guidance
     end
-    Client->>Gate: Consume exact accepted JPEG once
-    Gate-->>Client: Permit or reject
-    Note over Client,Matcher: This integration path is proposed, not run in official clients
-    Client->>Matcher: Perform identity matching if liveness gate permits
+    Desktop->>Gate: Candidate JPEG and current session proof
+    Gate->>Engine: Verify proof, role, expiry, exact JPEG digest
+    alt Required evidence valid and PAD passes
+        Gate-->>Desktop: Allow candidate once
+        Desktop->>Matcher: Continue normal identity matching
+    else Missing, expired, mismatched, or failed evidence
+        Gate-->>Desktop: Reject before identity matching
+    end
+    Note over Desktop,Gate: Controlled controller tests use synthetic frames and injected action geometry; live camera success is unverified
+```
+
+```mermaid
+sequenceDiagram
+    participant RC as Patched Android Registration Client
+    participant SBI as Camera-owning reference SBI
+    participant Camera as Camera2 stream
+    participant Engine as Native PAD and action engine
+    participant Ledger as One-use transaction ledger
+    RC->>SBI: Request capture with transaction and optional policy hints
+    SBI->>Camera: Open camera and start bounded session
+    loop Session frames
+        Camera-->>SBI: JPEG frame
+        SBI->>Engine: Frame, requested count/pool/retry policy, PAD checks
+        Engine-->>SBI: Face/PAD/action result
+    end
+    alt Session and PAD pass
+        SBI->>SBI: Build ISO from exact challenged JPEG
+        SBI->>SBI: Sign capture payload with active result
+        SBI-->>RC: Signed SBI response
+        RC->>RC: Verify signature, trust, timestamp, transaction
+        RC->>Ledger: Validate evidence and consume transaction once
+        RC->>RC: Apply client PAD and store accepted capture
+    else Failure or interruption
+        SBI-->>RC: Empty failed capture
+        RC->>RC: Keep capture out of storage
+    end
+    Note over RC,Ledger: Version 2 binds action types, session timing and retry use to the exact JPEG; client policy is checked after signed capture, caller policy mapping is pending, and emulator tests use fixture trust and simulated action metadata
 ```

@@ -44,7 +44,7 @@ public class AndroidActiveEvidenceTest {
     private String transaction;
     @Before public void setup() throws Exception {
         context=InstrumentationRegistry.getInstrumentation().getTargetContext();
-        assertTrue(context.getSharedPreferences("facepad-evidence-v1",Context.MODE_PRIVATE).edit().clear().commit());
+        assertTrue(context.getSharedPreferences("facepad-evidence-v2",Context.MODE_PRIVATE).edit().clear().commit());
         transaction=UUID.randomUUID().toString();
         try(InputStream in=InstrumentationRegistry.getInstrumentation().getContext().getAssets().open("portrait-face.iso");
             ByteArrayOutputStream out=new ByteArrayOutputStream()) {
@@ -52,11 +52,15 @@ public class AndroidActiveEvidenceTest {
         }
     }
     private JSONObject payload() throws Exception {
-        JSONObject proof=new JSONObject().put("version",1).put("source","CAMERA2_JPEG_V1")
-            .put("state","COMPLETE").put("actionCount",2).put("transactionId",transaction)
+        long now=System.currentTimeMillis();
+        JSONObject proof=new JSONObject().put("version",2).put("source","CAMERA2_JPEG_V2")
+            .put("state","COMPLETE").put("actionCount",2).put("actionTypes",new JSONArray().put("BLINK").put("TURN_LEFT"))
+            .put("transactionId",transaction)
             .put("padModelSha256",NativePadEngine.MODEL_SHA256)
             .put("landmarkModelSha256",NativeLandmarkEngine.MODEL_SHA256)
-            .put("isoSha256",AndroidActiveEvidence.sha256(iso)).put("completedAtMillis",System.currentTimeMillis());
+            .put("isoSha256",AndroidActiveEvidence.sha256(iso))
+            .put("sessionStartedAtMillis",now-5000).put("sessionTimeoutMillis",20000)
+            .put("retryLimit",2).put("retriesUsed",0).put("completedAtMillis",now-1000);
         return new JSONObject().put("bioType","Face").put("bioSubType","Face")
             .put("bioValue",Base64.getUrlEncoder().withoutPadding().encodeToString(iso))
             .put("transactionId",transaction).put("qualityScore",99).put("requestedScore","60")
@@ -73,7 +77,7 @@ public class AndroidActiveEvidenceTest {
     }
     @Test public void exactProofIsConsumedOnceAndPersisted() throws Exception {
         JSONObject value=payload();AndroidActiveEvidence.verifyAndConsume(context,dto(value),iso,transaction);
-        assertEquals(1,new JSONObject(context.getSharedPreferences("facepad-evidence-v1",0).getString("used","{}")).length());
+        assertEquals(1,new JSONObject(context.getSharedPreferences("facepad-evidence-v2",0).getString("used","{}")).length());
         rejected(value,transaction);
     }
     @Test public void configuredActionCountMismatchDoesNotConsumeProof() throws Exception {
@@ -83,10 +87,11 @@ public class AndroidActiveEvidenceTest {
         JSONObject value=payload();
         try {AndroidActiveEvidence.verifyAndConsume(context,dto(value),iso,transaction,policy);fail("Wrong action count accepted");}
         catch(IOException expected) {assertTrue(expected.getMessage().contains("action count"));}
-        assertEquals("{}",context.getSharedPreferences("facepad-evidence-v1",0).getString("used","{}"));
+        assertEquals("{}",context.getSharedPreferences("facepad-evidence-v2",0).getString("used","{}"));
         value.getJSONObject("facePad").put("actionCount",3);
+        value.getJSONObject("facePad").put("actionTypes",new JSONArray().put("BLINK").put("TURN_LEFT").put("BLINK"));
         AndroidActiveEvidence.verifyAndConsume(context,dto(value),iso,transaction,policy);
-        assertEquals(1,new JSONObject(context.getSharedPreferences("facepad-evidence-v1",0).getString("used","{}")).length());
+        assertEquals(1,new JSONObject(context.getSharedPreferences("facepad-evidence-v2",0).getString("used","{}")).length());
         try {AndroidActiveEvidence.verifyAndConsume(context,dto(value),iso,transaction,policy);fail("Replayed proof accepted");}
         catch(IOException expected) {assertTrue(expected.getMessage().contains("already consumed"));}
     }
@@ -97,35 +102,81 @@ public class AndroidActiveEvidenceTest {
             JSONObject value=payload();
             try {AndroidActiveEvidence.verifyAndConsume(context,dto(value),iso,transaction,policy);fail("Unavailable policy accepted");}
             catch(IOException expected) {assertTrue(expected.getMessage().contains("current policy"));}
-            assertEquals("{}",context.getSharedPreferences("facepad-evidence-v1",0).getString("used","{}"));
+            assertEquals("{}",context.getSharedPreferences("facepad-evidence-v2",0).getString("used","{}"));
         }
+    }
+    @Test public void mandatoryWorkflowRequiresActiveEvidenceEvenAfterPassiveClear() throws Exception {
+        NativePadEngine.Decision clear=new NativePadEngine.Decision(true,"PASSIVE_CLEAR",.99);
+        NativePadEngine.Decision uncertain=new NativePadEngine.Decision(false,"ACTIVE_CHALLENGE_REQUIRED",.6);
+        assertTrue(AndroidPadCheckpoint.requiresActiveEvidence(
+            NativePadPolicy.defaults(NativePadPolicy.Workflow.OPERATOR),clear));
+        assertTrue(AndroidPadCheckpoint.requiresActiveEvidence(
+            NativePadPolicy.defaults(NativePadPolicy.Workflow.SUPERVISOR),clear));
+        assertFalse(AndroidPadCheckpoint.requiresActiveEvidence(
+            NativePadPolicy.defaults(NativePadPolicy.Workflow.RESIDENT),clear));
+        assertTrue(AndroidPadCheckpoint.requiresActiveEvidence(
+            NativePadPolicy.defaults(NativePadPolicy.Workflow.RESIDENT),uncertain));
     }
     @Test public void extraActionsSatisfyResidentMinimumButUnboundedCountsReject() throws Exception {
         JSONObject value=payload();
         value.getJSONObject("facePad").put("actionCount",5);
         try {AndroidActiveEvidence.verifyAndConsume(context,dto(value),iso,transaction);fail("Unbounded action count accepted");}
         catch(IOException expected) {assertTrue(expected.getMessage().contains("action count"));}
-        assertEquals("{}",context.getSharedPreferences("facepad-evidence-v1",0).getString("used","{}"));
+        assertEquals("{}",context.getSharedPreferences("facepad-evidence-v2",0).getString("used","{}"));
         value.getJSONObject("facePad").put("actionCount",2);
         AndroidActiveEvidence.verifyAndConsume(context,dto(value),iso,transaction,
             NativePadPolicy.defaults(NativePadPolicy.Workflow.RESIDENT));
-        assertEquals(1,new JSONObject(context.getSharedPreferences("facepad-evidence-v1",0).getString("used","{}")).length());
+        assertEquals(1,new JSONObject(context.getSharedPreferences("facepad-evidence-v2",0).getString("used","{}")).length());
     }
     @Test public void mismatchedIncompleteExpiredAndMalformedClaimsReject() throws Exception {
-        String[] fields={"isoSha256","transactionId","padModelSha256","landmarkModelSha256","state","source"};
+        String[] fields={"isoSha256","transactionId","padModelSha256","landmarkModelSha256","state","source","actionTypes"};
         for(String field:fields) {JSONObject value=payload();value.getJSONObject("facePad").put(field,"wrong");rejected(value,transaction);}
         for(long timestamp:new long[]{System.currentTimeMillis()-31000,System.currentTimeMillis()+10000}) {
-            JSONObject value=payload();value.getJSONObject("facePad").put("completedAtMillis",timestamp);rejected(value,transaction);
+            JSONObject value=payload();JSONObject proof=value.getJSONObject("facePad");
+            proof.put("completedAtMillis",timestamp).put("sessionStartedAtMillis",timestamp-4000);
+            rejected(value,transaction);
         }
         JSONObject value=payload();value.getJSONObject("facePad").put("actionCount",1);rejected(value,transaction);
         value=payload();value.getJSONObject("facePad").put("version","1");rejected(value,transaction);
+        value=payload();value.getJSONObject("facePad").put("sessionStartedAtMillis",value.getJSONObject("facePad").getLong("completedAtMillis")+1);rejected(value,transaction);
+        value=payload();value.getJSONObject("facePad").put("sessionTimeoutMillis",500);rejected(value,transaction);
+        value=payload();value.getJSONObject("facePad").put("retryLimit",0).put("retriesUsed",1);rejected(value,transaction);
         value=payload();value.remove("facePad");rejected(value,transaction);
         rejected(payload(),null);rejected(payload(),"other-transaction");
         value=payload();BiometricsDto mismatch=dto(value);mismatch.setBioValue("AA");
         try {AndroidActiveEvidence.verifyAndConsume(context,mismatch,iso,transaction);fail("DTO mismatch accepted");}catch(IOException expected){}
     }
+    @Test public void timeoutAndRecoveryClaimsMustFitCurrentPolicy() throws Exception {
+        NativePadPolicy restrictive=NativePadPolicy.read(key -> {
+            if("mosip.facepad.operator.active.timeout_seconds".equals(key))return "5";
+            if("mosip.facepad.operator.active.max_retries".equals(key))return "0";
+            return null;
+        },NativePadPolicy.Workflow.OPERATOR);
+        JSONObject value=payload();
+        value.getJSONObject("facePad").put("sessionStartedAtMillis",
+            value.getJSONObject("facePad").getLong("completedAtMillis")-7000);
+        try {AndroidActiveEvidence.verifyAndConsume(context,dto(value),iso,transaction,restrictive);fail("Long session accepted under short timeout");}
+        catch(IOException expected) {assertTrue(expected.getMessage().contains("policy timeout"));}
+        value=payload();JSONObject proof=value.getJSONObject("facePad");
+        proof.put("sessionStartedAtMillis",proof.getLong("completedAtMillis")-4000);
+        proof.put("retriesUsed",1);
+        try {AndroidActiveEvidence.verifyAndConsume(context,dto(value),iso,transaction,restrictive);fail("Retry accepted under zero-retry policy");}
+        catch(IOException expected) {assertTrue(expected.getMessage().contains("retry policy"));}
+        proof.put("retriesUsed",0);
+        AndroidActiveEvidence.verifyAndConsume(context,dto(value),iso,transaction,restrictive);
+    }
+    @Test public void challengeTypesMustBelongToCurrentPolicyPool() throws Exception {
+        NativePadPolicy blinkOnly=NativePadPolicy.read(key ->
+            "mosip.facepad.operator.active.challenge_types".equals(key)?"blink":null,
+            NativePadPolicy.Workflow.OPERATOR);
+        JSONObject value=payload();
+        try {AndroidActiveEvidence.verifyAndConsume(context,dto(value),iso,transaction,blinkOnly);fail("Turn outside configured challenge pool accepted");}
+        catch(IOException expected) {assertTrue(expected.getMessage().contains("challenge type"));}
+        value.getJSONObject("facePad").put("actionTypes",new JSONArray().put("BLINK").put("BLINK"));
+        AndroidActiveEvidence.verifyAndConsume(context,dto(value),iso,transaction,blinkOnly);
+    }
     @Test public void clockRollbackAndFullLedgerReject() throws Exception {
-        android.content.SharedPreferences storage=context.getSharedPreferences("facepad-evidence-v1",0);
+        android.content.SharedPreferences storage=context.getSharedPreferences("facepad-evidence-v2",0);
         assertTrue(storage.edit().putLong("clock",System.currentTimeMillis()+10000).commit());rejected(payload(),transaction);
         JSONObject ledger=new JSONObject();for(int i=0;i<256;i++)ledger.put("used-"+i,System.currentTimeMillis()+120000);
         assertTrue(storage.edit().putLong("clock",0).putString("used",ledger.toString()).commit());rejected(payload(),transaction);
@@ -134,7 +185,7 @@ public class AndroidActiveEvidenceTest {
         Context failing=mock(Context.class);
         android.content.SharedPreferences storage=mock(android.content.SharedPreferences.class);
         android.content.SharedPreferences.Editor editor=mock(android.content.SharedPreferences.Editor.class,RETURNS_SELF);
-        when(failing.getSharedPreferences("facepad-evidence-v1",0)).thenReturn(storage);
+        when(failing.getSharedPreferences("facepad-evidence-v2",0)).thenReturn(storage);
         when(storage.getString("used","{}")).thenReturn("{}");when(storage.edit()).thenReturn(editor);
         when(editor.commit()).thenReturn(false);
         try {AndroidActiveEvidence.verifyAndConsume(failing,dto(payload()),iso,transaction);fail("Unpersisted proof accepted");}
@@ -149,7 +200,7 @@ public class AndroidActiveEvidenceTest {
         JSONObject value=payload();value.put("bioValue",encode(blank));value.getJSONObject("facePad").put("isoSha256",AndroidActiveEvidence.sha256(blank));
         try {AndroidPadCheckpoint.requireClear(context,Collections.singletonList(dto(value)),true,transaction);fail("No-face capture accepted");}
         catch(IOException expected) {assertTrue(expected.getMessage().contains("NO_FACE"));}
-        assertEquals("{}",context.getSharedPreferences("facepad-evidence-v1",0).getString("used","{}"));
+        assertEquals("{}",context.getSharedPreferences("facepad-evidence-v2",0).getString("used","{}"));
     }
     private static String encode(byte[] bytes) {return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);}
     private static String sign(JSONObject payload,KeyPair keys) throws Exception {

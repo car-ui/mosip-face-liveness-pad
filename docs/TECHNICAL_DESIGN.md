@@ -1,8 +1,8 @@
 # Technical design
 
-This document describes the implemented research service and the boundaries required for integration into MOSIP Registration Clients. The custom HTTP service runs on a desktop host. Python, OpenCV, and MediaPipe are not an Android deployment architecture.
+This document covers three related paths: the Python research prototype, the pinned MOSIP Desktop and Android client patches, and the camera-owning reference SBI extension. The Python HTTP service runs on a desktop host; it is not the Android deployment architecture. These implementations have build and synthetic/emulator evidence, but complete live client workflows, physical attack performance, and production device trust remain unverified. See the [requirement matrix](REQUIREMENTS_MATRIX.md) and [local delivery status](LOCAL_DELIVERY_STATUS.md) for the exact evidence boundary.
 
-## Components and data flow
+## Python prototype components and data flow
 
 ```mermaid
 flowchart LR
@@ -20,6 +20,31 @@ flowchart LR
     Preview[Preview and status UI] -. observes .-> Device
 ```
 
+## Native client checkpoints
+
+```mermaid
+flowchart LR
+    subgraph Desktop[Patched MOSIP Desktop client]
+        Stream[Client preview stream] --> Native[Native PAD and action engine]
+        Native --> Proof[Role-bound, single-use JPEG proof]
+        Candidate[Resident/authentication candidate] --> Gate[Controller acceptance checkpoint]
+        Proof --> Gate
+        Gate -->|Allowed| Next[Storage or identity matcher]
+        Gate -->|Rejected| Stop[No candidate accepted]
+    end
+    subgraph Android[Patched Android client and reference SBI]
+        Cam[Camera2 frames in SBI] --> CamEngine[Native PAD and two-action session]
+        CamEngine --> Exact[Exact JPEG embedded in ISO]
+        Exact --> Signed[Signed SBI payload with transaction evidence]
+        Signed --> Verify[Existing SBI signature and transaction checks]
+        Verify --> ClientGate[Client PAD and one-use evidence gate]
+        ClientGate -->|Allowed| Store[Registration/onboarding storage]
+        ClientGate -->|Rejected| NoStore[No candidate stored]
+    end
+```
+
+The Desktop checks and Android/SBI path are source integrations with retained build and controlled-test evidence for earlier source milestones. The Desktop diagram does not imply support for every capture format or screen. The Android SBI camera activity accepts validated action-count, blink/turn-pool, timeout and retry settings from request `customOpts` and includes the resulting session claims in version 2 signed evidence. The pinned registration-client patch now attaches its cached resident/operator policy to that request; the registration client checks signed claims against its own current policy. These latest source edits need fresh platform builds before they can be described as packaged Android evidence.
+
 `VideoFrame` carries a BGR `uint8` array, dimensions, frame number, timestamp, and optional device metadata. The pipeline rejects invalid pixel layouts. It does not trust simulator metadata as evidence of a completed action. Device adapters implement connection, frame delivery, stream control, and capability discovery. The L1 adapter is simulated and does not supply secure hardware attestation.
 
 ## Decision flow
@@ -30,7 +55,7 @@ Passive evaluation returns `BONA_FIDE_LIVE`, `UNCERTAIN`, `PRESENTATION_ATTACK`,
 
 Operator and supervisor policies require active challenges by default. A random action is selected from the configured pool. The existing action detector tracks blink, smile, left/right turn, and up/down movement. An active frame still undergoes quality and PAD checks. A failed PAD result terminates acceptance. Face loss invalidates partial action history and consumes a retry. Terminal rejection cannot change to success without a reset.
 
-All workflow decisions in this repository stop at liveness verification. An integrating client must additionally perform identity matching, registration packet construction, authorization, and any required SBI signature verification.
+The Python prototype stops at liveness verification and does not perform identity matching or construct registration packets. The native Desktop and Android patches connect liveness checks to client acceptance points, but complete live authentication/registration, packet generation and production SBI trust remain unverified.
 
 ## Concurrency and privacy
 
@@ -54,9 +79,13 @@ The updater writes a temporary payload and swaps it atomically. Its conservative
 
 ## Native client integration
 
-`NativeCaptureGate` is a portable Java 8 component, compiled and exercised independently. It binds accepted bytes to a session and permits consumption once. It must receive assessments from a trusted native inference adapter. It does not make a client-supplied `PASSED` field trustworthy.
+The pinned Desktop patch adds in-process ONNX PAD and landmark processing at the resident capture and authentication acceptance points. Its operator/supervisor preview binds a one-use active proof to the exact JPEG candidate; unsupported formats or missing required evidence fail closed. The actual five-module Desktop reactor builds, and controller/preview checks exercise the patched upstream components with synthetic inputs and injected action geometry. This does not establish a successful live action or a complete camera-to-storage workflow.
 
-The existing Java HTTP adapter now validates loopback URLs, restricts workflow names, requires a configured bearer token, limits response size, applies timeouts, and avoids printing biometric payloads. It is transport example code. No official Desktop or Android Registration Client build has been modified or run by these changes. See the [integration contract](NATIVE_INTEGRATION.md).
+The pinned Android Registration Client patch checks decoded SBI captures after the existing signature, certificate-trust, timestamp, and transaction validation, before resident or onboarding storage. The reference camera SBI owns its Camera2 stream, evaluates its own frames, and binds its active result to the exact ISO image and transaction. The client enforces one-use transaction evidence and performs its own PAD check. The latest retained API 34 camera-disabled instrumentation records 17 Registration Client tests and eight reference-SBI tests. Fixture keys, repositories, and action metadata are used in the signed-evidence tests; these results do not establish production PKI or human action accuracy.
+
+`NativeCaptureGate` remains a portable Java 8 component for the standalone contract. It binds accepted bytes to a session and permits consumption once, but it trusts its caller's inference result. It does not make an untrusted client-supplied `PASSED` field trustworthy.
+
+The Java HTTP adapter is still a separate transport example. It validates loopback URLs, restricts workflow names, requires a configured bearer token, limits response size, applies timeouts, and avoids printing biometric payloads. Native implementation details, pinned source revisions, and acceptance limits are documented in the [integration contract](NATIVE_INTEGRATION.md), [native integration report](../integrations/native/README.md), and [camera SBI design](CAMERA_SBI_INTEGRATION.md).
 
 ## Standards and evaluation
 

@@ -1,5 +1,10 @@
 # Native policy enforcement, 20 October
 
+This is a milestone record, not the current submission checklist. Its final
+publication/demo scope note records an earlier user request. The current
+evidence summary is in [`LOCAL_DELIVERY_STATUS.md`](LOCAL_DELIVERY_STATUS.md);
+the supplied submission guide requires a demo video, which is still absent.
+
 The freshly fetched starting point was `a4d851c`. Its native configuration parser
 accepted action count, timeout and retry settings, but the frame challenge still
 constructed a fixed two-action session. Desktop also supplied a fixed 30-second

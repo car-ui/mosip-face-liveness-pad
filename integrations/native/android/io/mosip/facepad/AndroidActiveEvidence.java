@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Iterator;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 /** Consumes only the decoded payload returned by the existing trusted SBI validator.
@@ -37,19 +38,39 @@ public final class AndroidActiveEvidence {
             require(expectedTransaction.equals(payload.opt("transactionId")),"capture transaction mismatch");
             require(biometric.getBioValue().equals(payload.opt("bioValue")),"capture value mismatch");
             JSONObject proof=payload.getJSONObject("facePad");
-            require(integer(proof,"version")==1,"unsupported active proof version");
-            require("CAMERA2_JPEG_V1".equals(proof.opt("source")),"unsupported active proof source");
+            require(integer(proof,"version")==2,"unsupported active proof version");
+            require("CAMERA2_JPEG_V2".equals(proof.opt("source")),"unsupported active proof source");
             require("COMPLETE".equals(proof.opt("state")),"active challenge incomplete");
             long actionCount=integer(proof,"actionCount");
             require(actionCount>=policy.actionCount && actionCount<=4,"active challenge action count does not satisfy current policy");
+            JSONArray actionTypes=proof.getJSONArray("actionTypes");
+            require(actionTypes.length()==actionCount,"active challenge action list does not match action count");
+            for(int i=0;i<actionTypes.length();i++) {
+                String action=actionTypes.getString(i);
+                require(("BLINK".equals(action) && policy.challengeTypes.contains(NativePadPolicy.ChallengeType.BLINK))
+                        || (("TURN_LEFT".equals(action) || "TURN_RIGHT".equals(action))
+                            && policy.challengeTypes.contains(NativePadPolicy.ChallengeType.TURN)),
+                        "active challenge type does not satisfy current policy");
+            }
+            long started=integer(proof,"sessionStartedAtMillis");
+            long timeout=integer(proof,"sessionTimeoutMillis");
+            long retryLimit=integer(proof,"retryLimit");
+            long retriesUsed=integer(proof,"retriesUsed");
             require(expectedTransaction.equals(proof.opt("transactionId")),"active transaction mismatch");
             require(NativePadEngine.MODEL_SHA256.equals(proof.opt("padModelSha256")),"PAD model mismatch");
             require(NativeLandmarkEngine.MODEL_SHA256.equals(proof.opt("landmarkModelSha256")),"landmark model mismatch");
             require(sha256(iso).equals(proof.opt("isoSha256")),"active capture digest mismatch");
             long completed=integer(proof,"completedAtMillis"),now=System.currentTimeMillis();
+            require(started>0 && completed>=started,"invalid active session interval");
+            long duration=completed-started;
+            require(timeout>=1000 && timeout<=60000 && duration<=timeout,"active session exceeded its SBI timeout");
+            require(duration<=policy.timeoutSeconds*1000L,"active session exceeded current policy timeout");
+            require(retryLimit>=0 && retryLimit<=5 && retriesUsed>=0 && retriesUsed<=retryLimit
+                    && retriesUsed<=policy.maxRetries,"active session exceeded current retry policy");
             require(completed>0 && completed<=now+SKEW_MS && completed>=now-MAX_AGE_MS,"active proof expired");
+            require(started<=now+SKEW_MS,"active session starts in the future");
 
-            SharedPreferences storage=context.getSharedPreferences("facepad-evidence-v1",Context.MODE_PRIVATE);
+            SharedPreferences storage=context.getSharedPreferences("facepad-evidence-v2",Context.MODE_PRIVATE);
             long previousClock=storage.getLong("clock",0);
             require(now>=previousClock-SKEW_MS,"clock moved backwards");
             JSONObject ledger=new JSONObject(storage.getString("used","{}"));

@@ -69,6 +69,9 @@ public final class NativeFrameChallenge {
     }
     public synchronized NativeActiveSession.State state() { return session.state(); }
     public synchronized boolean consume(byte[] exactFrameJpeg) throws Exception { return session.consume(exactFrameJpeg); }
+    public synchronized NativeActiveSession.Attestation consumeAndAttest(byte[] exactFrameJpeg) throws Exception {
+        return session.consumeAndAttest(exactFrameJpeg);
+    }
     public synchronized boolean consume(byte[] exactFrameJpeg,NativePadPolicy expectedPolicy) throws Exception {
         if (!policy.sameAs(expectedPolicy)) { session.cancel(); return false; }
         return session.consume(exactFrameJpeg);

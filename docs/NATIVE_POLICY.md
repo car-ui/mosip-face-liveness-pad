@@ -19,6 +19,7 @@ settings and are not selected from a measured physical error-rate target.
 | `mosip.facepad.<role>.active.enabled` | `true` | Disabling required active checks is invalid. |
 | `mosip.facepad.<role>.active.required` | Resident `false`; operator/supervisor `true` | Required for both authentication roles and cannot be disabled there. |
 | `mosip.facepad.<role>.active.action_count` | Resident `1`; operator/supervisor `2` | Number of sequential actions required (`1` through `4`). Alternate key `mosip.facepad.<role>.action.count`. |
+| `mosip.facepad.<role>.active.challenge_types` | `blink,turn` | Comma-separated allowed native action families: `blink`, `turn`, or both. Alternate key `mosip.facepad.<role>.challenge.types`. |
 | `mosip.facepad.<role>.active.timeout_seconds` | Resident `15`; operator/supervisor `20` | Session timeout in seconds (`5` through `60`). Alternate key `mosip.facepad.<role>.timeout_seconds`. |
 | `mosip.facepad.<role>.active.max_retries` | `2` | Maximum recovery episodes inside a native frame session (`0` through `5`). Alternate key `mosip.facepad.<role>.max_retries`. |
 
@@ -33,11 +34,14 @@ the proof. Model errors and attack decisions still reject before consumption.
 The final JPEG and proof remain single-use. A policy does not supply identity
 matching or turn an uncertain passive result into a completed action.
 
-The desktop frame session now uses the parsed action count and timeout. The
+The desktop frame session now uses the parsed action count, challenge pool and timeout. The
 timeout covers acquisition, preparation and every action; recovery does not
 extend it. If an adapter supplies a shorter capture timeout, the shorter limit
 wins. Actions alternate between blink and a randomly selected turn, with a
 random starting action. Each action requires its own return to neutral.
+Selecting only `blink` uses blink for each action; selecting only `turn` uses
+turns. Arbitrary action families such as smile or spoken prompts are not
+implemented by the native landmark detector.
 
 A recovery episode starts when clear evidence or action progress is interrupted
 by face loss, a stream gap or suspect PAD evidence. It clears all action credit
@@ -51,22 +55,46 @@ The Android registration/onboarding callback reads the corresponding resident
 or operator policy. Its signed active-evidence extension still requires the
 existing trusted SBI validation and one-use transaction ledger. The checkpoint
 requires the signed `actionCount` to be between one and four and at least the
-current policy's required count. Insufficient or out-of-range counts reject
-before the transaction is consumed. The compatibility
+current policy's required count. Evidence version 2 includes the ordered
+`actionTypes` actually completed, and every reported action must be in the
+current policy's challenge pool. Insufficient counts, unexpected types or
+out-of-range values reject before the transaction is consumed. The compatibility
 overload uses the default operator policy, which requires two actions.
 
-The reference camera app has its own request timeout and two-action implementation.
-Its two-action proof satisfies a client minimum of one or two actions. It cannot
-currently fulfill a client policy requiring three or four actions. Such a policy
-fails closed at the Android checkpoint. The version 1 evidence
-does not include a session start time, retry count or complete policy snapshot.
-Its completion timestamp supports a freshness check, but does not demonstrate
-that the client's configured timeout or retry limit was enforced by the SBI.
-Those values need an authenticated request and signed response contract before
-they can be described as enforced across the Android/SBI boundary. This
-change does not add a native settings screen, dynamic custom action pool selection,
-localized guidance templates, or cache-update transactions. Android supervisor
-UI integration and live synchronization remain unverified.
+The reference camera activity accepts a validated requested action count,
+`blink`/`turn` pool, timeout and retry limit. Its default is two actions with
+both types allowed. `NativePadPolicy.toSbiCustomOptions()` serializes the cached
+client policy to four non-sensitive entries in the SBI `customOpts` object;
+`CameraSbiRequestPolicy` validates that complete object and maps it to the
+private camera activity's typed extras. The SBI specification defines
+`customOpts` for configured, documented capture parameters. The gate applies the
+policy bounds to the session. Evidence version 2 is minted only
+after the native session consumes the exact final JPEG. Its signed payload
+includes the ordered action types, session start, effective SBI timeout,
+allowed and used retries, action count, completion time, ISO digest, model hashes,
+and transaction.
+After the existing SBI signature and transaction checks, Android also verifies
+that the observed duration fits both the SBI timeout and the current client
+timeout, and that retries used fit the current retry limit. Version 1 evidence
+is rejected. If the SBI settings differ from the current client policy, its
+result fails the client checkpoint.
+
+The pinned Android Registration Client patch now adds a `customOpts` property
+to its SBI request DTO and fills it in `BiometricsDetailsApi.rcapture()` for
+face/exception-photo requests. It reads the resident or operator policy from
+the current global-parameter cache and assigns
+`captureRequest.setCustomOpts(policy.toSbiCustomOptions())`. The request options
+are still untrusted hints; the signed result is checked against the client's
+current policy before storage. The source patch applies to the pinned client
+revision, but the updated apps have not been rebuilt here. See the [MOSIP SBI
+capture specification](https://github.com/mosip/documentation/blob/1.2.0/docs/id-lifecycle-management/supporting-components/biometrics/sbispec.md)
+for the standard `customOpts` request field. It emits
+`facePadActionCount`, `facePadTimeoutSeconds`, `facePadMaxRetries`, and
+`facePadChallengeTypes`; it carries no subject data, image, transaction secret,
+or signing material.
+Native pools currently support only blink and turn; additional action families,
+localized guidance templates, authenticated cache-update transactions, Android
+supervisor UI integration, and live synchronization remain unverified.
 
 Verification includes strict parsing, immutable policy values, workflow
 separation and changed-policy proof rejection. Real model and controller checks

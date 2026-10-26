@@ -74,7 +74,31 @@ diff --git a/app/src/main/java/nprime/reg/sbi/face/MainActivity.java b/app/src/m
 index 226edf0..2d2bed2 100644
 --- a/app/src/main/java/nprime/reg/sbi/face/MainActivity.java
 +++ b/app/src/main/java/nprime/reg/sbi/face/MainActivity.java
-@@ -386,11 +386,15 @@ public class MainActivity extends AppCompatActivity {
+@@ -353,6 +353,23 @@ public class MainActivity extends AppCompatActivity {
+             if(null == ob){
+                 ob = new ObjectMapper();
+             }
++            com.fasterxml.jackson.databind.JsonNode requestNode = ob.readTree(input);
++            if (requestNode != null && requestNode.has("customOpts")
++                    && requestNode.get("customOpts").isObject()) {
++                com.fasterxml.jackson.databind.node.ObjectNode requestObject =
++                        (com.fasterxml.jackson.databind.node.ObjectNode) requestNode;
++                com.fasterxml.jackson.databind.node.ArrayNode legacyOptions = ob.createArrayNode();
++                java.util.Iterator<java.util.Map.Entry<String,com.fasterxml.jackson.databind.JsonNode>> fields =
++                        requestNode.get("customOpts").fields();
++                while (fields.hasNext()) {
++                    java.util.Map.Entry<String,com.fasterxml.jackson.databind.JsonNode> field = fields.next();
++                    com.fasterxml.jackson.databind.node.ObjectNode option = ob.createObjectNode();
++                    option.set(field.getKey(), field.getValue());
++                    legacyOptions.add(option);
++                }
++                requestObject.set("customOpts", legacyOptions);
++                input = ob.writeValueAsString(requestObject);
++            }
+             captureRequestDto = (CaptureRequestDto)(ob.readValue(input.getBytes(), CaptureRequestDto.class));
+             currentStatus = DeviceConstants.ServiceStatus.BUSY;
+ 
+@@ -386,11 +403,34 @@ public class MainActivity extends AppCompatActivity {
  			qualityThreshold = captureReqDetailDto.requestedScore;
  		}*/
  
@@ -88,10 +112,29 @@ index 226edf0..2d2bed2 100644
 +        Intent intent = new Intent(this, nprime.reg.sbi.googlevision.NativePadCameraActivity.class);
          intent.putExtra("CaptureTimeout", captureTimeout);
 +        intent.putExtra("FacePadTransactionId", captureReqDto.transactionId);
++        // The SBI customOpts snapshot is untrusted request input; the client independently
++        // validates the returned signed claims against its current cached policy.
++        java.util.Map<String,Object> callerFacePadOptions = new java.util.HashMap<>();
++        android.os.Bundle callerExtras = getIntent().getExtras();
++        if (callerExtras != null) for (String key : new String[]{"FacePadActionCount",
++                "FacePadTimeoutSeconds","FacePadMaxRetries","FacePadChallengeTypes"})
++            if (callerExtras.containsKey(key)) callerFacePadOptions.put(key,callerExtras.get(key));
++        try {
++            io.mosip.facepad.NativePadPolicy facePadPolicy =
++                    io.mosip.facepad.CameraSbiRequestPolicy.fromCaptureRequest(captureReqDto,callerFacePadOptions);
++            java.util.Map<String,Object> facePadExtras = io.mosip.facepad.CameraSbiRequestPolicy.toIntentOptions(facePadPolicy);
++            intent.putExtra("FacePadActionCount",(Integer)facePadExtras.get("FacePadActionCount"));
++            intent.putExtra("FacePadTimeoutSeconds",(Integer)facePadExtras.get("FacePadTimeoutSeconds"));
++            intent.putExtra("FacePadMaxRetries",(Integer)facePadExtras.get("FacePadMaxRetries"));
++            intent.putExtra("FacePadChallengeTypes",(String)facePadExtras.get("FacePadChallengeTypes"));
++        } catch (java.io.IOException invalidFacePadPolicy) {
++            // Invalid policy fails in NativePadCameraActivity before camera access.
++            intent.putExtra("FacePadActionCount",0);
++        }
          intent.putExtra("QualityThreshold", qualityThreshold);
          startActivityForResult(intent, captureRequestType);
          //fcResult = invokeFaceCapture(captureTimeout, qualityThreshold);
-@@ -431,6 +435,7 @@ public class MainActivity extends AppCompatActivity {
+@@ -431,6 +471,7 @@ public class MainActivity extends AppCompatActivity {
                              FaceCaptureResult captureResult = new FaceCaptureResult();
                              //captureResult.setCapturedImage(bmpPhoto);
                              captureResult.setIsoFaceRecord(data.getByteArrayExtra("IsoFaceRecord"));
@@ -99,7 +142,7 @@ index 226edf0..2d2bed2 100644
                              captureResult.setStatus(data.getIntExtra("Status", FaceCaptureResult.CAPTURE_CANCELLED));
                              captureResult.setQualityScore(data.getIntExtra("Quality", 0));
  
-@@ -452,6 +457,7 @@ public class MainActivity extends AppCompatActivity {
+@@ -452,6 +493,7 @@ public class MainActivity extends AppCompatActivity {
              }else{
                  FaceCaptureResult captureResult = new FaceCaptureResult();
                  captureResult.setIsoFaceRecord(data.getByteArrayExtra("IsoFaceRecord"));
@@ -107,7 +150,7 @@ index 226edf0..2d2bed2 100644
                  captureResult.setStatus(data.getIntExtra("Status", FaceCaptureResult.CAPTURE_CANCELLED));
                  captureResult.setQualityScore(data.getIntExtra("Quality", 0));
  
-@@ -472,6 +478,7 @@ public class MainActivity extends AppCompatActivity {
+@@ -472,6 +514,7 @@ public class MainActivity extends AppCompatActivity {
                              FaceCaptureResult captureResult = new FaceCaptureResult();
                              //captureResult.setCapturedImage(bmpPhoto);
                              captureResult.setIsoFaceRecord(data.getByteArrayExtra("IsoFaceRecord"));

@@ -2,9 +2,12 @@
 
 An offline research prototype for MOSIP Decode 2026, Problem 04. It processes camera frames, checks face quality and passive PAD, and asks for randomly selected facial actions when policy requires them. An attack, engine error, or failed challenge prevents the prototype from returning a captured image.
 
-The repository includes a local browser console, an OpenCV desktop demo, a mock device, workflow policies, an ONNX adapter, offline signed model updates, automated tests, and native client patches. The patched official desktop client compiles, and synthetic ISO captures are rejected inside its resident and authentication controllers. The patched Android client passes 12 emulator tests, including real RSA fixture verification through its existing SBI parser, native PAD, and one-use acceptance before operator-onboarding storage. The reference camera SBI adds Camera2 action evaluation and exact-JPEG ISO capture, with six passing emulator tests. Its active metadata is included inside the existing signed SBI payload.
+The repository includes a local browser console, an OpenCV desktop demo, mock device adapters, workflow policies, ONNX inference, offline signed model updates, evaluation tools, and native client patches. The recorded native build milestone passed 17 Android Registration Client instrumentation tests and eight reference camera-SBI tests on an API 34 emulator with cameras disabled. Desktop controller and preview checks also passed. Later working-source changes add signed evidence version 2, configurable camera action policies, a development-only threshold selector, and a portable device capability-contract check. The pinned Desktop source now builds locally with a JDK compatibility override; the retained APKs predate these changes, so Android and SBI still need a fresh platform build.
 
-**Native integration remains incomplete.** Successful human actions, production device-certificate trust, complete live client UI flows, physical Android/L1 hardware, ISO conformance and physical attack accuracy still need validation. See the [camera SBI integration](docs/CAMERA_SBI_INTEGRATION.md) for the custom extension and test boundaries. See the [requirement-by-requirement evidence matrix](docs/REQUIREMENTS_MATRIX.md) before presenting coverage claims.
+**Native integration remains incomplete.** The source includes operator/supervisor active-action checkpoints, an Android signed-evidence path, and the pinned Android client now serializes cached resident/operator settings into the standard SBI `customOpts` request. Successful human actions, production device-certificate trust, complete live client UI flows, physical Android/L1 hardware, ISO conformance and physical attack accuracy still need validation. The latest client/SBI source changes have not been rebuilt. See the [camera SBI integration](docs/CAMERA_SBI_INTEGRATION.md) and [requirement matrix](docs/REQUIREMENTS_MATRIX.md) for evidence boundaries.
+
+Current submission readiness, completed prototype work, and remaining partial
+acceptance criteria are summarized in the [submission status](docs/SUBMISSION_STATUS.md).
 
 ## Run locally
 
@@ -34,6 +37,8 @@ On Linux or macOS, use `.venv/bin/python` instead. Linux desktop OpenCV may also
 Open [the local verification console](http://127.0.0.1:4501). The default source is a simulator. Select a scenario and choose **Start verification**. Select **Physical webcam** explicitly for camera use. A disconnected camera produces an error rather than switching silently to simulated success.
 
 The console provides positioning guidance, progress, active prompts, retry messages, device diagnostics, and policy settings. Diagnostic controls apply to the selected workflow. Settings are in memory by default. Set `MOSIP_PAD_POLICY_FILE` to enable validated offline persistence; see [the policy guide](docs/OFFLINE_POLICY.md).
+
+To create a hash-verified source archive that includes the current working changes and non-ignored new files, run `python scripts/package_release.py --worktree --output output/local/face-liveness-prototype.zip`. The manifest identifies this as a working-tree package and records each included file's SHA-256. A normal run without `--worktree` continues to package the committed tree.
 
 For the separate OpenCV desktop demo:
 
@@ -65,30 +70,33 @@ The heuristic backend is a research fallback. Texture, glare, color, and frequen
 
 ```powershell
 .\.venv\Scripts\python -m pytest -q --junitxml=output/local/test-results.xml
+.\.venv\Scripts\python scripts/check_device_interoperability.py --output output/local/device-interoperability.json
 javac --release 8 -d output/local/java src/java_integration/*.java tests/java/NativeCaptureGateTest.java
 java -cp output/local/java NativeCaptureGateTest
 ```
 
-The Java suite checks session binding, challenge counts, rejection, payload binding, and single-use capture acceptance. The Python suite separates control-flow tests with injected scores/actions from detector tests on image fixtures. Neither suite measures real-world attack accuracy. [Validation notes](docs/VALIDATION.md) record the commands and evidence boundaries.
+The Java suite checks session binding, challenge counts, rejection, payload binding, and single-use capture acceptance. The interoperability CLI validates capability consistency across the webcam contract, mock device, and two simulated vendor adapters; it does not establish physical vendor support. The Python suite separates control-flow tests with injected scores/actions from detector tests on image fixtures. Neither suite measures real-world attack accuracy. [Validation notes](docs/VALIDATION.md) record the commands and evidence boundaries.
 
-For a private, independently collected test set:
+For private, independently collected data, evaluate the development split and select a threshold first:
 
 ```powershell
-.\.venv\Scripts\python scripts/evaluate_dataset.py path/to/test-manifest.jsonl --model assets/models/minifasnet_v2.onnx --output output/local/dataset-evaluation.json
+.\.venv\Scripts\python scripts/evaluate_dataset.py path/to/pad-master.jsonl --split development --model assets/models/minifasnet_v2.onnx --output output/local/pad-development.json
+.\.venv\Scripts\python scripts/select_pad_threshold.py output/local/pad-development.json --max-apcer 0.05 --minimum-per-class 20 --output output/local/pad-threshold.json
+.\.venv\Scripts\python scripts/evaluate_dataset.py path/to/pad-master.jsonl --split test --model assets/models/minifasnet_v2.onnx --threshold SELECTED_THRESHOLD --output output/local/pad-test.json
 ```
 
-The [evaluation protocol](docs/EVALUATION_PROTOCOL.md) defines the manifest, denominators, attack groups, nonresponses, and limits. The older `test_photo_spoof_simulation.py` remains a developer-fixture experiment. Its figures must not be presented as human live-versus-spoof accuracy.
+Replace `SELECTED_THRESHOLD` with the value in `pad-threshold.json`. Both commands use the same private master manifest, which includes development and test rows plus pseudonymous subject and attack-source groups; the loader rejects group overlap and out-of-folder paths. Keep the manifest private because it contains split linkage. The [evaluation protocol](docs/EVALUATION_PROTOCOL.md) defines the manifest, denominators, attack groups, nonresponses, and limits. The older `test_photo_spoof_simulation.py` remains a developer-fixture experiment. Its figures must not be presented as human live-versus-spoof accuracy.
 
 ## Build the native checkpoints
 
-The [native integration directory](integrations/native/README.md) contains small patches for exact official Android and desktop source commits, a shared Java ONNX engine, and platform-specific ISO decoding adapters. Apply them to a clean upstream checkout:
+The [native integration directory](integrations/native/README.md) contains small patches for exact official Android, camera-SBI, and desktop source commits, a shared Java ONNX engine, and platform-specific ISO decoding adapters. Apply them to a clean upstream checkout:
 
 ```powershell
 python scripts/prepare_native_clients.py desktop path/to/registration-client
 python scripts/prepare_native_clients.py android path/to/android-registration-client
 ```
 
-The desktop check runs before resident capture storage and operator/supervisor identity matching. Android checks before resident or operator-onboarding storage. Required active evidence is not connected to these adapters yet, so native operator/supervisor captures reject even when passive scores are high. The [native evidence report](integrations/native/validation.json) distinguishes actual upstream controller execution from live UI and physical attack testing.
+The Desktop and Android checkpoints run before capture storage or identity matching. Operator/supervisor paths require active evidence in the current source. The Android client attaches its cached resident/operator policy to face `CaptureRequest.customOpts`; the reference SBI parses the bounded action count, blink/turn pool, timeout and retry policy and passes them to its camera activity. These current Android/SBI edits apply to the pinned upstream commits, but need fresh APK builds and end-to-end verification. The [native evidence report](integrations/native/validation.json) separates retained build evidence from live UI and physical attack testing.
 
 ## API and local security
 
@@ -101,12 +109,15 @@ Audit logs omit image buffers and redact nested sensitive fields. Their hash cha
 ## Submission material
 
 - [Requirement matrix](docs/REQUIREMENTS_MATRIX.md), covering all mandatory, good-to-have, and bonus task groups.
+- [Evaluation scorecard](docs/EVALUATION_SCORECARD.md), mapping the official weighted rubric to retained evidence and remaining gaps.
 - [Technical design](docs/TECHNICAL_DESIGN.md), [sequence diagrams](docs/SEQUENCE_DIAGRAMS.md), and [native integration contract](docs/NATIVE_INTEGRATION.md).
 - [Pitch deck](pitch/index.html), a self-contained browser presentation with keyboard navigation.
 - [Demo script and submission checklist](docs/DEMO_AND_SUBMISSION.md).
+- [Native usability and accessibility study protocol](docs/USABILITY_STUDY.md); participant results are still required.
+- [Remaining acceptance work and time estimate](docs/REMAINING_WORK_PLAN.md).
 - Official problem statement, evaluation criteria, and submission guidelines PDFs in the repository root.
 
-The rubric assigns 40% to functionality, 40% to deliverable quality, 10% to user experience, and 10% to presentation. The highest-value remaining work is real native integration and representative attack testing. Winning probability cannot be inferred from unit-test counts.
+The rubric assigns 40% to functionality, 40% to deliverable quality, 10% to user experience, and 10% to presentation. Native source checkpoints and emulator evidence are present; the highest-value remaining work is live client/device validation and representative attack testing. See the [rubric evidence map](docs/EVALUATION_SCORECARD.md). Winning probability cannot be inferred from unit-test counts.
 
 ## Third-party assets
 

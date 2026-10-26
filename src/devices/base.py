@@ -13,6 +13,7 @@ from enum import Enum
 from typing import Optional, Generator, Tuple, Dict, Any, List
 import numpy as np
 import hashlib
+import secrets
 import time
 
 
@@ -185,7 +186,8 @@ class VendorL1Adapter(L1Device):
         self._is_streaming = False
         self._frame_count = 0
         self._tamper_compromised = False
-        self._secret_key = b"MOSIP_L1_VENDOR_SECURE_TOKEN_2026"
+        # Per-instance simulator key only. This must never be treated as a hardware key.
+        self._secret_key = secrets.token_bytes(32)
 
     def connect(self) -> bool:
         self._is_connected = True
@@ -232,6 +234,10 @@ class VendorL1Adapter(L1Device):
 
     def sign_biometric_data(self, data: bytes) -> bytes:
         """Simulates on-chip cryptographic signature generation using HMAC-SHA256."""
+        if not self._is_connected or self._tamper_compromised:
+            raise RuntimeError("Simulated L1 signing is unavailable while disconnected or tampered")
+        if not isinstance(data, bytes) or not data:
+            raise ValueError("Biometric data must be non-empty bytes")
         import hmac
         return hmac.new(self._secret_key, data, hashlib.sha256).digest()
 

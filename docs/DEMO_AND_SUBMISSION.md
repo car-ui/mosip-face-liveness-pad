@@ -13,16 +13,17 @@ The prototype can demonstrate local processing, policy enforcement, attack-fixtu
 
 Practice with the exact packaged code and chosen device. Pre-download dependencies, disconnect the network, rehearse pass/failure paths, and time the full recording. Avoid filming private IDs, tokens, credentials, or unconsented faces.
 
-## Mandatory submission artifacts
+## Mandatory and supporting submission artifacts
 
 - Complete, runnable source repository with accessible history and dependency instructions.
 - Stable working prototype/demo.
 - Pitch deck with problem, solution, stack, intended users, impact, and evidence limits.
+- Optional 2-5 minute video demo. The supplied guide does not mark it as mandatory, and no recording is currently included.
 - Usage and installation instructions.
 - API documentation where applicable.
 - Student college/university credentials through the organizer's private process. Never commit them here.
 
-The submission guide also lists optional video, mockups, architecture diagrams, sample test data, and test results. A script is not a recorded demo. A generated slide deck still needs team details and rehearsal.
+The submission guide also lists mockups, architecture diagrams, sample test data, and test results as supporting artifacts. This repository contains architecture/sequence diagrams, sample fixtures and scenario-driven tests. A script is not a recorded demo. The pitch still needs the actual team name, member/institution details, and rehearsal.
 
 ## Before external submission
 
@@ -30,7 +31,7 @@ The submission guide also lists optional video, mockups, architecture diagrams, 
 - Run and record a consented, representative attack evaluation with fixed thresholds and separate test participants.
 - Retain the NASA fixture attribution, official landmark/model provenance, runtime notices and upstream client licenses. Review the reference SBI's inherited bundled JAR terms before distributing its APK.
 - Verify a clean extraction/install, model checksums, Python tests, Java checks, and CI results for the submitted commit.
-- Record a 2-5 minute demo if submitting video. Play the full export, inspect its start/end, and check that captions and any links work.
+- If submitting a 2-5 minute demo, play the full export, inspect its start/end, and check that captions and links work. Use a consented subject for live actions; label simulator and fixture footage clearly.
 - Add the actual team name/members and institution details to the final private submission material.
 - Make the source and artifact URLs accessible to the jury, then verify them in a signed-out session.
 

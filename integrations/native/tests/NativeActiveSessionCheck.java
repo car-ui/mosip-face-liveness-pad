@@ -15,8 +15,11 @@ public final class NativeActiveSessionCheck {
             this(origin, 10000, 2, 2);
         }
         Fixture(long origin, long timeout, int count, int retries) {
+            this(origin,timeout,count,retries,java.util.EnumSet.allOf(NativePadPolicy.ChallengeType.class));
+        }
+        Fixture(long origin, long timeout, int count, int retries,java.util.Set<NativePadPolicy.ChallengeType> types) {
             clock = new AtomicLong(origin);
-            session = new NativeActiveSession(timeout, count, retries, clock::get, new SecureRandom() {
+            session = new NativeActiveSession(timeout, count, retries, types, clock::get, new SecureRandom() {
                 public boolean nextBoolean() { return true; }
             });
         }
@@ -32,7 +35,14 @@ public final class NativeActiveSessionCheck {
             for (int i=0; i<session.requiredActions(); i++) {
                 if (i>0) neutral(3);
                 neutral(20);
-                for(int j=0;j<3;j++) frame(i%2==0 ? .1 : .3,i%2==0 ? 0 : -.4);
+                String instruction=session.prompt();
+                if(session.state()!=NativeActiveSession.State.VERIFYING)return;
+                double ear,turn;
+                if(instruction.startsWith("Blink once")) {ear=.1;turn=0;}
+                else if(instruction.startsWith("Move your nose toward the left")) {ear=.3;turn=-.4;}
+                else if(instruction.startsWith("Move your nose toward the right")) {ear=.3;turn=.4;}
+                else throw new AssertionError("No active action prompt after preparation: "+instruction);
+                for(int j=0;j<3;j++)frame(ear,turn);
                 neutral(2);
             }
         }
@@ -66,6 +76,14 @@ public final class NativeActiveSessionCheck {
             require(configured.session.completedActions()==count && configured.session.consume(JPEG),
                     "Configured sequence did not require and complete every action");
         }
+        for(NativePadPolicy.ChallengeType type:NativePadPolicy.ChallengeType.values()) {
+            Fixture pool=new Fixture(0,60000,2,2,java.util.EnumSet.of(type));pool.complete();
+            NativeActiveSession.Attestation claims=pool.session.consumeAndAttest(JPEG);
+            require(claims!=null && claims.actionCount==2,"Single-type challenge pool did not complete");
+            for(String action:claims.actionTypes())
+                require(type==NativePadPolicy.ChallengeType.BLINK ? "BLINK".equals(action) : action.startsWith("TURN_"),
+                        "Challenge escaped configured native action pool");
+        }
         Fixture noRetry=new Fixture(0,20000,2,0); noRetry.neutral(7); noRetry.session.invalidateFrame();
         require(noRetry.session.state()==NativeActiveSession.State.REJECTED,"Zero retry policy allowed recovery");
         Fixture oneRetry=new Fixture(0,20000,2,1); oneRetry.neutral(7); oneRetry.session.invalidateFrame();
@@ -78,8 +96,14 @@ public final class NativeActiveSessionCheck {
         require(budget.session.state()==NativeActiveSession.State.REJECTED,"Configured timeout ignored");
         Fixture accepted=new Fixture();accepted.complete();
         require(accepted.session.state()==NativeActiveSession.State.COMPLETE,"Action sequence did not complete");
-        require(accepted.session.consume(JPEG),"Exact frame was not consumable");
-        require(!accepted.session.consume(JPEG),"Evidence reused");
+        NativeActiveSession.Attestation attestation=accepted.session.consumeAndAttest(JPEG);
+        require(attestation!=null,"Exact frame was not consumable");
+        require(attestation.actionCount==2 && attestation.sessionTimeoutMillis==10000
+                && attestation.retryLimit==2 && attestation.retriesUsed==0
+                && attestation.sessionStartedAtMillis>0
+                && attestation.completedAtMillis>=attestation.sessionStartedAtMillis,
+                "Consumed proof lost its immutable session policy claims");
+        require(accepted.session.consumeAndAttest(JPEG)==null,"Evidence reused");
         require(accepted.session.completedActions()==2,"Completed action count lost");
         Fixture reading=new Fixture();reading.neutral(7);
         for(int i=0;i<3;i++)reading.frame(.1,0);

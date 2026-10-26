@@ -2,6 +2,7 @@
 import argparse
 from collections import defaultdict
 import json
+import math
 from pathlib import Path
 import sys
 import time
@@ -11,7 +12,9 @@ import cv2
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.core.face_detector import FaceQualityAssessor
 from src.core.passive_pad import PassivePADDetector
-from src.core.config import PADMode, PADVerdict
+from src.core.config import (PADMode, PADVerdict, MIN_PASSIVE_THRESHOLD,
+                             MAX_PASSIVE_THRESHOLD)
+from scripts.pad_manifest import load_private_manifest, ManifestError, SPLIT_AUDIT
 
 
 def summarize(rows):
@@ -28,28 +31,44 @@ def summarize(rows):
     return groups
 
 
+def validate_threshold(threshold):
+    """Require an operating point accepted by both API and native policies."""
+    if (isinstance(threshold, bool) or not isinstance(threshold, (int, float))
+            or not math.isfinite(threshold)
+            or not MIN_PASSIVE_THRESHOLD <= threshold <= MAX_PASSIVE_THRESHOLD):
+        raise ValueError("Threshold must be within the supported range {:.2f}..{:.2f}".format(
+            MIN_PASSIVE_THRESHOLD, MAX_PASSIVE_THRESHOLD))
+    return float(threshold)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("manifest", type=Path, help="JSONL rows: path, label attack|bona_fide, pai, split=test")
+    parser.add_argument("manifest", type=Path, help="Private master JSONL: path, label, split, subject_group; attacks also require pai and attack_source_group")
     parser.add_argument("--model", required=True)
     parser.add_argument("--threshold", type=float, default=.82)
     parser.add_argument("--frames", type=int, default=60)
+    parser.add_argument("--split", choices=("development", "test"), default="test",
+                        help="Evaluate exactly this manifest split; use development reports only for calibration")
     parser.add_argument("--output", type=Path, default=Path("output/local/dataset-evaluation.json"))
     args = parser.parse_args()
-    if not 0 < args.threshold < 1 or args.frames < 1:
-        parser.error("Threshold must be 0..1 and frame count must be positive")
+    try:
+        args.threshold = validate_threshold(args.threshold)
+    except ValueError as failure:
+        parser.error(str(failure))
+    if args.frames < 1:
+        parser.error("Frame count must be positive")
     detector = PassivePADDetector(args.model, mode=PADMode.ONNX_ONLY, high_confidence_threshold=args.threshold)
     if not detector._onnx_backend.is_available():
         parser.error("A compatible ONNX model and manifest are required")
     quality = FaceQualityAssessor()
+    try:
+        manifest_rows = load_private_manifest(args.manifest)
+    except (OSError, UnicodeDecodeError, ManifestError) as failure:
+        parser.error(str(failure))
+    selected_entries = [entry for entry in manifest_rows if entry["split"] == args.split]
     rows, latencies = [], []
-    for line in args.manifest.read_text(encoding="utf-8").splitlines():
-        entry = json.loads(line)
-        if entry.get("split") != "test" or entry.get("label") not in ("attack", "bona_fide"):
-            parser.error("Use test-only rows with an explicit attack or bona_fide label")
-        if entry["label"] == "attack" and not entry.get("pai"):
-            parser.error("Attack rows require a presentation attack instrument group, pai")
-        cap = cv2.VideoCapture(str(args.manifest.parent / entry["path"]))
+    for entry in selected_entries:
+        cap = cv2.VideoCapture(str(entry["path"]))
         scores = []
         try:
             for _ in range(args.frames):
@@ -66,9 +85,11 @@ def main():
                 latencies.append((time.perf_counter() - start) * 1000)
         finally:
             cap.release()
-        rows.append({"label": entry["label"], "pai": entry.get("pai", "bona_fide"),
+        mean_score = float(np.mean(scores)) if scores else None
+        rows.append({"label": entry["label"], "pai": entry["pai"],
                      "validFrames": len(scores),
-                     "accepted": bool(np.mean(scores) >= args.threshold) if scores else None})
+                     "meanLiveScore": mean_score,
+                     "accepted": bool(mean_score >= args.threshold) if mean_score is not None else None})
     if not rows:
         parser.error("The manifest contains no clips")
     by_pai = defaultdict(list)
@@ -76,8 +97,11 @@ def main():
         if row["label"] == "attack":
             by_pai[row["pai"]].append(row)
     report = {"scope": "Passive model only. Mean valid-frame score per clip. Not ISO certification or active workflow accuracy.",
+              "dataSplit": args.split,
+              "splitAudit": SPLIT_AUDIT,
               "nonResponsePolicy": "Clips without valid frames excluded from APCER/BPCER and counted separately.",
-              "threshold": args.threshold, "modelHash": detector._onnx_backend.get_metadata().model_hash,
+              "threshold": args.threshold, "framesPerClipLimit": args.frames,
+              "modelHash": detector._onnx_backend.get_metadata().model_hash,
               "countsAndRates": summarize(rows),
               "attackGroups": {k: summarize(v) for k, v in by_pai.items()},
               "frameLatencyMs": {"p50": float(np.median(latencies)), "p95": float(np.percentile(latencies, 95))} if latencies else None,

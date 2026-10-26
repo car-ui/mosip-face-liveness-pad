@@ -74,10 +74,17 @@ public final class AndroidPadCheckpoint {
             if (!decision.accepted) {
                 if(!"ACTIVE_CHALLENGE_REQUIRED".equals(decision.reason))
                     throw new IOException("PAD rejected face capture: " + decision.reason);
+            }
+            if(requiresActiveEvidence(policy,decision)) {
                 AndroidActiveEvidence.verifyAndConsume(context,biometrics.get(0),iso,transactionId,policy);
             }
         } catch (IOException e) { throw e; }
         catch (Exception | LinkageError e) { throw new IOException("PAD unavailable; face capture rejected", e); }
         finally { if (bitmap != null) bitmap.recycle(); if (rgba != null) rgba.release(); if (bgr != null) bgr.release(); }
+    }
+
+    static boolean requiresActiveEvidence(NativePadPolicy policy,NativePadEngine.Decision decision) {
+        return policy!=null && (policy.activeRequired
+                || (decision!=null && "ACTIVE_CHALLENGE_REQUIRED".equals(decision.reason)));
     }
 }

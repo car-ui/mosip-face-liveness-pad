@@ -1,0 +1,96 @@
+{
+  "status": "PASS",
+  "platform": "desktop",
+  "upstreamCommit": "935306e2fd38bff2803697468e595026b1d18cec",
+  "patchPresent": true,
+  "filesChecked": 21,
+  "mismatches": [],
+  "fingerprints": [
+    {
+      "path": "registration/registration-client/src/main/java/io/mosip/facepad/BoundedImage.java",
+      "sha256": "5fc9fa3aaaccf83b4803ffff3be590c7ba56c395c787f6eed70f635885383c31"
+    },
+    {
+      "path": "registration/registration-client/src/main/java/io/mosip/facepad/BoundedMjpegReader.java",
+      "sha256": "de9bb3189a4b9baa187920e25a9647c1c9065d14361480f0701a74a0a798e5d0"
+    },
+    {
+      "path": "registration/registration-client/src/main/java/io/mosip/facepad/NativeActiveSession.java",
+      "sha256": "1620ec35d52b41892cffded49f29e19b0fdc72201739c8e16bbcc4d5f083a937"
+    },
+    {
+      "path": "registration/registration-client/src/main/java/io/mosip/facepad/NativeFrameChallenge.java",
+      "sha256": "c873da1fa0dd71dd8e9f45c956a9c7f76dd2336bf28491e2c4126d65ae63b293"
+    },
+    {
+      "path": "registration/registration-client/src/main/java/io/mosip/facepad/NativeLandmarkEngine.java",
+      "sha256": "928b394f9506946b0dd644914f236d005045f6ec7b7e06314b769df4166d599d"
+    },
+    {
+      "path": "registration/registration-client/src/main/java/io/mosip/facepad/NativePadEngine.java",
+      "sha256": "a9af7387b058a552d2e61aaff628aa5bda0358696ff4b0015cc55f241f3f0905"
+    },
+    {
+      "path": "registration/registration-client/src/main/java/io/mosip/facepad/NativePadPolicy.java",
+      "sha256": "bcc98f49d8c237c4ab6cfde71d32eebfd18aebc1aece8fe7517ef69f64d9d560"
+    },
+    {
+      "path": "registration/registration-client/src/main/java/io/mosip/facepad/NativeYuNet.java",
+      "sha256": "64d7c646530ec8e500a1f6dff9be73bb82400ff0026152fbbdc78be7d635dc06"
+    },
+    {
+      "path": "registration/registration-client/src/main/java/io/mosip/facepad/DesktopPadCheckpoint.java",
+      "sha256": "e41b1fb84c1601b4d7ebd425daf744380679c20bce9c9af78895c968a5e12dff"
+    },
+    {
+      "path": "registration/registration-client/src/main/resources/facepad/minifasnet_v2.onnx",
+      "sha256": "5281b4a621b1a2a7570d88bc3a37ac5273ab3082b61d1e284b9847660909cbef"
+    },
+    {
+      "path": "registration/registration-client/src/main/resources/facepad/minifasnet_v2.onnx.json",
+      "sha256": "44eb32abc96706f2996838995417832f3c3ca62558c782b628bc2ec52021cd81"
+    },
+    {
+      "path": "registration/registration-client/src/main/resources/facepad/facemesh_v2.onnx",
+      "sha256": "09c96e67163c660431d37eccc24d40172e514fe4f5768ebf507941e3cb9e3bfb"
+    },
+    {
+      "path": "registration/registration-client/src/main/resources/facepad/facemesh_v2.onnx.json",
+      "sha256": "8039df9c70d5df9ffe35d629e82784d775c536872943856608a23d61027ede14"
+    },
+    {
+      "path": "registration/registration-client/src/main/resources/facepad/face_detection_yunet_2023mar.onnx",
+      "sha256": "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4"
+    },
+    {
+      "path": "registration/registration-client/src/main/resources/facepad/face_detection_yunet_2023mar.onnx.json",
+      "sha256": "65e59b154ca6d20a9614bc46c37cff7caa54dfd12e40ae87d56558cec7d28873"
+    },
+    {
+      "path": "registration/registration-client/src/main/resources/facepad/MODEL-LICENSE.txt",
+      "sha256": "daf94bf1dc9cc5700fe5af2c7c0cbd1836e70d509ed78fd0bebef7432edee6fb"
+    },
+    {
+      "path": "registration/registration-client/src/main/resources/facepad/LANDMARK-MODEL-LICENSE.txt",
+      "sha256": "8707eef0533987efc5b155d64761eeb6e20793f50b9bd1a68dad1cf4719d0ed8"
+    },
+    {
+      "path": "registration/registration-client/src/main/resources/facepad/FACE-DETECTOR-LICENSE.txt",
+      "sha256": "c83b8120c50ccbd4c4f96edf53141bdd566ebb8f8e9227e415326aa1b1aba958"
+    },
+    {
+      "path": "registration/registration-client/src/main/resources/facepad/ONNX-Runtime-LICENSE.txt",
+      "sha256": "2f07c72751aed99790b8a4869cf2311df85a860b22ded05fa22803587a48922c"
+    },
+    {
+      "path": "registration/registration-client/src/main/resources/facepad/OpenCV-LICENSE.txt",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "registration/registration-client/src/main/resources/facepad/haarcascade_frontalface_default.xml",
+      "sha256": "0f7d4527844eb514d4a4948e822da90fbb16a34a0bbbbc6adc6498747a5aafb0"
+    }
+  ],
+  "textLineEndings": "LF",
+  "scope": "Prepared generated source/assets and patch hunks. Not a build, full upstream-content attestation or physical validation."
+}

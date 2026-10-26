@@ -19,6 +19,7 @@ import io.mosip.facepad.CameraOwnedPadGate;
 import io.mosip.facepad.CameraActiveEvidence;
 import io.mosip.facepad.NativeActiveSession;
 import io.mosip.facepad.BoundedImage;
+import io.mosip.facepad.NativePadPolicy;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.util.*;
@@ -40,6 +41,21 @@ public final class NativePadCameraActivity extends AppCompatActivity {
     private volatile CameraCaptureSession capture;
     private volatile ImageReader reader;
     private volatile CameraOwnedPadGate gate;
+    private NativePadPolicy capturePolicy;
+    private int intExtra(String name,int fallback) throws IOException {
+        Bundle extras=getIntent().getExtras();
+        if(extras==null || !extras.containsKey(name))return fallback;
+        Object value=extras.get(name);
+        if(!(value instanceof Integer))throw new IOException("Invalid capture policy value");
+        return (Integer)value;
+    }
+    private String stringExtra(String name,String fallback) throws IOException {
+        Bundle extras=getIntent().getExtras();
+        if(extras==null || !extras.containsKey(name))return fallback;
+        Object value=extras.get(name);
+        if(!(value instanceof String))throw new IOException("Invalid capture policy value");
+        return (String)value;
+    }
     private ImageView preview;
     private TextView prompt;
     private Bitmap displayed;
@@ -49,15 +65,28 @@ public final class NativePadCameraActivity extends AppCompatActivity {
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
-        timeout = Math.max(1000, Math.min(60000, getIntent().getIntExtra("CaptureTimeout",30000)));
+        timeout = 30000;
         LinearLayout layout = new LinearLayout(this); layout.setOrientation(LinearLayout.VERTICAL);
         int padding=(int)(16*getResources().getDisplayMetrics().density);
         layout.setPadding(padding,padding,padding,padding);
         prompt=new TextView(this);prompt.setTextSize(20);prompt.setText("Preparing face check");
+        prompt.setMaxLines(4);prompt.setAccessibilityLiveRegion(android.view.View.ACCESSIBILITY_LIVE_REGION_POLITE);
         preview=new ImageView(this);preview.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        preview.setContentDescription("Live camera preview. Keep your face centered and follow the instruction.");
         Button cancel=new Button(this);cancel.setText("Cancel");cancel.setOnClickListener(view -> fail(FaceCaptureResult.CAPTURE_CANCELLED,"Capture cancelled"));
         layout.addView(prompt);layout.addView(preview,new LinearLayout.LayoutParams(-1,0,1));layout.addView(cancel);
         setContentView(layout);
+        try {
+            timeout=Math.max(1000,Math.min(60000,intExtra("CaptureTimeout",30000)));
+            capturePolicy=NativePadPolicy.forCameraCapture(
+                intExtra("FacePadActionCount",2),
+                intExtra("FacePadTimeoutSeconds",20),
+                intExtra("FacePadMaxRetries",2),
+                stringExtra("FacePadChallengeTypes","blink,turn"));
+        } catch(IOException invalidPolicy) {
+            fail(FaceCaptureResult.CAPTURE_FAILED,"Face check settings are invalid");
+            return;
+        }
         ui.postDelayed(() -> fail(FaceCaptureResult.CAPTURE_TIMEOUT,"Face check timed out"),timeout);
         if(checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED)
             requestPermissions(new String[]{Manifest.permission.CAMERA},71);
@@ -78,7 +107,7 @@ public final class NativePadCameraActivity extends AppCompatActivity {
         worker=new HandlerThread("PAD_CAMERA");worker.start();background=new Handler(worker.getLooper());
         background.post(() -> {
             try {
-                gate=new CameraOwnedPadGate(this,timeout);
+                gate=new CameraOwnedPadGate(this,timeout,capturePolicy);
                 if(!running || finished.get())return;
                 CameraManager manager=(CameraManager)getSystemService(CAMERA_SERVICE);
                 String selected=null;
@@ -148,13 +177,14 @@ public final class NativePadCameraActivity extends AppCompatActivity {
                 int quality=frameQuality(jpeg);
                 int threshold=Math.max(0,Math.min(100,getIntent().getIntExtra("QualityThreshold",60)));
                 if(quality<threshold) { fail(FaceCaptureResult.CAPTURE_FAILED,"Image quality is too low. Try better light and keep still.");return; }
-                if(!gate.consume(jpeg))throw new IOException("Completed frame binding failed");
+                io.mosip.facepad.NativeActiveSession.Attestation attestation=gate.consumeAndAttest(jpeg);
+                if(attestation==null)throw new IOException("Completed frame binding failed");
                 BitmapFactory.Options dimensions=new BitmapFactory.Options();dimensions.inJustDecodeBounds=true;
                 BitmapFactory.decodeByteArray(jpeg,0,jpeg.length,dimensions);
                 byte[] iso=BioFace.generateFaceISO2011(jpeg,dimensions.outHeight,dimensions.outWidth,"00");
                 if(iso==null || !BioFace.isFaceISO2011Valid(iso))throw new IOException("ISO encoding failed");
                 if(iso.length>750*1024)throw new IOException("ISO capture exceeds safe activity-result size");
-                String evidence=CameraActiveEvidence.completed(iso,getIntent().getStringExtra("FacePadTransactionId"));
+                String evidence=CameraActiveEvidence.completed(iso,getIntent().getStringExtra("FacePadTransactionId"),attestation);
                 ui.post(() -> {
                     if(!running || !finished.compareAndSet(false,true))return;
                     Intent result=new Intent();result.putExtra("Status",FaceCaptureResult.CAPTURE_SUCCESS);
@@ -170,7 +200,8 @@ public final class NativePadCameraActivity extends AppCompatActivity {
                 ui.post(() -> {
                     try {
                         if(!running || finished.get())return;
-                        displayed=next;preview.setImageBitmap(next);prompt.setText(guidance);
+                        displayed=next;preview.setImageBitmap(next);
+                        if(!guidance.contentEquals(prompt.getText()))prompt.setText(guidance);
                     } finally { previewPending.set(false); }
                 });
             }

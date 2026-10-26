@@ -9,6 +9,10 @@ from enum import Enum
 from typing import List, Dict, Any, Optional
 
 
+MIN_PASSIVE_THRESHOLD = 0.46
+MAX_PASSIVE_THRESHOLD = 0.99
+
+
 class WorkflowType(str, Enum):
     RESIDENT_REGISTRATION = "RESIDENT_REGISTRATION"
     OPERATOR_AUTHENTICATION = "OPERATOR_AUTHENTICATION"

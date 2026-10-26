@@ -1,0 +1,30 @@
+{
+  "scope": "Capability contract only. Simulated adapters do not establish physical L1 or vendor interoperability.",
+  "valid": true,
+  "adapters": [
+    {
+      "device_id": "MOCK_L0_SIM_001",
+      "device_type": "MOCK_L0_SIMULATOR",
+      "valid": true,
+      "errors": []
+    },
+    {
+      "device_id": "WEBCAM_L0_0",
+      "device_type": "PHYSICAL_L0_WEBCAM",
+      "valid": true,
+      "errors": []
+    },
+    {
+      "device_id": "SIM-L1-A",
+      "device_type": "VENDOR_L1_ADAPTER",
+      "valid": true,
+      "errors": []
+    },
+    {
+      "device_id": "SIM-L1-B",
+      "device_type": "VENDOR_L1_ADAPTER",
+      "valid": true,
+      "errors": []
+    }
+  ]
+}

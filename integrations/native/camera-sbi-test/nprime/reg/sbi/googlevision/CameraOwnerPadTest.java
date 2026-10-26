@@ -12,6 +12,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 import io.mosip.facepad.CameraOwnedPadGate;
 import io.mosip.facepad.CameraActiveEvidence;
+import io.mosip.facepad.CameraEvidenceFixture;
 import io.mosip.facepad.NativePadEngine;
 import io.mosip.facepad.NativeLandmarkEngine;
 import org.json.JSONObject;
@@ -27,14 +28,28 @@ import org.junit.runner.RunWith;
 public class CameraOwnerPadTest {
     @Test public void activeMetadataBindsIsoModelsAndTransaction() throws Exception {
         byte[] iso=new byte[]{1,2,3};
-        JSONObject proof=new JSONObject(CameraActiveEvidence.completed(iso,"fixture-transaction"));
+        JSONObject proof=new JSONObject(CameraActiveEvidence.completed(iso,"fixture-transaction",CameraEvidenceFixture.completedSession()));
         assertEquals("fixture-transaction",proof.getString("transactionId"));
         assertEquals("039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81",proof.getString("isoSha256"));
         assertEquals(NativePadEngine.MODEL_SHA256,proof.getString("padModelSha256"));
         assertEquals(NativeLandmarkEngine.MODEL_SHA256,proof.getString("landmarkModelSha256"));
         assertEquals(2,proof.getInt("actionCount"));
+        assertEquals("BLINK",proof.getJSONArray("actionTypes").getString(0));
+        assertEquals("TURN_LEFT",proof.getJSONArray("actionTypes").getString(1));
         assertTrue(Math.abs(System.currentTimeMillis()-proof.getLong("completedAtMillis"))<2000);
-        try {CameraActiveEvidence.completed(iso,null);fail("Missing transaction accepted");}catch(IOException expected){}
+        assertTrue(proof.getLong("completedAtMillis")>=proof.getLong("sessionStartedAtMillis"));
+        assertEquals(20000,proof.getLong("sessionTimeoutMillis"));
+        assertEquals(2,proof.getInt("retryLimit"));assertEquals(0,proof.getInt("retriesUsed"));
+        try {CameraActiveEvidence.completed(iso,null,CameraEvidenceFixture.completedSession());fail("Missing transaction accepted");}catch(IOException expected){}
+        try {CameraActiveEvidence.completed(iso,"fixture-transaction",null);fail("Missing session attestation accepted");}catch(IOException expected){}
+        io.mosip.facepad.NativePadPolicy blinkPolicy=io.mosip.facepad.NativePadPolicy.forCameraCapture(3,30,1,"blink");
+        JSONObject configured=new JSONObject(CameraActiveEvidence.completed(iso,"configured-transaction",
+            CameraEvidenceFixture.completedSession(blinkPolicy)));
+        assertEquals(3,configured.getInt("actionCount"));
+        assertEquals(1,configured.getInt("retryLimit"));
+        assertEquals(30000,configured.getLong("sessionTimeoutMillis"));
+        for(int i=0;i<configured.getJSONArray("actionTypes").length();i++)
+            assertEquals("BLINK",configured.getJSONArray("actionTypes").getString(i));
     }
     private Context target() { return InstrumentationRegistry.getInstrumentation().getTargetContext(); }
     private byte[] portrait() throws Exception {

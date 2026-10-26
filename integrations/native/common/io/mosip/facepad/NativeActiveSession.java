@@ -2,6 +2,7 @@ package io.mosip.facepad;
 
 import java.security.MessageDigest;
 import java.security.SecureRandom;
+import java.util.Set;
 import java.util.function.LongSupplier;
 
 /** Session-bound action progression for trusted frame adapters and exact-image consumers. */
@@ -10,6 +11,8 @@ public final class NativeActiveSession {
     private enum Action { BLINK, TURN_IMAGE_LEFT, TURN_IMAGE_RIGHT }
     private final LongSupplier clock;
     private final long startedAt, timeoutNanos;
+    private final long startedAtMillis;
+    private final long timeoutMillis;
     private final Action[] actions;
     private final int maxRetries;
     private int retries;
@@ -18,6 +21,7 @@ public final class NativeActiveSession {
     private long lastSequence = -1, lastTime = -1, heldSince;
     private boolean observed;
     private long completedAt;
+    private long completedAtMillis;
     private long actionPromptAt;
     private byte[] candidateDigest;
     private int padStreak;
@@ -40,21 +44,34 @@ public final class NativeActiveSession {
 
     public NativeActiveSession(long timeoutMillis, NativePadPolicy policy) {
         this(Math.min(timeoutMillis, policy.timeoutSeconds * 1000L), policy.actionCount, policy.maxRetries,
-                System::nanoTime, new SecureRandom());
+                policy.challengeTypes, System::nanoTime, new SecureRandom());
     }
 
     NativeActiveSession(long timeoutMillis, int actionCount, int maxRetries, LongSupplier clock, SecureRandom random) {
+        this(timeoutMillis, actionCount, maxRetries, java.util.EnumSet.allOf(NativePadPolicy.ChallengeType.class), clock, random);
+    }
+
+    NativeActiveSession(long timeoutMillis, int actionCount, int maxRetries,
+            Set<NativePadPolicy.ChallengeType> challengeTypes, LongSupplier clock, SecureRandom random) {
         if (timeoutMillis < 1000 || timeoutMillis > 60000) throw new IllegalArgumentException("Invalid action timeout");
         if (actionCount < 1 || actionCount > 4 || maxRetries < 0 || maxRetries > 5)
             throw new IllegalArgumentException("Invalid action/retry count");
+        if (challengeTypes == null || challengeTypes.isEmpty()) throw new IllegalArgumentException("No active challenge types");
         this.clock = clock;
         this.maxRetries = maxRetries;
         startedAt = clock.getAsLong();
+        startedAtMillis = System.currentTimeMillis();
+        this.timeoutMillis = timeoutMillis;
         timeoutNanos = timeoutMillis * 1_000_000L;
         Action turn = random.nextBoolean() ? Action.TURN_IMAGE_LEFT : Action.TURN_IMAGE_RIGHT;
         boolean blinkFirst = random.nextBoolean();
         actions = new Action[actionCount];
-        for (int i = 0; i < actionCount; i++) actions[i] = ((i % 2 == 0) == blinkFirst) ? Action.BLINK : turn;
+        boolean allowBlink = challengeTypes.contains(NativePadPolicy.ChallengeType.BLINK);
+        boolean allowTurn = challengeTypes.contains(NativePadPolicy.ChallengeType.TURN);
+        for (int i = 0; i < actionCount; i++) {
+            actions[i] = allowBlink && allowTurn ? (((i % 2 == 0) == blinkFirst) ? Action.BLINK : turn)
+                    : allowBlink ? Action.BLINK : turn;
+        }
     }
 
     public synchronized State state() {
@@ -67,6 +84,26 @@ public final class NativeActiveSession {
 
     public int requiredActions() { return actions.length; }
     public synchronized int retriesUsed() { return retries; }
+    public long startedAtMillis() { return startedAtMillis; }
+    public long timeoutMillis() { return timeoutMillis; }
+
+    /** Immutable claims minted only after exact-frame proof consumption. */
+    public static final class Attestation {
+        public final long sessionStartedAtMillis, completedAtMillis, sessionTimeoutMillis;
+        public final int actionCount, retryLimit, retriesUsed;
+        private final String[] actions;
+
+        private Attestation(long started, long completed, long timeout, Action[] actions, int retryLimit, int retries) {
+            sessionStartedAtMillis = started; completedAtMillis = completed; sessionTimeoutMillis = timeout;
+            actionCount = actions.length; this.retryLimit = retryLimit; retriesUsed = retries;
+            this.actions = new String[actions.length];
+            for (int i = 0; i < actions.length; i++) {
+                this.actions[i] = actions[i] == Action.BLINK ? "BLINK"
+                        : actions[i] == Action.TURN_IMAGE_LEFT ? "TURN_LEFT" : "TURN_RIGHT";
+            }
+        }
+        public String[] actionTypes() { return actions.clone(); }
+    }
 
     public synchronized String prompt() {
         expire();
@@ -139,6 +176,7 @@ public final class NativeActiveSession {
                     return reject();
                 candidateDigest = MessageDigest.getInstance("SHA-256").digest(exactFrameJpeg);
                 completedAt = now;
+                completedAtMillis = System.currentTimeMillis();
                 state = State.COMPLETE;
             }
         }
@@ -192,12 +230,18 @@ public final class NativeActiveSession {
     }
     /** One use, exact JPEG bytes, before expiry. No similarity or user-supplied verdict. */
     public synchronized boolean consume(byte[] exactFrameJpeg) throws Exception {
+        return consumeAndAttest(exactFrameJpeg) != null;
+    }
+
+    /** One-use exact-frame consumption and immutable session claims for the signed SBI result. */
+    public synchronized Attestation consumeAndAttest(byte[] exactFrameJpeg) throws Exception {
         expire();
-        if (state != State.COMPLETE) return false;
+        if (state != State.COMPLETE) return null;
         boolean matches = exactFrameJpeg != null && MessageDigest.isEqual(candidateDigest,
                 MessageDigest.getInstance("SHA-256").digest(exactFrameJpeg));
         state = matches ? State.CONSUMED : State.REJECTED;
         candidateDigest = null;
-        return matches;
+        return matches ? new Attestation(startedAtMillis, completedAtMillis, timeoutMillis,
+                actions, maxRetries, retries) : null;
     }
 }
